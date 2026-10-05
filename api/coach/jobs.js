@@ -488,7 +488,10 @@ export async function testRun() {
 // inline in the request rather than through the queue: seconds, not minutes, and nothing to
 // keep once the answer is back.
 export const FOOD_DAILY = Math.max(1, +process.env.COACH_FOOD_DAILY || 40);
-const FOOD_TIMEOUT_MS = 120000;
+// One deadline for the whole lookup, retries included, under the client's own (130 s): a client
+// that has given up must not leave the server still calling — and still spending.
+const FOOD_DEADLINE_MS = 110000;
+const foodInflight = new Set();     // one lookup per profile at a time
 
 function bumpFoodDaily(uid) {
   const rec = readUser(uid);
@@ -508,16 +511,19 @@ const webSearchOn = () => !/^(0|false|no|off)$/i.test(process.env.COACH_FOOD_WEB
 
 /**
  * Look a food up with the configured provider. Throws CoachError like enqueue does (`off`,
- * `shared`, `cap`, `unprivileged`); otherwise resolves to { ok: true, food, web } |
- * { ok: true, found: false, note } | { ok: false, errorClass, detail }.
+ * `consent`, `busy`, `shared`, `cap`, `unprivileged`); otherwise resolves to
+ * { ok: true, food, web } | { ok: true, found: false, note } | { ok: false, errorClass, detail }.
  *
- * What is sent is the query and the language and nothing else, so this does not wait on the
- * training-data consent that the plan jobs need — there is no training data in it.
+ * What is sent is the query and the language and nothing else. It still needs the Coach's
+ * consent: that screen is where a person is told whose account pays, and a lookup spends — and,
+ * on a personal credential, binds — that account the same way a plan job does.
  */
-export async function foodLookup(uid, { query, lang } = {}) {
+export async function foodLookup(uid, { query, lang, signal } = {}) {
   if (!cfgStore.isEnabled() || !cfgStore.isConnected()) throw new CoachError('off', 'the Coach is not set up on this instance');
   const q = cleanQuery(query);
   if (q.length < 2) return { ok: false, errorClass: 'empty' };
+  if (!readState(uid)?.coach?.consent?.agreedAt) throw new CoachError('consent', 'the Coach needs your go-ahead first');
+  if (foodInflight.has(uid)) throw new CoachError('busy', 'a food lookup is already running');
   const cred = cfgStore.credentialFor(uid);
   if (!cred.ok) {
     if (cred.reason === 'shared-account') throw new CoachError('shared', cred.message);
@@ -530,18 +536,29 @@ export async function foodLookup(uid, { query, lang } = {}) {
     const priv = canDropPrivileges();
     if (!priv.ok) throw new CoachError('unprivileged', `Coach jobs are disabled: ${priv.why}`);
   }
+  // The instance-wide cap is the owner's bound on what everyone together can spend, so a lookup
+  // counts against it like any job; the per-profile budget is the lookups' own.
+  const caps = cfg.caps || {};
+  if (caps.instanceDaily > 0 && instanceUsedToday() >= caps.instanceDaily) throw new CoachError('cap', 'this instance has reached its daily limit');
   if (!bumpFoodDaily(uid)) throw new CoachError('cap', 'daily food lookup limit reached');
+  bumpInstanceDaily();
   cfgStore.bindInstanceCredential(uid);
+  foodInflight.add(uid);
 
   const parts = buildFoodPrompt(q, payloadLib.langTag(lang) || 'en');
-  const jobDir = adapter.spawns === false ? null : fs.mkdtempSync(path.join(os.tmpdir(), 'coach-food-'));
-  const started = Date.now();
+  let jobDir = null;
+  const deadline = Date.now() + FOOD_DEADLINE_MS;
+  const ctl = new AbortController();
+  const onOuter = () => ctl.abort();
+  if (signal) signal.addEventListener('abort', onOuter, { once: true });
+  const timer = setTimeout(() => ctl.abort(), FOOD_DEADLINE_MS);
   try {
+    if (adapter.spawns !== false) jobDir = fs.mkdtempSync(path.join(os.tmpdir(), 'coach-food-'));
     const env = cfgStore.jobEnv(jobDir || os.tmpdir(), cred);
     const ids = jobDir && unprivilegedIds();
     if (ids) shareJobDir(jobDir, ids);
     const base = {
-      cfg, jobDir, env, model: cfgStore.modelFor(cfg), timeoutMs: FOOD_TIMEOUT_MS, fetch: fetchFor(FOOD_TIMEOUT_MS),
+      cfg, jobDir, env, model: cfgStore.modelFor(cfg), timeoutMs: FOOD_DEADLINE_MS, fetch: fetchFor(FOOD_DEADLINE_MS), signal: ctl.signal,
       ...(adapter.spawns === false
         ? { prompt: parts.user, system: parts.system, schema: FOOD_SCHEMA }
         : { prompt: parts.system + '\n\n---\n\n' + parts.user })
@@ -549,9 +566,11 @@ export async function foodLookup(uid, { query, lang } = {}) {
     const web = cfg.provider === 'anthropic' && webSearchOn();
     let r = await adapter.invoke(web ? { ...base, tools: WEB_SEARCH } : base);
     let usedWeb = web;
-    // A 400 about the tool (not enabled for the organisation, not offered for the model): once more without it.
-    if (web && r.code !== 0 && !r.timedOut && /\b400\b|tool|web_search/i.test(r.stderr || '')) {
-      r = await adapter.invoke(base);
+    // Refused because of the tool (a 400 that names it: not enabled for the organisation, not
+    // offered for the model) or a search turn that paused: once more without it, if time is left.
+    const toolTrouble = e => (/\b400\b/.test(e) && /tool|web_search/i.test(e)) || /pause_turn/.test(e);
+    if (web && r.code !== 0 && !r.timedOut && toolTrouble(r.stderr || '') && deadline - Date.now() > 15000 && !ctl.signal.aborted) {
+      r = await adapter.invoke({ ...base, timeoutMs: deadline - Date.now() });
       usedWeb = false;
     }
     if (r.timedOut) return { ok: false, errorClass: 'timeout' };
@@ -562,11 +581,13 @@ export async function foodLookup(uid, { query, lang } = {}) {
     }
     const parsed = extractJSON(r.text);
     const checked = parsed.error ? { ok: false, errors: [parsed.error] } : validateFood(parsed.value);
-    cfgStore.logJob({ at: Date.now(), kind: 'food', trigger: 'manual', outcome: checked.ok ? 'ready' : 'failed', errorClass: checked.ok ? null : 'unusable', ms: Date.now() - started });
     if (!checked.ok) return { ok: false, errorClass: 'unusable', detail: checked.errors.join('; ').slice(0, 300) };
     if (checked.found === false) return { ok: true, found: false, note: checked.note };
     return { ok: true, food: checked.food, web: usedWeb };
   } finally {
+    clearTimeout(timer);
+    if (signal) signal.removeEventListener('abort', onOuter);
+    foodInflight.delete(uid);
     if (jobDir) removeJobDir(jobDir, unprivilegedIds());
   }
 }

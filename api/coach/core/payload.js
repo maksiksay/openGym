@@ -437,10 +437,14 @@ export function healthSlice(S, from, to) {
     })
     .filter(o => Object.keys(o).length > 1)
     .sort((a, b) => (a.d < b.d ? -1 : 1));
+  // Food only while tracking is on, and only for days that are over: today's total is still
+  // growing, and read at lunchtime it would look like a deficit.
+  const tracking = S.nutri?.on === false ? 'off' : S.nutri?.paused ? 'paused' : 'on';
+  const today = iso(new Date());
   const byDay = new Map();
-  for (const m of list(S.meals)) {
+  for (const m of tracking === 'on' ? list(S.meals) : []) {
     const d = m && typeof m === 'object' ? day(m.d) : null;
-    if (!inside(d)) continue;
+    if (!inside(d) || d >= today) continue;
     const t = byDay.get(d) || { d, kcal: 0, p: 0, f: 0, c: 0 };
     for (const k of ['kcal', 'p', 'f', 'c']) { const x = bounded(m[k], 0, 20000); if (x !== undefined) t[k] += x; }
     byDay.set(d, t);
@@ -448,8 +452,7 @@ export function healthSlice(S, from, to) {
   const food = [...byDay.values()].sort((a, b) => (a.d < b.d ? -1 : 1))
     .map(t => ({ d: t.d, kcal: Math.round(t.kcal), p: Math.round(t.p), f: Math.round(t.f), c: Math.round(t.c) }));
   const g = S.nutri && typeof S.nutri === 'object' && S.nutri.goals && typeof S.nutri.goals === 'object' ? S.nutri.goals : null;
-  const goals = g ? Object.fromEntries(['kcal', 'p', 'f', 'c'].map(k => [k, bounded(g[k], 0, 20000) ?? null])) : null;
-  const tracking = S.nutri?.on === false ? 'off' : S.nutri?.paused ? 'paused' : 'on';
+  const goals = g && tracking === 'on' ? Object.fromEntries(['kcal', 'p', 'f', 'c'].map(k => [k, bounded(g[k], 0, 20000) ?? null])) : null;
   if (!days.length && !food.length) return null;
   return { from: start, to: to || null, days, food, goals, foodTracking: tracking };
 }

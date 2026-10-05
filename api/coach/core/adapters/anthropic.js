@@ -31,6 +31,9 @@ export const anthropicSpec = {
   }),
   errorMessage: data => data && data.error && data.error.message,
   readText: data => {
+    // A long server-tool turn can pause before the answer; the food lookup then asks again
+    // without the tool rather than reading half a turn.
+    if (data.stop_reason === 'pause_turn') return { error: 'pause_turn: the web_search turn did not finish' };
     if (data.stop_reason === 'refusal') return { error: 'the model declined this request' + (data.stop_details && data.stop_details.explanation ? ': ' + data.stop_details.explanation : '') };
     // A web search turn interleaves search blocks with text; the answer is the text after the
     // last search, so with tools only that is read — the earlier text is the model thinking aloud.

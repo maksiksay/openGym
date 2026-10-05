@@ -35,7 +35,7 @@ describe('reset', () => {
   it('names health days, meals and foods, and drops exactly those from a copy that missed it', () => {
     const before = base({ health: [{ d: '2026-10-01', t: 1, sleep: 7 }], meals: [{ id: 'm1', t: 1 }], foods: [{ id: 'f1', t: 1 }] })
     const ids = resetIdsOf(before)
-    expect(ids.health).toEqual(['2026-10-01'])
+    expect(ids.health).toEqual(['2026-10-01|1'])
     expect(ids.meals).toEqual(['m1'])
     const stale = base({ health: [...before.health, { d: '2026-10-02', t: 5, sleep: 6 }], meals: [...before.meals, { id: 'm2', t: 5 }], foods: before.foods })
     const kept = sinceReset(stale, 3, ids)
@@ -58,5 +58,14 @@ describe('change count', () => {
     const fp = syncFingerprint(S)
     const S2 = { ...S, meals: [{ id: 'm1' }, { id: 'm2' }], health: [{ d: '2026-10-05', sleep: 7 }] }
     expect(countChanges(S2, fp)).toBe(3)
+  })
+})
+
+describe('sign-in extras', () => {
+  it('counts meals, check-in days and foods the server lacks', async () => {
+    const { localExtras } = await import('./sync-merge.js')
+    const local = base({ meals: [{ id: 'a' }, { id: 'b' }], health: [{ d: 'x', t: 5 }, { d: 'y', t: 1 }], foods: [{ id: 'f' }] })
+    const server = base({ meals: [{ id: 'a' }], health: [{ d: 'x', t: 1 }, { d: 'y', t: 9 }] })
+    expect(localExtras(local, server)).toMatchObject({ meals: 1, health: 1, foods: 1 })
   })
 })

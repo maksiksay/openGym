@@ -17,6 +17,7 @@ describe('cleanCode', () => {
     expect(cleanCode(' 4810268 031012 ')).toBe('4810268031012')
     expect(cleanCode('12345')).toBeNull()
     expect(cleanCode('96385074')).toBe('96385074')
+    expect(cleanCode('036000291452')).toBe('0036000291452')     // UPC-A folds into its EAN-13
   })
 })
 

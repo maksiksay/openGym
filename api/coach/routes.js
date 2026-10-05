@@ -110,9 +110,12 @@ export function coachRoutes({ json, readBody, readSession, requireAdmin }) {
     'POST /api/coach/food': async (req, res) => {
       const user = guard(req, res); if (!user) return;
       const body = await readBody(req);
+      // A client that hangs up stops the provider call with it.
+      const ctl = new AbortController();
+      res.on('close', () => { if (!res.writableEnded) ctl.abort(); });
       try {
-        const r = await jobs.foodLookup(user.id, { query: body.query, lang: body.lang });
-        json(res, 200, r);
+        const r = await jobs.foodLookup(user.id, { query: body.query, lang: body.lang, signal: ctl.signal });
+        if (!res.writableEnded) json(res, 200, r);
       } catch (e) { failEnqueue(res, e); }
     },
 

@@ -222,7 +222,7 @@ const bodyweightKey = e => `${e?.d}|${e?.t ?? ''}`
 const RESET_LISTS = {
   workouts: workoutKey, routines: x => x?.id, customEx: x => x?.id, bodyweight: bodyweightKey,
   gymCards: x => x?.id, equipProfiles: x => x?.id, favEx: x => x,
-  health: x => x?.d, meals: x => x?.id, foods: x => x?.id,
+  health: x => `${x?.d}|${x?.t ?? ''}`, meals: x => x?.id, foods: x => x?.id,
 }
 const RESET_MAPS = ['exNotes', 'barWeights', 'balanceOverrides', 'loadKind', 'plates']
 /** An entry's name in resetIds: a workout's id (or day and start), a weigh-in's day and time, … */
@@ -493,12 +493,21 @@ export function localExtras(local, server) {
   const have = new Set(list(server?.workouts).map(workoutKey))
   const days = new Map(list(server?.bodyweight).filter(e => e && e.d != null).map(e => [e.d, e]))
   const ex = new Set(list(server?.customEx).map(e => e?.id))
+  const meals = new Set(list(server?.meals).map(m => m?.id))
+  const foods = new Set(list(server?.foods).map(f => f?.id))
+  const hdays = new Map(list(server?.health).filter(e => e && e.d != null).map(e => [e.d, e]))
   const from = unitOf(local), to = unitOf(server)
   const differs = (mine, theirs) =>
     (Number(mine.t) || 0) > (Number(theirs.t) || 0) && Number(convertBodyWeight(mine.w, from, to)) !== Number(theirs.w)
   return {
     workouts: list(local?.workouts).filter(w => !have.has(workoutKey(w))).length,
     bodyweight: list(local?.bodyweight).filter(e => e && e.d != null && (!days.has(e.d) || differs(e, days.get(e.d)))).length,
-    customEx: list(local?.customEx).filter(e => e && !ex.has(e.id)).length
+    customEx: list(local?.customEx).filter(e => e && !ex.has(e.id)).length,
+    // The health module's entries count the same way: a meal row by id, a check-in day the
+    // server lacks or has an older edit of. Without them a copy holding only food was taken for
+    // an empty one, and dropped without the question.
+    meals: list(local?.meals).filter(m => m && m.id != null && !meals.has(m.id)).length,
+    health: list(local?.health).filter(e => e && e.d != null && (!hdays.has(e.d) || (Number(e.t) || 0) > (Number(hdays.get(e.d).t) || 0))).length,
+    foods: list(local?.foods).filter(f => f && f.id != null && !foods.has(f.id)).length
   }
 }

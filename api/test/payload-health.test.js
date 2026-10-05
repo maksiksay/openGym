@@ -65,3 +65,24 @@ test('a paused tracker says so', () => {
   assert.equal(p.health.foodTracking, 'paused');
   assert.equal(p.health.goals, null);
 });
+
+test('with tracking off or paused, no food and no goals leave — only the check-ins', () => {
+  for (const nutri of [{ on: false, goals: { kcal: 2600 } }, { on: true, paused: true, goals: { kcal: 2600 } }]) {
+    const p = payload.build(withHealth({ nutri }), { handle: 'h'.repeat(16), kind: 'debrief', workoutId: 'w1' });
+    assert.deepEqual(p.health.food, []);
+    assert.equal(p.health.goals, null);
+    assert.ok(p.health.days.length > 0);
+  }
+});
+
+test('today\'s food is left out: the day is not over', () => {
+  const today = new Date().toISOString().slice(0, 10);
+  const S = withHealth({
+    workouts: [{ id: 'w2', d: today, name: 'Full body A', entries: [] }],
+    meals: [{ id: 'x', d: today, t: 1, kcal: 500, p: 20, f: 10, c: 60 }],
+    health: [{ d: today, t: 1, sleep: 7 }],
+  });
+  const p = payload.build(S, { handle: 'h'.repeat(16), kind: 'debrief', workoutId: 'w2' });
+  assert.deepEqual(p.health.food, []);
+  assert.equal(p.health.days[0].sleep, 7);
+});

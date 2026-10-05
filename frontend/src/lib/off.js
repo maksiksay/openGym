@@ -18,10 +18,15 @@ const TIMEOUT_MS = 12000
 const num = v => (v != null && v !== '' && Number.isFinite(Number(v)) ? Number(v) : null)
 const r1 = n => Math.round(n * 10) / 10
 
-/** A barcode as digits only; EAN-8, UPC-A/E, EAN-13 and GTIN-14 lengths. null otherwise. */
+/**
+ * A barcode as digits only — EAN-8, EAN-13, GTIN-14 — or null. A 12-digit UPC-A is the same
+ * product as the EAN-13 with a leading zero, which is how Open Food Facts stores it; folding it
+ * here lets a scanner that reports 12 digits find the food saved under 13.
+ */
 export function cleanCode(s) {
   const d = String(s || '').replace(/\D/g, '')
-  return [8, 12, 13, 14].includes(d.length) ? d : null
+  if (d.length === 12) return '0' + d
+  return [8, 13, 14].includes(d.length) ? d : null
 }
 
 /** The product's name in the UI language when OFF has one, else whatever it has. */

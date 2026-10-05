@@ -59,14 +59,18 @@ function Scale5({ field, value, onChange }) {
 function CheckInSheet({ d, close }) {
   const st = useStore(s => s.S)
   const cur = healthOn(st.health, d) || {}
-  const [v, setV] = useState(() => ({
-    sleep: cur.sleep ?? 7.5, sq: cur.sq ?? null, energy: cur.energy ?? null, stress: cur.stress ?? null,
+  const initial = useMemo(() => ({
+    sleep: cur.sleep ?? null, sq: cur.sq ?? null, energy: cur.energy ?? null, stress: cur.stress ?? null,
     steps: cur.steps ?? null, waist: cur.waist ?? null, note: cur.note ?? '',
-  }))
+  }), [])   // eslint-disable-line react-hooks/exhaustive-deps -- the day as the sheet opened on it
+  const [v, setV] = useState(initial)
   const [more, setMore] = useState(cur.steps != null || cur.waist != null || !!cur.note)
   const set = (k, x) => setV(o => ({ ...o, [k]: x }))
+  // Only what was touched is written: an untouched field keeps whatever the other device or the
+  // last edit put there, and nothing the person did not enter is stored as if they had.
   const save = () => {
-    update(s => { setHealth(s, d, v) })
+    const patch = Object.fromEntries(Object.entries(v).filter(([k, x]) => (x ?? '') !== (initial[k] ?? '')))
+    if (Object.keys(patch).length) update(s => { setHealth(s, d, patch) })
     close()
     toast(th('Saved'))
   }
@@ -76,7 +80,12 @@ function CheckInSheet({ d, close }) {
     <div className="muted small" style={{ marginBottom: 12 }}>{th('A few taps — a week of these says more than any one night.')}</div>
 
     <h4 className="sec">{th('Sleep last night')}</h4>
-    <Stepper value={v.sleep} step={0.5} min={0} max={16} unit={th('h')} onChange={x => set('sleep', x)} />
+    {v.sleep == null
+      ? <Button icon="moon" onClick={() => set('sleep', 7.5)}>{th('Enter hours slept')}</Button>
+      : <div className="row" style={{ gap: 8 }}>
+          <div style={{ flex: 1 }}><Stepper value={v.sleep} step={0.5} min={0} max={16} unit={th('h')} onChange={x => set('sleep', x)} /></div>
+          <button className="iconbtn" aria-label={th('Clear')} onClick={() => set('sleep', null)}><Icon name="xmark" /></button>
+        </div>}
     <h4 className="sec">{th('Sleep quality')}</h4>
     <Scale5 field="sq" value={v.sq} onChange={x => set('sq', x)} />
     <h4 className="sec">{th('Energy')}</h4>
@@ -212,7 +221,9 @@ function AiFoodSection({ q, onPick }) {
       if (r?.ok && r.food) setSt({ state: 'done', food: r.food, web: !!r.web })
       else if (r?.ok && r.found === false) setSt({ state: 'none', note: r.note })
       else setSt({ state: 'error', code: r?.errorClass })
-    } catch (e) { setSt({ state: 'error', msg: e?.data?.error || e?.message }) }
+    } catch (e) {
+      setSt({ state: 'error', msg: e?.data?.code === 'consent' ? th('Open Plan → Coach once and agree to it — then the AI can look foods up.') : (e?.data?.error || e?.message) })
+    }
   }
   return <>
     <h4 className="sec">{th('AI search')}</h4>
@@ -243,7 +254,9 @@ export const addFoodSheet = (opts = {}) => ui().openSheet(close => <AddFoodSheet
 // time it is a local, offline pick. Returns the stored food.
 function keepOffFood(s, f) {
   s.foods = Array.isArray(s.foods) ? s.foods : []
-  const have = f.code && s.foods.find(x => x.code === f.code)
+  const have = f.code
+    ? s.foods.find(x => x.code === f.code)
+    : s.foods.find(x => x.src === 'off' && !x.code && x.name === f.name && (x.brand || '') === (f.brand || ''))
   if (have) return have
   const food = { id: uid(), t: Date.now(), name: f.name, ...(f.brand ? { brand: f.brand } : {}), ...(f.code ? { code: f.code } : {}),
     kcal: f.kcal, p: f.p, f: f.f, c: f.c, ...(f.srv ? { srv: f.srv } : {}), src: 'off' }
@@ -307,7 +320,8 @@ function FoodFormSheet({ initial = {}, note, onSaved, close }) {
       if (f.brand.trim()) row.brand = f.brand.trim().slice(0, 60); else delete row.brand
       const code = cleanCode(f.code); if (code) row.code = code; else delete row.code
       if (f.srv > 0) row.srv = Math.round(f.srv); else delete row.srv
-      if (existing) Object.assign(existing, row); else s.foods.push(row)
+      // Replaced, not merged into: a brand or barcode cleared in the form has to be gone.
+      if (existing) s.foods = s.foods.map(x => (x === existing ? row : x)); else s.foods.push(row)
       saved = { ...row }
     })
     close()
@@ -415,6 +429,10 @@ function ProductScan({ onCode, close }) {
   const fileRef = useRef(null)
   const [error, setError] = useState(null)
   const [typed, setTyped] = useState('')
+  // The handler through a ref: the effect below owns the camera, and restarting it whenever the
+  // sheet re-renders (a toast, a timer tick) would blink the stream off and on.
+  const onCodeRef = useRef(onCode)
+  onCodeRef.current = onCode
   useEffect(() => {
     let stream = null, timer = null, done = false
     const stop = () => { done = true; if (timer) clearTimeout(timer); if (stream) stream.getTracks().forEach(tr => tr.stop()) }
@@ -433,14 +451,14 @@ function ProductScan({ onCode, close }) {
         if (v.readyState >= 2) {
           let code = null
           try { code = await decodeProductCode(v) } catch (e) { /* keep trying */ }
-          if (code && !done) { stop(); onCode(code); return }
+          if (code && !done) { stop(); onCodeRef.current(code); return }
         }
         timer = setTimeout(tick, 250)
       }
       tick()
     })()
     return stop
-  }, [onCode])
+  }, [])
   const onFile = async ev => {
     const file = ev.target.files?.[0]
     ev.target.value = ''
@@ -467,10 +485,11 @@ function ProductScan({ onCode, close }) {
 }
 
 export function barcodeSheet({ d, slot, onDone }) {
-  const h = ui().openSheet(close => <ProductScan close={close} onCode={async code => {
+  const h = ui().openSheet(close => <ProductScan close={close} onCode={async raw => {
+    const code = cleanCode(raw) || raw
     close()
     const st = useStore.getState().S
-    const own = (st.foods || []).find(f => f.code === code)
+    const own = (st.foods || []).find(f => f.code && cleanCode(f.code) === code)
     if (own) { portionSheet({ food: own, fid: 'o:' + own.id, src: own.src || 'own', d, slot, onDone }); return }
     toast(th('Looking up {0}…', code))
     let r

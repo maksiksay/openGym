@@ -10,6 +10,7 @@ import { PLATE_SIZES, pairsOf, ownsPlates, withPlatePairs, withStandardPlates, w
 import { toScale, rirOf, EFFORT_PRESETS, effortColor } from './lib/effort.js'
 import { beep, vibrate } from './lib/sound.js'
 import { t, dateLocale, instrFor, exerciseNameFor, exerciseNameClass, getLang, INSTR_LANGS } from './lib/i18n.js'
+import { th } from './lib/health-i18n.js'
 import { nav } from './lib/nav.js'
 import { buildStarterPlan, starterPlanDays, starterPlanOptions } from './lib/starter.js'
 import Media, { Thumb } from './components/Media.jsx'
@@ -86,7 +87,8 @@ export function addDeviceDataMessage(workouts, weighIns) {
 export function askAddDeviceData(extras) {
   return new Promise(resolve => confirmSheet({
     title: t('Add this device\'s workouts to your profile?'),
-    message: addDeviceDataMessage(extras.workouts, extras.bodyweight),
+    message: addDeviceDataMessage(extras.workouts, extras.bodyweight)
+      + (extras.meals || extras.health ? ' ' + th('Food entries on this device: {0}; check-in days: {1}.', extras.meals || 0, extras.health || 0) : ''),
     confirmText: t('Add them'), cancelText: t('Keep profile as is'),
     onConfirm: () => resolve(true), onCancel: () => resolve(false), locked: true
   }))

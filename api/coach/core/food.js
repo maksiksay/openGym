@@ -69,8 +69,11 @@ export function validateFood(v) {
   }
   if (p != null && f != null && c != null && p + f + c > 100.5) errors.push('protein, fat and carbs add up to more than 100 g per 100 g');
   if (kcal != null && p != null && f != null && c != null) {
+    // Below the macros is never right; above them is, by up to 7 kcal per gram of alcohol — a
+    // beer, a wine, a spirit at 40 % carry energy no macro shows. 250 covers a spirit.
     const implied = 4 * p + 9 * f + 4 * c;
-    if (Math.abs(kcal - implied) > Math.max(25, implied * 0.25)) errors.push(`kcal ${kcal} does not match the macros (about ${Math.round(implied)})`);
+    const slack = Math.max(25, implied * 0.25);
+    if (kcal < implied - slack || kcal > implied + slack + 250) errors.push(`kcal ${kcal} does not match the macros (about ${Math.round(implied)})`);
   }
   if (!CONFIDENCE.includes(v.confidence)) errors.push('`confidence` must be label, typical or estimate');
   if (errors.length) return { ok: false, errors };

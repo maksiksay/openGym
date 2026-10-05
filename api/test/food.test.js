@@ -39,7 +39,8 @@ test('not found is an answer, not an error', () => {
 test('out-of-range, inconsistent or incomplete answers are refused', () => {
   assert.equal(validateFood({ ...good, kcal: 1200 }).ok, false);
   assert.equal(validateFood({ ...good, p: 60, f: 30, c: 20, kcal: 590 }).ok, false);        // > 100 g of macros
-  assert.equal(validateFood({ ...good, kcal: 400 }).ok, false);                             // far from 4·17 + 9·5 + 4·1.8
+  assert.equal(validateFood({ ...good, kcal: 500 }).ok, false);                             // far above 4·17 + 9·5 + 4·1.8
+  assert.equal(validateFood({ ...good, kcal: 60 }).ok, false);                              // below the macros is never right
   assert.equal(validateFood({ ...good, confidence: 'sure' }).ok, false);
   assert.equal(validateFood({ ...good, name: '' }).ok, false);
   assert.equal(validateFood({ ...good, found: 'yes' }).ok, false);
@@ -75,4 +76,10 @@ test('with web search, the answer is the text after the last search result', () 
   };
   assert.equal(anthropicSpec.readText(data).text, '{"found":false,"note":"n"}');
   assert.equal(anthropicSpec.readText({ content: [{ type: 'text', text: 'plain' }] }).text, 'plain');
+});
+
+test('alcohol carries energy the macros do not show, and is accepted', () => {
+  const beer = { found: true, name: 'Пиво светлое', kcal: 43, p: 0.5, f: 0, c: 3.6, confidence: 'typical', note: '' };
+  assert.equal(validateFood(beer).ok, true);
+  assert.equal(validateFood({ ...beer, name: 'Водка', kcal: 235, p: 0, c: 0.1 }).ok, true);
 });

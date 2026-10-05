@@ -366,7 +366,7 @@ describe('signing in again to the account this copy belongs to', () => {
     const ask = vi.fn(async () => false)
     useStore.getState().setUser(USER)
     await useStore.getState().adoptProfile(ask)
-    expect(ask).toHaveBeenCalledWith({ workouts: 1, bodyweight: 0, customEx: 0 })
+    expect(ask).toHaveBeenCalledWith({ workouts: 1, bodyweight: 0, customEx: 0, meals: 0, health: 0, foods: 0 })
     expect(ids(useStore.getState().S.workouts)).toEqual(['w1', 'w-phone'])
   })
 })

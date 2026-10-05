@@ -237,9 +237,9 @@ describe('sign-in adoption helpers', () => {
   it('localExtras counts what the device has that the server does not', () => {
     // the new day, and 09-01: the device's weigh-in of a day the server has too, entered later
     // and different (79 kg is 174.2 lb, not the server's 80 lb)
-    expect(localExtras(local, server)).toEqual({ workouts: 1, bodyweight: 2, customEx: 1 })
-    expect(localExtras(server, server)).toEqual({ workouts: 0, bodyweight: 0, customEx: 0 })
-    expect(localExtras(null, server)).toEqual({ workouts: 0, bodyweight: 0, customEx: 0 })
+    expect(localExtras(local, server)).toEqual({ workouts: 1, bodyweight: 2, customEx: 1, meals: 0, health: 0, foods: 0 })
+    expect(localExtras(server, server)).toEqual({ workouts: 0, bodyweight: 0, customEx: 0, meals: 0, health: 0, foods: 0 })
+    expect(localExtras(null, server)).toEqual({ workouts: 0, bodyweight: 0, customEx: 0, meals: 0, health: 0, foods: 0 })
   })
   it('mergeStates with prefer keeps the preferred side\'s settings and plan although the other is newer', () => {
     const m = mergeStates(server, local, { prefer: 'a' })
