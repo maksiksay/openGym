@@ -10,6 +10,45 @@ import Icon from '../components/Icon.jsx'
 import { Button } from '../components/ui.jsx'
 import { tappable } from '../lib/use-sheet-keyboard.js'
 import { glyphOf } from '../lib/glyphs.js'
+import { th } from '../lib/health-i18n.js'
+import { healthOn } from '../lib/health.js'
+import { dayTotals } from '../lib/nutrition.js'
+import { checkInSheet, addFoodSheet, fmt1 } from '../sheets-health.jsx'
+import { MacroBar } from './Health.jsx'
+
+// Today's health at a glance: the morning check-in (or the question, before it is answered) and
+// the food so far against the goals. The card opens the Health screen; its two buttons go
+// straight to the two things done every day.
+function HealthCard({ S, nav }) {
+  const d = todayISO()
+  const h = healthOn(S.health, d)
+  const nutri = S.nutri || {}
+  const food = nutri.on !== false && !nutri.paused
+  const tot = dayTotals(S.meals, d)
+  const goals = nutri.goals || null
+  return <div className="card tappable" style={{ cursor: 'pointer' }} {...tappable(() => nav('/health'))}>
+    <div className="row between" style={{ marginBottom: 8 }}>
+      <div className="row" style={{ gap: 9 }}>
+        <span className="lrow-i" style={{ background: 'var(--pink, #ff375f)' }}><Icon name="heart" /></span>
+        <div>
+          <div className="lbl2">{th('Health')}</div>
+          <div className="ttl">{h
+            ? [h.sleep != null ? th('Slept {0} h', fmt1(h.sleep)) : null, h.energy != null ? th('energy {0}/5', h.energy) : null].filter(Boolean).join(' · ') || th('Checked in')
+            : th('How did you sleep?')}</div>
+        </div>
+      </div>
+      <Icon name="chevronRight" className="chev" />
+    </div>
+    {food && <>
+      <MacroBar label={th('Calories')} value={tot.kcal} goal={goals?.kcal} unit="kcal" color="var(--orange)" />
+      <MacroBar label={th('Protein')} value={tot.p} goal={goals?.p} unit="g" color="var(--acc)" />
+    </>}
+    <div className="row" style={{ gap: 8, marginTop: 8 }} onClick={e => e.stopPropagation()}>
+      {!h && <Button size="sm" variant="primary" icon="moon" onClick={() => checkInSheet(d)}>{th('Log wellbeing')}</Button>}
+      {food && <Button size="sm" icon="plus" onClick={() => addFoodSheet({ d })}>{th('Food')}</Button>}
+    </div>
+  </div>
+}
 
 // Home = what to do now + a quick glance. Deep charts & history live in Stats.
 export default function Home() {
@@ -129,6 +168,8 @@ export default function Home() {
         </div>
       </div>
     )}
+
+    {S.healthOn !== false && <HealthCard S={S} nav={nav} />}
 
     {!S.routines.length && !S.active && (
       <div className="card">

@@ -407,6 +407,53 @@ function weighIns(S, from, to) {
     .filter(b => b.d && b.w !== undefined && (!from || b.d >= from) && (!to || b.d <= to));
 }
 
+/* ---------- health & food ----------
+ * The daily log (sleep, energy, stress, steps) and the food totals per day, with the goals —
+ * never the meal rows, the food names or the free-text note: what the Coach needs to read a
+ * session against is "slept five hours, ate 1 900 of 2 600 kcal", not what was for dinner.
+ * Sent only when the module is on (`healthOn`) and the person agreed to the consent version that
+ * names this category (2); a profile still on the first consent keeps the payload it agreed to. */
+export const HEALTH_CONSENT_VERSION = 2;
+const HEALTH_DAYS_MAX = 84;
+const healthAllowed = S => S.healthOn !== false && (Number(S.coach?.consent?.version) || 0) >= HEALTH_CONSENT_VERSION;
+const scale = v => (Number.isInteger(v) && v >= 1 && v <= 5 ? v : undefined);
+const bounded = (v, lo, hi) => (typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi ? v : undefined);
+
+export function healthSlice(S, from, to) {
+  if (!healthAllowed(S) || !from) return null;
+  // Never more than twelve weeks, whatever window the caller asked for.
+  const floor = new Date((to || iso(new Date())) + 'T12:00:00');
+  floor.setDate(floor.getDate() - HEALTH_DAYS_MAX);
+  const start = from > iso(floor) ? from : iso(floor);
+  const inside = d => d && d >= start && (!to || d <= to);
+  const days = list(S.health)
+    .filter(e => e && typeof e === 'object' && inside(day(e.d)))
+    .map(e => {
+      const o = { d: day(e.d) };
+      const sl = bounded(e.sleep, 0, 16); if (sl !== undefined) o.sleep = sl;
+      for (const k of ['sq', 'energy', 'stress']) { const x = scale(e[k]); if (x !== undefined) o[k] = x; }
+      const st = bounded(e.steps, 0, 200000); if (st !== undefined) o.steps = Math.round(st);
+      return o;
+    })
+    .filter(o => Object.keys(o).length > 1)
+    .sort((a, b) => (a.d < b.d ? -1 : 1));
+  const byDay = new Map();
+  for (const m of list(S.meals)) {
+    const d = m && typeof m === 'object' ? day(m.d) : null;
+    if (!inside(d)) continue;
+    const t = byDay.get(d) || { d, kcal: 0, p: 0, f: 0, c: 0 };
+    for (const k of ['kcal', 'p', 'f', 'c']) { const x = bounded(m[k], 0, 20000); if (x !== undefined) t[k] += x; }
+    byDay.set(d, t);
+  }
+  const food = [...byDay.values()].sort((a, b) => (a.d < b.d ? -1 : 1))
+    .map(t => ({ d: t.d, kcal: Math.round(t.kcal), p: Math.round(t.p), f: Math.round(t.f), c: Math.round(t.c) }));
+  const g = S.nutri && typeof S.nutri === 'object' && S.nutri.goals && typeof S.nutri.goals === 'object' ? S.nutri.goals : null;
+  const goals = g ? Object.fromEntries(['kcal', 'p', 'f', 'c'].map(k => [k, bounded(g[k], 0, 20000) ?? null])) : null;
+  const tracking = S.nutri?.on === false ? 'off' : S.nutri?.paused ? 'paused' : 'on';
+  if (!days.length && !food.length) return null;
+  return { from: start, to: to || null, days, food, goals, foodTracking: tracking };
+}
+
 /* The room's medians are computed on this server, but from other people's synced workouts —
    state their own clients wrote. cohort.js keeps only catalogue exercises; this copy bounds
    every field again, so what reaches one person's prompt never depends on that filter alone. */
@@ -509,6 +556,12 @@ export function build(S, opts = {}) {
       since.setDate(since.getDate() - 28);
       const dated = !!on && Number.isFinite(since.getTime());
       p.bodyweight = { goal: num(S.targetW) ?? null, series: dated ? weighIns(S, iso(since), on) : [] };
+      // The week up to and including the session: the nights before it and what was eaten.
+      if (dated) {
+        const wk = new Date(on + 'T12:00:00'); wk.setDate(wk.getDate() - 6);
+        const h = healthSlice(S, iso(wk), on);
+        if (h) p.health = h;
+      }
     } else {
       p.session = null;
       p.previous = [];
@@ -524,6 +577,7 @@ export function build(S, opts = {}) {
     };
     p.aggregates = aggregates(S, workouts);
     p.bodyweight = { goal: num(S.targetW) ?? null, series: weighIns(S, p.window.from, null) };
+    { const h = healthSlice(S, p.window.from, null); if (h) p.health = h; }
     if (opts.note) p.userNote = String(opts.note).slice(0, MAX_NOTE_CHARS);
     if (opts.cohort) p.cohort = cleanCohort(opts.cohort);
     // A review names mostly what is already trained; 60 candidates is plenty for a swap.

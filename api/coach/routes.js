@@ -104,6 +104,18 @@ export function coachRoutes({ json, readBody, readSession, requireAdmin }) {
       } catch (e) { failEnqueue(res, e); }
     },
 
+    // A food nothing in the app knows: the query goes to the provider, a candidate comes back.
+    // Inline rather than queued (jobs.foodLookup says why); the client shows the candidate and
+    // saves it only once the person has looked at it.
+    'POST /api/coach/food': async (req, res) => {
+      const user = guard(req, res); if (!user) return;
+      const body = await readBody(req);
+      try {
+        const r = await jobs.foodLookup(user.id, { query: body.query, lang: body.lang });
+        json(res, 200, r);
+      } catch (e) { failEnqueue(res, e); }
+    },
+
     /* How this profile sits against everyone else on the instance who opted in: medians only,
        at least three people, and nothing for a profile that does not share itself. */
     'GET /api/coach/cohort': async (req, res) => {

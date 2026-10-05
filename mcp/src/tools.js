@@ -1,4 +1,4 @@
-/* The eight read-only tools. Each handler returns JSON; labels.js pre-substitutes any
+/* The read-only tools. Each handler returns JSON; labels.js pre-substitutes any
    {0}/{1} template the lib returns so the LLM gets final text, not template strings.
    ISO dates are validated on the way in; the handlers never see 'yesterday'. */
 import { z } from 'zod'
@@ -17,6 +17,8 @@ import {
 import { loadOfWorkouts, rankOf, levelsOf } from '../../frontend/src/lib/muscles.js'
 import { policyFor } from '../../frontend/src/lib/progression.js'
 import { buildSessionEntries, startsFromLast } from '../../frontend/src/lib/session-start.js'
+import { healthBetween, meanOf } from '../../frontend/src/lib/health.js'
+import { dailySeries, mealsOn, SLOT_NAMES } from '../../frontend/src/lib/nutrition.js'
 
 /* ---------- helpers ---------- */
 
@@ -329,6 +331,49 @@ export const getBodyweight = {
   }
 }
 
+/** get_health_log — the Health module: daily check-ins, food per day, goals. */
+export const getHealthLog = {
+  name: 'get_health_log',
+  description: 'Get the health & food log: per-day sleep (hours, the night before that date), sleep quality / energy / stress (1–5; stress higher = more), steps, waist (cm) and notes; per-day food totals (kcal, protein, fat, carbs in g) against the daily goals; and averages over the range. With detail=true each day also lists what was eaten (name, grams, slot). A day missing from the food list was not logged — unknown, not zero. Useful for "does my sleep affect my lifting?", "how is my protein this month?" or "what did I eat before my best sessions?".',
+  schema: {
+    from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe('Inclusive start date YYYY-MM-DD. Defaults to 28 days before `to`.'),
+    to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe('Inclusive end date YYYY-MM-DD. Defaults to today.'),
+    detail: z.boolean().optional().describe('Include the individual food rows per day.')
+  },
+  handler: ({ from, to, detail = false }) => {
+    const S = getState()
+    if (!S) return noState()
+    const end = to || isoDay(new Date())
+    const startD = new Date(end + 'T12:00:00'); startD.setDate(startD.getDate() - 27)
+    const start = from || isoDay(startD)
+    const days = healthBetween(S.health, start, end).map(e => {
+      const o = { date: e.d }
+      for (const k of ['sleep', 'sq', 'energy', 'stress', 'steps', 'waist', 'note']) if (e[k] != null) o[k === 'sq' ? 'sleep_quality' : k] = e[k]
+      return o
+    })
+    const food = dailySeries(S.meals, start, end).map(x => {
+      const o = { date: x.d, kcal: x.kcal, protein_g: x.p, fat_g: x.f, carbs_g: x.c, items: x.n }
+      if (detail) o.meals = mealsOn(S.meals, x.d).map(m => ({ slot: SLOT_NAMES[m.slot] || m.slot, name: m.name, grams: m.g || null, kcal: m.kcal, protein_g: m.p }))
+      return o
+    })
+    const goals = S.nutri?.goals || null
+    const avg = (xs, f) => { const m = meanOf(xs, f); return m == null ? null : Math.round(m * 10) / 10 }
+    return {
+      range: { from: start, to: end },
+      module_on: S.healthOn !== false,
+      food_tracking: S.nutri?.on === false ? 'off' : S.nutri?.paused ? 'paused' : 'on',
+      goals: goals ? { kcal: goals.kcal ?? null, protein_g: goals.p ?? null, fat_g: goals.f ?? null, carbs_g: goals.c ?? null } : null,
+      averages: {
+        sleep_h: avg(days, 'sleep'), sleep_quality: avg(days, 'sleep_quality'), energy: avg(days, 'energy'), stress: avg(days, 'stress'), steps: avg(days, 'steps'),
+        kcal_per_logged_day: avg(food, 'kcal'), protein_g_per_logged_day: avg(food, 'protein_g'), days_with_food: food.length, days_with_checkin: days.length
+      },
+      days,
+      food
+    }
+  }
+}
+const isoDay = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
+
 /** estimate_1rm — best-ever 1RM for one exercise or a PR table across all reps-mode exercises. */
 export const estimate1rm = {
   name: 'estimate_1rm',
@@ -573,7 +618,7 @@ export const previewSession = {
 /* ---------- registration list ---------- */
 
 export const TOOLS = [
-  listRoutines, getRoutine, previewSession, getWeekPlan, listWorkouts, getWorkout, getBodyweight, estimate1rm, muscleBalance
+  listRoutines, getRoutine, previewSession, getWeekPlan, listWorkouts, getWorkout, getBodyweight, getHealthLog, estimate1rm, muscleBalance
 ]
 
 function noState() {

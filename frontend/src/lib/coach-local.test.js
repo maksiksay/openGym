@@ -36,7 +36,7 @@ const state = () => ({
   week: { 1: 'r1' }, dayPlan: {}, customEx: [], bodyweight: [], workouts: [
     { d: '2026-08-20', start: 1, end: 3600001, entries: [{ id: EX, target: { sets: 3, reps: 8 }, sets: [{ done: true, w: 40, r: 8 }, { done: true, w: 40, r: 8 }, { done: true, w: 40, r: 8 }] }] }
   ],
-  coach: { consent: { agreedAt: '2026-08-01T00:00:00Z', version: 1 }, profile: null, cadence: 'off', lastReview: null, log: [], snapshots: [] }
+  coach: { consent: { agreedAt: '2026-08-01T00:00:00Z', version: 2 }, profile: null, cadence: 'off', lastReview: null, log: [], snapshots: [] }
 })
 const chat = content => ({ status: 200, body: { choices: [{ finish_reason: 'stop', message: { content } }] } })
 const review = { coach_contract: 1, summary: 'One tweak.', evidence: { from: '2026-08-01', to: '2026-08-20', sessions: 1 },
@@ -192,7 +192,7 @@ describe('the Coach on a phone with its own key', () => {
     const d = await local.localDisclosure()
     expect(d.payer).toBe('you')
     expect(d.host).toBe('api.openai.com')
-    expect(d.categories).toEqual(['plan', 'training', 'bodyweight', 'profile', 'prefs'])
+    expect(d.categories).toEqual(['plan', 'training', 'bodyweight', 'profile', 'health', 'prefs'])
   })
 })
 

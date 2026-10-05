@@ -22,6 +22,11 @@
  *   - routines: union by id in the newer copy's order; of an id that both have, the version
  *     edited last by its own `_ts` (stampRoutines), the newer copy's on a tie
  *   - bodyweight: union by day, the later-edited (`t`) entry of a day that both have
+ *   - health (lib/health.js): union by day; a day both have is merged field by field, the entry
+ *     edited later (`t`) supplying every field it has — a sleep check-in on the phone and a step
+ *     count from another device keep both halves (mergeHealth)
+ *   - meals, foods (lib/nutrition.js): union by id; of an id that both have, the version edited
+ *     last by its own `t`, the newer copy's on a tie
  *   - favEx: ordered set union, the newer copy first
  *   - exWeights: union by exercise, the better `w` for that exercise — larger for an ordinary
  *     lift, smaller on an assistance machine (a PR logged on the other device must not be
@@ -67,6 +72,7 @@
 import { beatsWeight } from './exercises.js'
 import { bestWeightForEntry } from './history.js'
 import { convertStateUnit, convertBodyWeight } from './units.js'
+import { mergeHealth } from './health.js'
 
 const clone = o => JSON.parse(JSON.stringify(o))
 const list = v => (Array.isArray(v) ? v : [])
@@ -216,6 +222,7 @@ const bodyweightKey = e => `${e?.d}|${e?.t ?? ''}`
 const RESET_LISTS = {
   workouts: workoutKey, routines: x => x?.id, customEx: x => x?.id, bodyweight: bodyweightKey,
   gymCards: x => x?.id, equipProfiles: x => x?.id, favEx: x => x,
+  health: x => x?.d, meals: x => x?.id, foods: x => x?.id,
 }
 const RESET_MAPS = ['exNotes', 'barWeights', 'balanceOverrides', 'loadKind', 'plates']
 /** An entry's name in resetIds: a workout's id (or day and start), a weigh-in's day and time, … */
@@ -270,6 +277,7 @@ export function sinceReset(S, at, ids) {
     out.routines = list(S.routines).filter(r => r && after(r._ts))
     out.customEx = list(S.customEx).filter(c => c && after(c._ts))
     out.bodyweight = list(S.bodyweight).filter(e => e && after(e.t))
+    for (const f of ['health', 'meals', 'foods']) if (Array.isArray(S[f])) out[f] = S[f].filter(e => e && after(e.t))
     // No time of their own: taken for what they were before the reset, which cleared them.
     out.equipProfiles = []
     out.gymCards = []
@@ -386,6 +394,17 @@ export function mergeStates(a0, b0, { prefer } = {}) {
     })
   }
   out.bodyweight = mergeBodyweight(n.bodyweight, o.bodyweight).map(clone)
+  if (list(n.health).length || list(o.health).length) out.health = mergeHealth(n.health, o.health).map(clone)
+  // A meal row or a food edited on both sides keeps the version edited last, whichever copy is
+  // newer as a whole — the rule routines follow, and for the same reason.
+  for (const f of ['meals', 'foods']) {
+    if (!list(n[f]).length && !list(o[f]).length) continue
+    const other = new Map(list(o[f]).filter(x => x?.id != null).map(x => [x.id, x]))
+    out[f] = unionById(n[f], o[f]).map(x => {
+      const alt = x?.id != null && other.get(x.id)
+      return clone(alt && (Number(alt.t) || 0) > (Number(x.t) || 0) ? alt : x)
+    })
+  }
   if (list(n.favEx).length || list(o.favEx).length) out.favEx = [...new Set([...list(n.favEx), ...list(o.favEx)])]
   out.exWeights = clone(mergeExWeights(n.exWeights, o.exWeights))
   for (const [id, sources] of editedBy) {

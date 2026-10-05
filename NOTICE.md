@@ -171,6 +171,21 @@ photo uses [**jsQR**](https://github.com/cozmo/jsQR) by Cosmo Wolfe, under the *
 Where the browser has a native `BarcodeDetector`, that is tried first and jsQR is the fallback.
 Video frames are decoded in memory and never uploaded or stored.
 
+### Product barcodes in the browser — `@zxing/library`
+
+The food log reads EAN/UPC barcodes off packages (`frontend/src/lib/barcode-web.js`) with
+[**ZXing for JavaScript**](https://github.com/zxing-js/library), under the **Apache License 2.0**.
+It is dynamic-imported and only loaded when someone opens the barcode scanner. Where the browser
+has a native `BarcodeDetector`, that is tried first.
+
+### Food data — Open Food Facts
+
+Packaged-product nutrition is looked up live from [**Open Food Facts**](https://world.openfoodfacts.org),
+whose database is available under the **Open Database License (ODbL)**; product pictures and texts
+are under CC BY-SA. The app shows the attribution wherever it shows Open Food Facts results. The
+built-in basic foods (`frontend/src/lib/foods-base.js`) are rounded reference values of the kind
+published in USDA FoodData Central (public domain) and common composition tables.
+
 ### Camera scan & photo decode in the app — `@capacitor-mlkit/barcode-scanning`
 
 In the Android/iOS app, reading a code — from the camera or from an imported photo — uses the

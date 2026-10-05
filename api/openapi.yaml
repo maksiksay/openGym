@@ -2498,6 +2498,69 @@ paths:
         '429': { $ref: '#/components/responses/CoachRefused' }
         '503': { $ref: '#/components/responses/CoachOff' }
 
+  /api/coach/food:
+    post:
+      tags: [coach]
+      operationId: postCoachFood
+      summary: Look up a food nothing else knows
+      description: |
+        Asks the configured provider for one food's values per 100 g, when the person's own
+        foods, the built-in basics and Open Food Facts have nothing. Runs inline (no job,
+        nothing kept on the server) and sends only `query` and `lang`, so it does not need
+        the training-data consent the plan jobs do. With the Anthropic provider the model may
+        use Anthropic's web search to read a real label (`COACH_FOOD_WEB=0` switches that off).
+        The answer is a candidate: the client shows it and saves it only once the person has
+        checked it. Budgeted per profile per day (`COACH_FOOD_DAILY`, default 40).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [query]
+              properties:
+                query:
+                  type: string
+                  maxLength: 200
+                  description: What the person typed — a product, a brand, a dish.
+                lang:
+                  type: string
+                  pattern: '^[A-Za-z]{2,3}([-_][A-Za-z0-9]{2,8})?$'
+                  description: The language the app is showing; names and the note come back in it.
+      responses:
+        '200':
+          description: |
+            `{ ok: true, food, web }` with a candidate food, `{ ok: true, found: false, note }`
+            when the query is not something the model can describe, or `{ ok: false, errorClass,
+            detail? }` when the provider failed or answered out of shape.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  found: { type: boolean }
+                  web: { type: boolean, description: Whether web search was offered to the model. }
+                  note: { type: string }
+                  errorClass: { type: string, enum: [empty, timeout, missing, auth, provider, unusable] }
+                  detail: { type: string }
+                  food:
+                    type: object
+                    properties:
+                      name: { type: string }
+                      brand: { type: string }
+                      kcal: { type: number }
+                      p: { type: number }
+                      f: { type: number }
+                      c: { type: number }
+                      srv: { type: number, description: A usual portion in grams. }
+                      confidence: { type: string, enum: [label, typical, estimate] }
+                      note: { type: string }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/CoachRefused' }
+        '429': { $ref: '#/components/responses/CoachRefused' }
+        '503': { $ref: '#/components/responses/CoachOff' }
+
   /api/coach/pending/resolve:
     post:
       tags: [coach]

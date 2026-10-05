@@ -42,7 +42,7 @@ const state = (over = {}) => ({
   ],
   week: { 1: 'r1', 4: 'r2' },
   workouts: [workout()],
-  coach: { consent: { agreedAt: '2026-09-01T00:00:00Z', version: 1 }, profile: null, log: [], snapshots: [], chat: [], timings: [] },
+  coach: { consent: { agreedAt: '2026-09-01T00:00:00Z', version: 2 }, profile: null, log: [], snapshots: [], chat: [], timings: [] },
   ...over
 })
 

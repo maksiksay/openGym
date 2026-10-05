@@ -177,6 +177,16 @@ export const DEF = {
   // cleared) replaces that role's curated exercise-id whitelist with a single user-chosen
   // exercise id; the stamp is what lets a sync keep the choice made last (lib/sync-merge.js).
   balanceTemplate: DEFAULT_TEMPLATE_ID, balanceOverrides: {},
+  // Health & nutrition (views/Health.jsx, lib/health.js, lib/nutrition.js). `health` is one entry
+  // per day (sleep, energy, stress, steps, waist, note); `meals` the food log, one row per food
+  // eaten; `foods` the person's own food library, per 100 g. All three sync entry by entry
+  // (lib/sync-merge.js). `nutri` holds the settings: tracking on, paused (logging stops being
+  // asked for and the Home card says so — a break from counting is a feature, not a lapse), the
+  // daily goals, and the body data the goals were worked out from. `healthOn` switches the
+  // whole module (Home card, screen, Coach payload) off without deleting anything.
+  health: [], meals: [], foods: [],
+  nutri: { on: true, paused: false, goals: null, body: null },
+  healthOn: true,
 }
 const clone = o => JSON.parse(JSON.stringify(o))
 
@@ -220,7 +230,8 @@ function loadState() {
 // weigh-ins and custom exercises. A custom exercise is all a new guest may have made — with its
 // photo or video, which the server counts as unreferenced until the state that names it lands —
 // so a profile created from such a copy takes it at once, like one holding a workout.
-const hasData = st => !!((st.workouts || []).length || (st.routines || []).length || (st.bodyweight || []).length || (st.customEx || []).length)
+const hasData = st => !!((st.workouts || []).length || (st.routines || []).length || (st.bodyweight || []).length || (st.customEx || []).length
+  || (st.meals || []).length || (st.health || []).length)
 
 // Decide whether a pulled account state may replace the local saved state. A local active workout
 // is deliberately carried forward: the server stores completed/saved state, while the in-progress

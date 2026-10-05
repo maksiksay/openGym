@@ -16,6 +16,7 @@ import { t } from '../lib/i18n.js'
 import { DAYN } from '../lib/format.js'
 import { EXDB } from '../lib/exercises.js'
 import { emptyCoach, coachAvailable, hasConsent, CONSENT_VERSION, CATEGORY_TEXT, appendChat } from '../lib/coach.js'
+import { th } from '../lib/health-i18n.js'
 import { requestPlan, disclosure } from '../lib/coach-api.js'
 import { DEMO } from '../lib/demo.js'
 import { MOBILE } from '../lib/mobile.js'
@@ -248,7 +249,7 @@ function Consent({ onAgree, onDecline }) {
     <div className="ob-consent">
       {(info?.categories || Object.keys(CATEGORY_TEXT)).map(k => {
         const [title, sub] = CATEGORY_TEXT[k] || [k, '']
-        return <div key={k} className="ob-consent-row"><Icon name="check" /><div><b>{t(title)}</b><span>{t(sub)}</span></div></div>
+        return <div key={k} className="ob-consent-row"><Icon name="check" /><div><b>{th(title)}</b><span>{th(sub)}</span></div></div>
       })}
     </div>
     <div className="ob-fine">

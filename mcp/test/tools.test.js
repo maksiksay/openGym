@@ -411,6 +411,46 @@ describe('get_workout', () => {
   })
 })
 
+/* ---------- get_health_log ---------- */
+
+describe('get_health_log', () => {
+  const seed = () => {
+    S.health = [
+      { d: '2026-07-20', t: 1, sleep: 6, sq: 2, energy: 3, note: 'late shift' },
+      { d: '2026-07-26', t: 2, sleep: 8, energy: 5, steps: 9000 },
+    ]
+    S.meals = [
+      { id: 'a', d: '2026-07-26', t: 1, slot: 'b', name: 'Oats', g: 80, kcal: 293, p: 10, f: 5, c: 49 },
+      { id: 'b', d: '2026-07-26', t: 2, slot: 'l', name: 'Chicken', g: 200, kcal: 330, p: 62, f: 7, c: 0 },
+    ]
+    S.nutri = { on: true, paused: false, goals: { kcal: 2600, p: 145, f: 75, c: 330 } }
+    _seedStateForTests(S)
+  }
+  test('defaults to the last four weeks, with days, food totals, goals and averages', () => {
+    seed()
+    const r = call('get_health_log')
+    expect(r.range).toEqual({ from: '2026-06-30', to: '2026-07-27' })
+    expect(r.days.map(d => d.date)).toEqual(['2026-07-20', '2026-07-26'])
+    expect(r.days[0]).toMatchObject({ sleep: 6, sleep_quality: 2, note: 'late shift' })
+    expect(r.food).toEqual([{ date: '2026-07-26', kcal: 623, protein_g: 72, fat_g: 12, carbs_g: 49, items: 2 }])
+    expect(r.goals.protein_g).toBe(145)
+    expect(r.averages).toMatchObject({ sleep_h: 7, energy: 4, days_with_food: 1, days_with_checkin: 2 })
+    expect(r.food_tracking).toBe('on')
+  })
+  test('detail lists what was eaten', () => {
+    seed()
+    const r = call('get_health_log', { detail: true })
+    expect(r.food[0].meals.map(m => m.name)).toEqual(['Oats', 'Chicken'])
+    expect(r.food[0].meals[0].slot).toBe('Breakfast')
+  })
+  test('an empty log is empty, not an error', () => {
+    const r = call('get_health_log', { from: '2026-07-01', to: '2026-07-02' })
+    expect(r.days).toEqual([])
+    expect(r.food).toEqual([])
+    expect(r.averages.sleep_h).toBeNull()
+  })
+})
+
 /* ---------- get_bodyweight ---------- */
 
 describe('get_bodyweight', () => {

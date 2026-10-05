@@ -68,6 +68,12 @@ const _refinePlan = async text => DEMO ? (await demo()).demoRefine(S()) : LOCAL(
 export const refinePlan = (...a) => _refinePlan(...a).then(track)
 const _requestDebrief = async workoutId => DEMO ? (await demo()).demoDebrief(S(), workoutId) : LOCAL() ? (await local()).localDebrief(S(), workoutId) : api('/api/coach/debrief', { method: 'POST', body: JSON.stringify({ workoutId: workoutId || null, lang: getLang() }) })
 export const requestDebrief = (...a) => _requestDebrief(...a).then(track)
+// A food nothing else knows (sheets-health.jsx): the query goes to the server's provider, which
+// answers inline with a candidate. Only a server runs it — a phone with its own key and the demo
+// say so instead of guessing. Two minutes, since a web search on the provider's side takes time.
+export const lookupFood = async query => (DEMO || LOCAL())
+  ? { ok: false, errorClass: 'unsupported' }
+  : api('/api/coach/food', { method: 'POST', body: JSON.stringify({ query, lang: getLang() }), timeout: 130000 })
 // The room: anonymous medians across the profiles on this instance that opted in. Only a
 // server has a room; a phone with its own key and the demo both answer locally.
 export const cohortStats = async () => DEMO ? (await demo()).demoCohort(S()) : LOCAL() ? { ok: false, enabled: false } : api('/api/coach/cohort')

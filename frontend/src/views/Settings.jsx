@@ -30,6 +30,8 @@ import { ServerSyncSection, KeptChangesRows, leaveServer, connectServer, passkey
 import { passwordOn, PasswordRow, openPasswordSignIn, openPasswordRegister } from '../components/PasswordAuth.jsx'
 import { usePasskeys, PasskeysRow, DeviceLinkRow } from '../components/Passkeys.jsx'
 import { Section, Row, SelectRow, Switch, Segmented, Button, TextField } from '../components/ui.jsx'
+import { th } from '../lib/health-i18n.js'
+import { goalsSheet } from '../sheets-health.jsx'
 
 export default function Settings() {
   const nav = useNavigate()
@@ -394,6 +396,25 @@ export default function Settings() {
         subtitle={t('Show the body weight card on Home.')}>
         <Switch checked={S.showWeightCard !== false} onChange={v => update(s => { s.showWeightCard = v })} />
       </Row>
+    </Section>
+
+    {/* ---------- health & food (views/Health.jsx) ---------- */}
+    <Section title={th('Health & food')} footer={th('Off hides the Health card, screen and the Coach\'s view of it. Nothing logged is deleted.')}>
+      <Row icon="heart" iconTint="var(--pink, #ff375f)" title={th('Health')} subtitle={th('Daily check-in: sleep, energy, stress, steps.')}>
+        <Switch checked={S.healthOn !== false} onChange={v => update(s => { s.healthOn = v })} />
+      </Row>
+      {S.healthOn !== false && <>
+        <Row icon="flame" iconTint="var(--orange)" title={th('Food tracking')} subtitle={th('Calories and macros, from your foods, the built-in basics and Open Food Facts.')}>
+          <Switch checked={S.nutri?.on !== false} onChange={v => update(s => { s.nutri = { ...(s.nutri || {}), on: v } })} />
+        </Row>
+        {S.nutri?.on !== false && <>
+          <Row icon="pause" iconTint="var(--label-3)" title={th('Pause counting')} subtitle={th('Keeps your log and goals, stops asking.')}>
+            <Switch checked={!!S.nutri?.paused} onChange={v => update(s => { s.nutri = { ...(s.nutri || {}), paused: v } })} />
+          </Row>
+          <Row icon="target" iconTint="var(--yellow)" title={th('Daily goals')} accessory="chevron" onClick={goalsSheet}
+            value={S.nutri?.goals?.kcal ? th('{0} kcal', S.nutri.goals.kcal) : null} />
+        </>}
+      </>}
     </Section>
 
     {/* ---------- during a workout ---------- */}

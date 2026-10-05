@@ -23,6 +23,7 @@ import { runPipeline } from './core/pipeline.js';
 import { extractJSON } from './core/parse.js';
 import { hashPlan } from './core/plan-hash.js';
 import { buildPrompt } from './core/prompt.js';
+import { buildFoodPrompt, validateFood, cleanQuery, FOOD_SCHEMA } from './core/food.js';
 import { handleFor } from './handle.js';
 import { fetchFor } from './node-fetch.js';
 import { canDropPrivileges, unprivilegedIds } from './adapters/spawn.js';
@@ -475,6 +476,96 @@ export async function testRun() {
       return { ok: false, version: check.version, error: 'the provider answered, but not in the expected shape' };
     }
     return { ok: true, version: check.version };
+  } finally {
+    if (jobDir) removeJobDir(jobDir, unprivilegedIds());
+  }
+}
+
+/* ---------- food lookup ---------- */
+
+// Food lookups are small and many — a person logging a week of meals may ask a dozen times — so
+// they have a budget of their own rather than eating the plan jobs' daily cap, and they run
+// inline in the request rather than through the queue: seconds, not minutes, and nothing to
+// keep once the answer is back.
+export const FOOD_DAILY = Math.max(1, +process.env.COACH_FOOD_DAILY || 40);
+const FOOD_TIMEOUT_MS = 120000;
+
+function bumpFoodDaily(uid) {
+  const rec = readUser(uid);
+  const d = todayISO();
+  const food = rec.food?.date === d ? { date: d, count: rec.food.count + 1 } : { date: d, count: 1 };
+  if (food.count > FOOD_DAILY) return false;
+  patchUser(uid, { food });
+  return true;
+}
+
+// Anthropic's server-side web search, offered on a food lookup so a branded product can be read
+// off its real label rather than recalled. Optional twice over: the owner can switch it off
+// (COACH_FOOD_WEB=0), and an account or model that does not have the tool gets the same request
+// again without it.
+const WEB_SEARCH = [{ type: 'web_search_20250305', name: 'web_search', max_uses: 3 }];
+const webSearchOn = () => !/^(0|false|no|off)$/i.test(process.env.COACH_FOOD_WEB || '');
+
+/**
+ * Look a food up with the configured provider. Throws CoachError like enqueue does (`off`,
+ * `shared`, `cap`, `unprivileged`); otherwise resolves to { ok: true, food, web } |
+ * { ok: true, found: false, note } | { ok: false, errorClass, detail }.
+ *
+ * What is sent is the query and the language and nothing else, so this does not wait on the
+ * training-data consent that the plan jobs need — there is no training data in it.
+ */
+export async function foodLookup(uid, { query, lang } = {}) {
+  if (!cfgStore.isEnabled() || !cfgStore.isConnected()) throw new CoachError('off', 'the Coach is not set up on this instance');
+  const q = cleanQuery(query);
+  if (q.length < 2) return { ok: false, errorClass: 'empty' };
+  const cred = cfgStore.credentialFor(uid);
+  if (!cred.ok) {
+    if (cred.reason === 'shared-account') throw new CoachError('shared', cred.message);
+    throw new CoachError('off', 'this profile has no provider account connected');
+  }
+  const cfg = cfgStore.load();
+  const adapter = adapterFor(cfg.provider);
+  if (!adapter) throw new CoachError('off', 'the Coach is not set up on this instance');
+  if (adapter.spawns !== false) {
+    const priv = canDropPrivileges();
+    if (!priv.ok) throw new CoachError('unprivileged', `Coach jobs are disabled: ${priv.why}`);
+  }
+  if (!bumpFoodDaily(uid)) throw new CoachError('cap', 'daily food lookup limit reached');
+  cfgStore.bindInstanceCredential(uid);
+
+  const parts = buildFoodPrompt(q, payloadLib.langTag(lang) || 'en');
+  const jobDir = adapter.spawns === false ? null : fs.mkdtempSync(path.join(os.tmpdir(), 'coach-food-'));
+  const started = Date.now();
+  try {
+    const env = cfgStore.jobEnv(jobDir || os.tmpdir(), cred);
+    const ids = jobDir && unprivilegedIds();
+    if (ids) shareJobDir(jobDir, ids);
+    const base = {
+      cfg, jobDir, env, model: cfgStore.modelFor(cfg), timeoutMs: FOOD_TIMEOUT_MS, fetch: fetchFor(FOOD_TIMEOUT_MS),
+      ...(adapter.spawns === false
+        ? { prompt: parts.user, system: parts.system, schema: FOOD_SCHEMA }
+        : { prompt: parts.system + '\n\n---\n\n' + parts.user })
+    };
+    const web = cfg.provider === 'anthropic' && webSearchOn();
+    let r = await adapter.invoke(web ? { ...base, tools: WEB_SEARCH } : base);
+    let usedWeb = web;
+    // A 400 about the tool (not enabled for the organisation, not offered for the model): once more without it.
+    if (web && r.code !== 0 && !r.timedOut && /\b400\b|tool|web_search/i.test(r.stderr || '')) {
+      r = await adapter.invoke(base);
+      usedWeb = false;
+    }
+    if (r.timedOut) return { ok: false, errorClass: 'timeout' };
+    if (r.spawnError) return { ok: false, errorClass: 'missing' };
+    if (r.code !== 0) {
+      const err = (r.stderr || r.text || '').toLowerCase();
+      return { ok: false, errorClass: /auth|unauthor|api key|credential|token|401|403|login/.test(err) ? 'auth' : 'provider', detail: (r.stderr || '').slice(0, 300) };
+    }
+    const parsed = extractJSON(r.text);
+    const checked = parsed.error ? { ok: false, errors: [parsed.error] } : validateFood(parsed.value);
+    cfgStore.logJob({ at: Date.now(), kind: 'food', trigger: 'manual', outcome: checked.ok ? 'ready' : 'failed', errorClass: checked.ok ? null : 'unusable', ms: Date.now() - started });
+    if (!checked.ok) return { ok: false, errorClass: 'unusable', detail: checked.errors.join('; ').slice(0, 300) };
+    if (checked.found === false) return { ok: true, found: false, note: checked.note };
+    return { ok: true, food: checked.food, web: usedWeb };
   } finally {
     if (jobDir) removeJobDir(jobDir, unprivilegedIds());
   }
