@@ -4,6 +4,7 @@
  * are closures over the db and the session secret, and passing them in keeps this module free
  * of a cycle (and trivially testable against fakes).
  */
+import fs from 'node:fs';
 import * as cfgStore from './config.js';
 import * as jobs from './jobs.js';
 import { computeCohort } from './cohort.js';
@@ -173,7 +174,7 @@ export function coachRoutes({ json, readBody, readSession, requireAdmin }) {
           http: !!p.http, baseUrl: !!p.baseUrl, keyOptional: !!p.keyOptional, keyPlaceholder: p.keyPlaceholder || null,
           defaultModel: p.defaultModel || null,
           // Which providers already hold a key — so switching chips is visibly not a reset.
-          connected: !!(cfgStore.authFor(cfg, id) && cfgStore.authFor(cfg, id).data)
+          connected: !!(cfgStore.authFor(cfg, id) && cfgStore.authFor(cfg, id).data) || !!cfgStore.cachedLogin(cfg, id)
         })),
         model: cfgStore.modelFor(cfg),
         models: cfg.models,
@@ -193,6 +194,8 @@ export function coachRoutes({ json, readBody, readSession, requireAdmin }) {
           const meta = cfgStore.providerMeta(cfg);
           const rec = cfgStore.authFor(cfg);
           if (!meta.oauthEnv && !meta.apiKeyEnv) return { state: 'not-required' };
+          const login = !rec && cfgStore.cachedLogin(cfg);
+          if (login) return { state: 'connected', type: login.type, account: null, connectedAt: login.since || null };
           if (!rec || !rec.data) return { state: meta.keyOptional ? 'optional' : 'none' };
           if (!cfgStore.decrypt(rec.data)) return { state: 'unreadable' };
           return { state: 'connected', type: rec.type || null, account: rec.account || null, connectedAt: rec.connectedAt || null };
@@ -312,6 +315,9 @@ export function coachRoutes({ json, readBody, readSession, requireAdmin }) {
       const provider = body.provider !== undefined ? String(body.provider) : cfgStore.load().provider;
       if (!cfgStore.PROVIDERS[provider]) return json(res, 400, { error: 'unknown provider' });
       cfgStore.saveAuth(provider, null);
+      // A CLI signed in on its own is signed out by removing its login cache.
+      const cache = cfgStore.loginCachePath(cfgStore.load(), provider);
+      if (cache) { try { fs.rmSync(cache, { force: true }); } catch { /* not there, or not ours to remove */ } }
       json(res, 200, { ok: true });
     },
 

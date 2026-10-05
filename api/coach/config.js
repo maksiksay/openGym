@@ -42,6 +42,10 @@ const FILE = path.join(DATA, 'coach.json');
  * quietly wrong about what they capture. */
 export const CREDENTIAL_HOME = process.env.COACH_CREDENTIAL_DIR || '/coach-auth';
 export const COACH_DISABLED = /^(1|true|yes|on)$/i.test(process.env.COACH_DISABLED || '');
+// An outbound HTTP(S) proxy for every provider call — the HTTPS adapters' fetch and the CLI
+// runtimes' environment alike. For an owner whose provider is only reachable through one (a
+// proxy on the host: http://host.docker.internal:1087). Unset, nothing changes.
+export const COACH_PROXY = (process.env.COACH_PROXY || '').trim() || null;
 
 // Providers this build can drive. `runtime` is what the adapter runs. Adding one is an adapter
 // file plus a row here — nothing else in the codebase branches on provider identity. The real
@@ -60,9 +64,13 @@ export const PROVIDERS = {
   // Codex keeps a refreshable login cache in $CODEX_HOME rather than taking a token on the
   // environment, so it is the one provider that needs somewhere durable to write. That
   // somewhere is CREDENTIAL_HOME — outside ./data, so `tar czf … data/` cannot capture it.
+  // `deviceLogin`: the owner can instead sign the CLI in with a ChatGPT account (`codex login
+  // --device-auth`, run in the container). The CLI writes `loginFile` into CREDENTIAL_HOME, and
+  // that file — not a filed token — is then the credential (cachedLogin below).
   codex: {
     label: 'Codex (OpenAI)', runtime: 'Codex CLI',
-    apiKeyEnv: 'CODEX_API_KEY', oauthEnv: null, credentialHomeEnv: 'CODEX_HOME'
+    apiKeyEnv: 'CODEX_API_KEY', oauthEnv: null, credentialHomeEnv: 'CODEX_HOME',
+    deviceLogin: true, loginFile: 'auth.json'
   },
   // The plain-HTTPS providers — Anthropic, OpenAI, Gemini and any OpenAI-compatible endpoint.
   // Described once in core/providers.js so the phone's picker and this table cannot disagree.
@@ -252,6 +260,7 @@ export function credentialFor(uid) {
     // An endpoint that takes no key (a model on the LAN) is connected without one. Only when
     // nothing was ever filed — a filed key that fails to decrypt is still a failure.
     if (providerMeta(cfg).keyOptional && !rec) return { ok: true, auth: null, type: null, account: null, mode: 'instance' };
+    if (!rec && cachedLogin(cfg)) return { ok: true, auth: null, type: 'chatgpt-cli', account: null, mode: 'instance' };
     return { ok: false, reason: 'no-credential', mode: 'instance' };
   }
   return { ok: true, auth, type: rec.type, account: rec.account || null, mode: 'instance' };
@@ -264,14 +273,29 @@ export function credentialFor(uid) {
    the provider terms forbid. An API key is what an admin pastes so their household can use the
    Coach; binding it to whoever happened to click first would just look broken, and the daily
    caps are what bound its spend. */
-export const isPersonalCredential = type => type === 'cli-token' || type === 'oauth';
+export const isPersonalCredential = type => type === 'cli-token' || type === 'oauth' || type === 'chatgpt-cli';
+
+/* A runtime signed in on its own — Codex with a ChatGPT account — has no token filed here: the
+   CLI's login cache in CREDENTIAL_HOME is the credential. It counts as connected when that file
+   exists, and as a personal credential (one person's subscription), so it binds to the first
+   profile that spends it exactly like a Claude Code setup token. */
+export function loginCachePath(cfg = load(), p = cfg.provider) {
+  const meta = PROVIDERS[p];
+  return meta && meta.loginFile ? path.join(CREDENTIAL_HOME, meta.loginFile) : null;
+}
+export function cachedLogin(cfg = load(), p = cfg.provider) {
+  const file = loginCachePath(cfg, p);
+  if (!file) return null;
+  try { return fs.statSync(file).size > 0 ? { type: 'chatgpt-cli', since: fs.statSync(file).mtimeMs } : null; } catch { return null; }
+}
 
 /** First profile to actually spend the instance credential binds it — a personal credential
  *  only; an API key is shared by every profile on the instance. */
 export function bindInstanceCredential(uid) {
   const cfg = load();
   const rec = authFor(cfg);
-  if (cfg.authMode === 'instance' && !boundUidFor(cfg) && cfg.provider !== 'fixture' && rec && isPersonalCredential(rec.type)) {
+  const personal = rec ? isPersonalCredential(rec.type) : !!cachedLogin(cfg);
+  if (cfg.authMode === 'instance' && !boundUidFor(cfg) && cfg.provider !== 'fixture' && personal) {
     save({ boundUid: { ...cfg.boundUid, [cfg.provider]: uid } });
   }
 }
@@ -310,7 +334,7 @@ export function isConnected() {
   if (cfg.provider === 'fixture') return true;
   if (cfg.authMode === 'profile') return true;
   const rec = authFor(cfg);
-  if (!rec) return !!providerMeta(cfg).keyOptional && !!baseUrlFor(cfg.provider, cfg);
+  if (!rec) return (!!providerMeta(cfg).keyOptional && !!baseUrlFor(cfg.provider, cfg)) || !!cachedLogin(cfg);
   return !!decrypt(rec.data);
 }
 
@@ -341,6 +365,9 @@ export function jobEnv(jobDir, resolved) {
   // because HOME is a temp dir that dies with it. It is deliberately NOT under ./data — see
   // CREDENTIAL_HOME — so the documented backup of ./data cannot pick up a live refresh token.
   if (meta.credentialHomeEnv) env[meta.credentialHomeEnv] = CREDENTIAL_HOME;
+  // The environment is built from nothing, so a proxy the CLI must use has to be put back
+  // explicitly — only the one the owner named for the Coach, never the server's own.
+  if (COACH_PROXY) { env.HTTPS_PROXY = env.HTTP_PROXY = env.https_proxy = env.http_proxy = COACH_PROXY; env.NO_PROXY = env.no_proxy = 'localhost,127.0.0.1'; }
   return env;
 }
 

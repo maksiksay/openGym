@@ -111,7 +111,7 @@ export default function AdminCoach() {
     { title: 'Testing', hint: 'A built-in fake that answers instantly, so the whole loop can be tried without an account.', items: d.providers.filter(p => TESTING_IDS.includes(p.id)) }
   ]
 
-  const hasCredentialStep = !!(meta.setupToken || meta.apiKey)
+  const hasCredentialStep = !!(meta.setupToken || meta.apiKey || meta.deviceLogin)
   const step1Done = !!d.provider
   const step2Done = hasEndpoint
   const step3Done = authed
@@ -190,7 +190,9 @@ export default function AdminCoach() {
           <CredentialPill auth={d.auth} />
         </div>
         {authState === 'connected' ? <>
-          <div className="adm-hint">Connected{d.auth.account ? ' as ' + d.auth.account : ''} via {credentialLabel(d.auth.type)}{d.auth.connectedAt ? ' · added ' + rel(d.auth.connectedAt) : ''}. The key is stored encrypted and is never shown again.</div>
+          <div className="adm-hint">Connected{d.auth.account ? ' as ' + d.auth.account : ''} via {credentialLabel(d.auth.type)}{d.auth.connectedAt ? ' · added ' + rel(d.auth.connectedAt) : ''}. {d.auth.type === 'chatgpt-cli'
+            ? 'The CLI keeps its own sign-in in ./coach-auth, outside ./data. It is one person\'s subscription, so it serves the first profile that uses it. Remove signs it out.'
+            : 'The key is stored encrypted and is never shown again.'}</div>
           <div className="adm-actions">
             {meta.apiKey && <Button size="sm" variant="tinted" icon="lock" disabled={busy}
               onClick={() => openSheet(close => <ApiKeySheet close={close} onDone={load} label={meta.label} placeholder={meta.keyPlaceholder} optional={meta.keyOptional} />)}>Replace key</Button>}
@@ -203,11 +205,14 @@ export default function AdminCoach() {
           {authState === 'optional' && <div className="adm-hint">This endpoint works without a key. Add one only if your server asks for it (OpenRouter does; a model on your own network usually does not).</div>}
           {authState === 'none' && <div className="adm-hint">{meta.setupToken
             ? 'Paste either a Claude Code setup token (your subscription) or an Anthropic API key (pay per use).'
-            : 'Paste an API key from the provider\'s console. It is stored encrypted on this server and sent to the provider only while a job runs.'}</div>}
+            : meta.deviceLogin
+              ? <>Sign the CLI in with your ChatGPT account (your subscription): on the server, run <code>docker compose exec -u coach -e CODEX_HOME=/coach-auth api codex login --device-auth</code>, open the link it prints, enter the code, then press <b>Check sign-in</b>. Or paste an OpenAI API key (pay per use).</>
+              : 'Paste an API key from the provider\'s console. It is stored encrypted on this server and sent to the provider only while a job runs.'}</div>}
           <div className="adm-actions">
             {meta.setupToken && <Button size="sm" variant="primary" icon="key" disabled={busy}
               onClick={() => openSheet(close => <SetupTokenSheet close={close} onDone={load} label={meta.label} />)}>Add Claude Code token</Button>}
-            {meta.apiKey && <Button size="sm" variant={meta.setupToken ? undefined : 'primary'} icon="lock" disabled={busy}
+            {meta.deviceLogin && <Button size="sm" variant="primary" icon="reset" disabled={busy} onClick={load}>Check sign-in</Button>}
+            {meta.apiKey && <Button size="sm" variant={meta.setupToken || meta.deviceLogin ? undefined : 'primary'} icon="lock" disabled={busy}
               onClick={() => openSheet(close => <ApiKeySheet close={close} onDone={load} label={meta.label} placeholder={meta.keyPlaceholder} optional={meta.keyOptional} />)}>
               {meta.keyOptional ? 'Add API key (optional)' : 'Add API key'}</Button>}
           </div>

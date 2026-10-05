@@ -11,7 +11,7 @@
  * take whichever fetch they are given. */
 // undici's own fetch alongside its Agent, so the dispatcher option is honoured by the same
 // undici version on every Node the image or a dev box happens to run.
-import { fetch as undiciFetch, Agent } from 'undici';
+import { fetch as undiciFetch, Agent, ProxyAgent } from 'undici';
 
 const GRACE_MS = 15000;
 
@@ -20,7 +20,12 @@ let agent = null;
 export function dispatcherFor(timeoutMs) {
   const budget = Math.max(60000, +timeoutMs || 0) + GRACE_MS;
   if (!agent || agent._coachBudget !== budget) {
-    agent = new Agent({ headersTimeout: budget, bodyTimeout: budget, connectTimeout: 30000 });
+    // COACH_PROXY (config.js) routes every provider call through the owner's proxy; read here
+    // directly so this module stays free of the config store.
+    const proxy = (process.env.COACH_PROXY || '').trim();
+    agent = proxy
+      ? new ProxyAgent({ uri: proxy, headersTimeout: budget, bodyTimeout: budget, connectTimeout: 30000 })
+      : new Agent({ headersTimeout: budget, bodyTimeout: budget, connectTimeout: 30000 });
     agent._coachBudget = budget;
   }
   return agent;
