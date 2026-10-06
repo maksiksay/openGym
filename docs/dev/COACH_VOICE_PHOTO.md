@@ -86,7 +86,7 @@ The fields:
 - per-100 g values within a label's bounds, with kcal agreeing with the macros. These are the
   checks `validateFood` makes, shared between the two;
 - `slot` and `day` from their lists, or dropped;
-- `text` up to 300 characters.
+- `text` up to 500 characters.
 
 The job's outcome is `meal`. The job's history entry keeps the validated meal, as a `nochange`
 keeps its reading, so the client gets it as `last.meal`. It does not use `pending`, so a meal card

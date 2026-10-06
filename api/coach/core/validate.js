@@ -637,6 +637,8 @@ const SOURCE_URL_MAX = 300;
 /** The longest a chat reading gets: the text and its source lines. jobs.js keeps it whole. */
 export const CHAT_READING_MAX = 5000;
 
+const plainText = s => String(s).replace(/`+/g, '').replace(/\*\*/g, '').trim();
+
 /** A source the person can open: an http(s) URL that parses, with a title cut short. */
 function sourceLine(s) {
   if (!s || typeof s !== 'object' || !isStr(s.url)) return null;
@@ -669,7 +671,9 @@ export function validateChat(data, plan, ctx = {}) {
     return validateReview({ summary: data.summary, evidence: data.evidence, changes: data.changes, notes: data.notes }, plan, ctx);
   }
   if (!isStr(data.text)) return fail([`reply "${data.reply}" needs its "text"`]);
-  let reading = clampStr(data.text.trim(), CHAT_TEXT_MAX);
+  // The chat shows plain text: code ticks and bold markers a model writes anyway would be shown
+  // as they are, so they go. The words stay.
+  let reading = clampStr(plainText(data.text), CHAT_TEXT_MAX);
   if (data.reply === 'answer' && Array.isArray(data.sources)) {
     const lines = [...new Set(data.sources.map(sourceLine).filter(Boolean))].slice(0, CHAT_SOURCES_MAX);
     if (lines.length) reading += '\n\n' + lines.join('\n');

@@ -133,7 +133,7 @@ export function validateMeal(v) {
   return {
     ok: true,
     meal: {
-      text: str(v.text, 300),
+      text: str(v.text, 500),
       slot: MEAL_SLOTS.includes(v.slot) ? v.slot : null,
       day: MEAL_DAYS.includes(v.day) ? v.day : 'today',
       items

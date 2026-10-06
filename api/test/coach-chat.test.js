@@ -67,6 +67,11 @@ test('an answer is clipped, and keeps at most five sources', () => {
   assert.ok(r.reading.length <= 4000);
 });
 
+test('an answer reaches the chat as plain text, without code ticks or bold markers', () => {
+  const r = validateChat({ reply: 'answer', text: 'Your `aggregates` are **empty**: no workouts yet.' }, plan());
+  assert.equal(r.reading, 'Your aggregates are empty: no workouts yet.');
+});
+
 test('a clarifying question is a message too, and needs its text', () => {
   const r = validateChat({ reply: 'clarify', text: 'Change what: a routine, or one exercise?' }, plan());
   assert.deepEqual(r, { ok: true, nochange: true, reading: 'Change what: a routine, or one exercise?' });
