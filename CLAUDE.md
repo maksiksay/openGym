@@ -25,7 +25,8 @@ website/   static project site (plain HTML/CSS/JS), deployed separately.
 kubernetes/ example manifests (docs/SELF_HOSTING_KUBERNETES.md).
 docs/      guides indexed in docs/README.md (FAQ, SELF_HOSTING*, MOBILE, AI_COACH, DATA_IMPORTS, API);
            docs/dev/ holds feature design notes (SET_TYPES: drop sets/rest-pause, LIST_VIEW, COMBINE_ROUTINES,
-           SCOREBOARD: wins, goal line, monthly quota).
+           SCOREBOARD: wins, goal line, monthly quota; AB_PLAN: Nordic/Copenhagen built-ins, the
+           2×40 A/B starter plan, the next session without a weekly schedule).
 ```
 
 ## Commands

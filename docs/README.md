@@ -49,6 +49,7 @@ Design notes for specific features, kept next to the code they describe:
 | [Workout views](dev/LIST_VIEW.md) | The cards, list and compact layouts of the workout screen |
 | [Combine routines](dev/COMBINE_ROUTINES.md) | Spec for running more than one routine in a session |
 | [Scoreboard](dev/SCOREBOARD.md) | Wins, the goal line on the exercise card and the monthly quota |
+| [A/B plan](dev/AB_PLAN.md) | Nordic curl and Copenhagen built-ins, the 2×40 starter plan, the next session without a schedule |
 
 ## Still stuck?
 
