@@ -51,6 +51,7 @@ Design notes for specific features, kept next to the code they describe:
 | [Scoreboard](dev/SCOREBOARD.md) | Wins, the goal line on the exercise card and the monthly quota |
 | [A/B plan](dev/AB_PLAN.md) | Nordic curl and Copenhagen built-ins, the 2×40 starter plan, the next session without a schedule |
 | [Coach web search](dev/COACH_WEB.md) | Letting the Coach search the web in plans, reviews and chat, search only |
+| [Coach chat](dev/COACH_CHAT.md) | The Coach decides whether a message is a question, a plan change or unclear |
 
 ## Still stuck?
 

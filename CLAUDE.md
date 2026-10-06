@@ -27,7 +27,8 @@ docs/      guides indexed in docs/README.md (FAQ, SELF_HOSTING*, MOBILE, AI_COAC
            docs/dev/ holds feature design notes (SET_TYPES: drop sets/rest-pause, LIST_VIEW, COMBINE_ROUTINES,
            SCOREBOARD: wins, goal line, monthly quota; AB_PLAN: Nordic/Copenhagen built-ins, the
            2×40 A/B starter plan, the next session without a weekly schedule; COACH_WEB: web search
-           for the Coach's plans, reviews and chat, search only).
+           for the Coach's plans, reviews and chat, search only; COACH_CHAT: one chat job that answers,
+           proposes plan changes or asks back).
 ```
 
 ## Commands
