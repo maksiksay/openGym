@@ -139,6 +139,49 @@ test('a review keeps its shorter memory of the conversation', () => {
   assert.ok(p.conversation.every(c => c.text.length <= payload.CONVERSATION_CHARS));
 });
 
+test('a chat payload carries the proposal still waiting, bounded', () => {
+  const waiting = {
+    id: 'p1', kind: 'review', planHash: 'h', summary: 'S'.repeat(900),
+    changes: [
+      { id: 'c1', type: 'sets', target: { routineId: 'r1', exId: '0001' }, before: 3, after: 4, why: 'w'.repeat(500) },
+      { id: 'c2', type: 'add-exercise', target: { routineId: 'r1' }, before: null, after: { id: '0002', sets: 3, reps: 10, pad: 'z'.repeat(1000) }, why: 'x' },
+    ],
+  };
+  const p = payload.build(sampleState(), { handle: 'h', kind: 'chat', message: 'Why?', waiting });
+  assert.equal(p.waiting.kind, 'review');
+  assert.equal(p.waiting.summary.length, 600);
+  assert.deepEqual(p.waiting.changes[0], { type: 'sets', target: { routineId: 'r1', exId: '0001', weekday: null }, before: 3, after: 4, why: 'w'.repeat(300) });
+  assert.ok(p.waiting.changes[1].after.startsWith('{"id":"0002"') && p.waiting.changes[1].after.length <= 200);
+  assert.equal('planHash' in p.waiting, false);
+  assert.equal('waiting' in payload.build(sampleState(), { handle: 'h', kind: 'review', waiting }), false, 'only a chat reads it');
+  assert.equal('waiting' in payload.build(sampleState(), { handle: 'h', kind: 'chat', message: 'x', waiting: { kind: 'create', bundle: {} } }), false);
+});
+
+test('a question asked while a review waits is answered, and the review keeps waiting', async () => {
+  const uid = 'u-chat-waiting';
+  writeState(DIR, uid, sampleState({ workouts: [{ ...sampleState().workouts[0], d: daysAgo(3) }] }));
+  jobs.enqueue(uid, { kind: 'review' });
+  const first = await settle(uid);
+  assert.equal(first.pending?.kind, 'review');
+  jobs.enqueue(uid, { kind: 'chat', message: 'Why one more set?' });
+  const s = await settle(uid);
+  assert.equal(s.pending?.id, first.pending.id, 'still the same proposal');
+  assert.equal(lastOutcome(uid).outcome, 'nochange');
+  assert.match(lastOutcome(uid).reading, /a waiting review \(1 changes\)/);
+});
+
+test('a review that finds nothing to change still clears the proposal waiting', async () => {
+  const uid = 'u-review-supersedes';
+  writeState(DIR, uid, sampleState({ workouts: [{ ...sampleState().workouts[0], d: daysAgo(3) }] }));
+  jobs.enqueue(uid, { kind: 'review' });
+  assert.ok((await settle(uid)).pending);
+  writeState(DIR, uid, sampleState({ workouts: [] }));
+  jobs.enqueue(uid, { kind: 'review' });
+  const s = await settle(uid);
+  assert.equal(lastOutcome(uid).outcome, 'nochange');
+  assert.equal(s.pending, null);
+});
+
 test('a chat may search the web like the other consultations', () => {
   assert.ok(jobs.webOptionsFor({ webSearch: true, provider: 'claude' }, 'chat').web);
   assert.deepEqual(jobs.webOptionsFor({ webSearch: false, provider: 'claude' }, 'chat'), {});

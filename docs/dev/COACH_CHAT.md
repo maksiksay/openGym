@@ -87,6 +87,9 @@ agreed to, so the consent does not change.
 The proposal waits as `pending` with kind `review`: the app shows, applies, logs and reverts it
 exactly as a review's. The job itself is `chat` in the history.
 
+An `answer` or a `clarify` leaves a proposal that was already waiting where it is, and the
+payload shows it to the model as `waiting` ([`COACH_VOICE_PHOTO.md`](COACH_VOICE_PHOTO.md)).
+
 ## Where it lives
 
 - `api/coach/prompts/chat.md`, then `node scripts/build-coach-assets.mjs` (`prompts.js`).

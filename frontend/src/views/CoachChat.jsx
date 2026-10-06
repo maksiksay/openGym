@@ -81,10 +81,16 @@ export default function CoachChat() {
     if (!was && !endedUnseen) return
     settleAwaited(was ? was.id : mine)
     const ms = was?.startedAt ? Date.now() - was.startedAt : 0
+    // How the run ended decides what the thread says, not whether a proposal is waiting: one may
+    // have been waiting all along, and a question asked about it is answered and leaves it there
+    // (docs/dev/COACH_VOICE_PHOTO.md). The demo's status has no `last`; there a proposal waiting
+    // after a run still means the run made it.
+    const ended = last && last.id === (was ? was.id : mine) ? last : null
+    const proposed = ended ? ended.outcome === 'ready' : !!pending
     update(s => {
       // A run that ended unseen has no duration worth learning from.
       if (was) recordTiming(s, ms)
-      if (!pending) {
+      if (!proposed) {
         const cls = lastError?.errorClass || (last?.outcome === 'failed' ? (last.errorClass || 'internal') : null)
         appendChat(s, cls
           ? { role: 'coach', kind: 'error', text: jobErrorText(cls, lastError?.detail) }

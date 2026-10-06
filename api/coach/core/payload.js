@@ -457,6 +457,41 @@ export function healthSlice(S, from, to) {
   return { from: start, to: to || null, days, food, goals, foodTracking: tracking };
 }
 
+/* ---------- a proposal still waiting, for a chat ----------
+ * What a question like "why fewer sets?" is about: the proposal the person has been shown and not
+ * yet decided on (docs/dev/COACH_VOICE_PHOTO.md). It was written by the server (or the phone),
+ * from an answer the validator passed, and is bounded again here like everything else that
+ * reaches a prompt. A value that is an object — an exercise being added — goes as short JSON. */
+const WAITING_CHANGES_MAX = 25;
+const WAITING_VALUE_MAX = 200;
+function waitingValue(v) {
+  if (v == null || typeof v === 'boolean' || (typeof v === 'number' && Number.isFinite(v))) return v ?? null;
+  if (typeof v === 'string') return v.slice(0, WAITING_VALUE_MAX);
+  try { return JSON.stringify(v).slice(0, WAITING_VALUE_MAX); } catch { return null; }
+}
+export function waitingSlice(w) {
+  if (!w || typeof w !== 'object') return null;
+  if (w.kind === 'debrief') return { kind: 'debrief', summary: text(w.summary, 600) };
+  if (w.kind !== 'review') return null;
+  return {
+    kind: 'review',
+    summary: text(w.summary, 600),
+    changes: list(w.changes).filter(c => c && typeof c === 'object').slice(0, WAITING_CHANGES_MAX).map(c => {
+      const t = c.target && typeof c.target === 'object' ? c.target : {};
+      return {
+        type: word(c.type, 24),
+        target: {
+          routineId: ident(t.routineId), exId: ident(t.exId),
+          weekday: Number.isInteger(t.weekday) && t.weekday >= 0 && t.weekday <= 6 ? t.weekday : null
+        },
+        before: waitingValue(c.before),
+        after: waitingValue(c.after),
+        why: text(c.why, 300)
+      };
+    })
+  };
+}
+
 /* The room's medians are computed on this server, but from other people's synced workouts —
    state their own clients wrote. cohort.js keeps only catalogue exercises; this copy bounds
    every field again, so what reaches one person's prompt never depends on that filter alone. */
@@ -501,7 +536,7 @@ export function workoutMeta(S, workoutId) {
  * Build a job payload.
  *
  * @param {object} S      the profile's synced state
- * @param {object} opts   { handle, kind, intake?, note?, refine?, message?, previous?, workoutId?, cohort?, lang? }
+ * @param {object} opts   { handle, kind, intake?, note?, refine?, message?, waiting?, previous?, workoutId?, cohort?, lang? }
  *
  * `handle` is the opaque per-profile pseudonym the payload carries instead of a uid. It is
  * supplied rather than derived because the two runtimes mint it differently: the server keys
@@ -587,6 +622,7 @@ export function build(S, opts = {}) {
     { const h = healthSlice(S, p.window.from, null); if (h) p.health = h; }
     if (opts.note) p.userNote = String(opts.note).slice(0, MAX_NOTE_CHARS);
     if (opts.kind === 'chat' && opts.message) p.message = String(opts.message).slice(0, MAX_NOTE_CHARS);
+    if (opts.kind === 'chat') { const w = waitingSlice(opts.waiting); if (w) p.waiting = w; }
     if (opts.cohort) p.cohort = cleanCohort(opts.cohort);
     // A review names mostly what is already trained; 60 candidates is plenty for a swap.
     p.library = librarySlice(S, p.coachProfile?.equipment, { keep: trainedIds(S, workouts), max: 60 });

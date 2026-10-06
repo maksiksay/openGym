@@ -89,7 +89,8 @@ export async function localStatus() {
 }
 
 export const localReview = (S, note) => start(S, 'review', { note: note ? String(note).slice(0, 1000) : null })
-export const localChat = (S, message) => start(S, 'chat', { message: String(message || '').slice(0, 1000) })
+// A chat reads the proposal still waiting on this phone, as the server's does.
+export const localChat = async (S, message) => start(S, 'chat', { message: String(message || '').slice(0, 1000), waiting: (await loadCoachDevice()).pending || null })
 export const localPlan = (S, intake) => start(S, 'create', { intake: intake || null })
 export const localRefine = async (S, text) => {
   const d = await loadCoachDevice()
@@ -143,7 +144,7 @@ async function start(S, kind, opts) {
 async function run(S, kind, opts, d, adapter) {
   const key = await getApiKey()
   const payload = payloadLib.build(S, {
-    handle: await handle(), kind, intake: opts.intake, note: opts.note, refine: opts.refine, message: opts.message, previous: opts.previous, workoutId: opts.workoutId,
+    handle: await handle(), kind, intake: opts.intake, note: opts.note, refine: opts.refine, message: opts.message, waiting: opts.waiting, previous: opts.previous, workoutId: opts.workoutId,
     lang: getLang()   // what the app shows, which a profile that never picked a language does not store (#303)
   })
   const attempt = await runPipeline({

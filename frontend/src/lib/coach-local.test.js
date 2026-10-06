@@ -92,6 +92,18 @@ describe('the Coach on a phone with its own key', () => {
     expect(wire.calls[0].body.messages[0].content).toContain('# Task: answer a message in the chat')
   })
 
+  it('a chat answer reads the proposal waiting on the phone, and leaves it waiting', async () => {
+    await local.localReview(state())
+    const first = await settle()
+    expect(first.pending.kind).toBe('review')
+    wire.answer = chat(JSON.stringify({ coach_contract: 1, reply: 'answer', text: 'One more set, because every set was clean.' }))
+    await local.localChat(state(), 'Why one more set?')
+    const s = await settle()
+    expect(s.pending.id).toBe(first.pending.id)
+    expect(s.last).toMatchObject({ kind: 'chat', outcome: 'nochange', reading: 'One more set, because every set was clean.' })
+    expect(wire.calls.at(-1).body.messages[1].content).toContain('"waiting":{"kind":"review"')
+  })
+
   it('a chat message that asks for a change gets a review\'s proposal, which the apply engine accepts', async () => {
     const S = state()
     wire.answer = chat(JSON.stringify({ ...review, reply: 'changes' }))

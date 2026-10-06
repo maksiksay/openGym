@@ -136,7 +136,7 @@ if (kind === 'chat') {
   }
   out({
     coach_contract: 1, reply: 'answer',
-    text: `You asked (${msg.length} characters): "${msg.slice(0, 200)}". I can see ${(P.conversation || []).length} earlier lines and ${(P.window?.workouts || []).length} sessions.`,
+    text: `You asked (${msg.length} characters): "${msg.slice(0, 200)}". I can see ${(P.conversation || []).length} earlier lines, ${(P.window?.workouts || []).length} sessions and ${P.waiting ? 'a waiting ' + P.waiting.kind + ' (' + (P.waiting.changes || []).length + ' changes)' : 'nothing waiting'}.`,
     sources: [
       { title: 'A source on protein', url: 'https://example.org/protein' },
       { title: 'Not a page', url: 'javascript:alert(1)' }

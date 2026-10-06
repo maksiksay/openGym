@@ -9,7 +9,7 @@ import { refinePlan, requestReview, sendChat } from '../lib/coach-api.js'
 // decides itself whether to answer, propose a change or ask back, except while a new plan is
 // pending or there is no plan at all, where it still refines the plan.
 const mocks = vi.hoisted(() => {
-  const state = { S: null, pending: null, job: null, nav: vi.fn(), toast: vi.fn(), openSheet: vi.fn(), refresh: vi.fn() }
+  const state = { S: null, pending: null, job: null, last: null, nav: vi.fn(), toast: vi.fn(), openSheet: vi.fn(), refresh: vi.fn() }
   state.storeSnapshot = () => ({
     S: state.S,
     user: { id: 'u1' },
@@ -34,7 +34,7 @@ vi.mock('../store/useUI.js', () => {
 })
 vi.mock('react-router-dom', () => ({ useNavigate: () => mocks.nav }))
 vi.mock('../lib/coach-api.js', () => ({
-  useCoachStatus: () => ({ pending: mocks.pending, job: mocks.job, cap: null, loading: false, lastError: null, last: null, refresh: mocks.refresh, maxMessageLen: 1000 }),
+  useCoachStatus: () => ({ pending: mocks.pending, job: mocks.job, cap: null, loading: false, lastError: null, last: mocks.last, refresh: mocks.refresh, maxMessageLen: 1000 }),
   resolvePending: vi.fn(() => Promise.resolve({})),
   refinePlan: vi.fn(() => Promise.resolve({})),
   requestReview: vi.fn(() => Promise.resolve({})),
@@ -67,10 +67,11 @@ const state = ({ routines = [routine], chat = [] } = {}) => ({
 })
 
 let root, host
-async function mount({ S = state(), pending = null } = {}) {
+async function mount({ S = state(), pending = null, job = null, last = null } = {}) {
   mocks.S = S
   mocks.pending = pending
-  mocks.job = null
+  mocks.job = job
+  mocks.last = last
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
@@ -119,6 +120,41 @@ describe('a message typed in the Coach chat', () => {
     await say('Three days, dumbbells only')
     expect(refinePlan).toHaveBeenCalledWith('Three days, dumbbells only')
     expect(sendChat).not.toHaveBeenCalled()
+  })
+})
+
+describe('when a run ends', () => {
+  const review = { id: 'r1', kind: 'review', summary: 's', changes: [] }
+  const running = { id: 'j1', kind: 'chat', state: 'running', startedAt: Date.now() }
+  async function end(last, pending = review) {
+    mocks.job = null
+    mocks.last = last
+    mocks.pending = pending
+    await act(async () => { root.render(React.createElement(CoachChat)) })
+  }
+
+  it('writes the answer into the thread even with a review waiting, and leaves the review', async () => {
+    await mount({ pending: review, job: running })
+    await end({ id: 'j1', kind: 'chat', outcome: 'nochange', reading: 'Because every set hit its target.' })
+    expect(mocks.S.coach.chat.at(-1)).toMatchObject({ role: 'coach', kind: 'nochange', text: 'Because every set hit its target.' })
+    const lines = mocks.S.coach.chat.length
+    await act(async () => { root.render(React.createElement(CoachChat)) })   // the store's update, seen
+    expect(mocks.S.coach.chat).toHaveLength(lines)
+    expect(host.textContent).toContain('Because every set hit its target.')
+    expect(host.querySelector('[role="checkbox"], .pcard')).toBeTruthy()
+  })
+
+  it('writes nothing when the run made the proposal', async () => {
+    await mount({ job: running })
+    const before = mocks.S.coach.chat.length
+    await end({ id: 'j1', kind: 'chat', outcome: 'ready' })
+    expect(mocks.S.coach.chat).toHaveLength(before)
+  })
+
+  it('says it failed, with a review waiting too', async () => {
+    await mount({ pending: review, job: running })
+    await end({ id: 'j1', kind: 'chat', outcome: 'failed', errorClass: 'timeout' })
+    expect(mocks.S.coach.chat.at(-1)).toMatchObject({ role: 'coach', kind: 'error' })
   })
 })
 

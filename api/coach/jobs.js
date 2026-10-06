@@ -327,6 +327,8 @@ async function execute(job) {
   }
 
   const pendingCreate = job.refine ? readUser(job.uid).pending : null;
+  // A chat reads the proposal still waiting, so a question can be about it.
+  const waiting = job.kind === 'chat' ? readUser(job.uid).pending : null;
   const payload = payloadLib.build(S, {
     handle: handleFor(job.uid),
     kind: job.kind,
@@ -334,6 +336,7 @@ async function execute(job) {
     note: job.note,
     refine: job.refine,
     message: job.message,
+    waiting,
     previous: pendingCreate?.bundle || null,
     workoutId: job.workoutId,
     // The app says which language it is in. A scheduled review has no app behind it: a profile
@@ -372,7 +375,10 @@ async function execute(job) {
       return finish(job, { outcome: 'failed', errorClass, detail: attempt.detail });
     }
     if (attempt.nochange) {
-      return finish(job, { outcome: 'nochange', pending: null, detail: null, reading: attempt.reading });
+      // A review that finds nothing to change supersedes the proposal waiting; a chat that
+      // answers a question, or asks one back, leaves it where it is: the question may well be
+      // about it (docs/dev/COACH_VOICE_PHOTO.md).
+      return finish(job, { outcome: 'nochange', pending: job.kind === 'chat' ? undefined : null, detail: null, reading: attempt.reading });
     }
     const pending = {
       id: job.id,
