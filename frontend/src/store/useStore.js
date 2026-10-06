@@ -171,6 +171,9 @@ export const DEF = {
   // is the last time in that routine, 'best' the best set of the exercise ever logged. Tapping
   // the line switches it. Absent reads as 'last', the line as it always was.
   logRef: 'last',
+  // Training days a month the Home quota counts towards (lib/quota.js): null follows the plan,
+  // four weeks of its training days; a number of your own holds whatever the plan says.
+  monthGoal: null,
   // Structural Balance (views/StructuralBalance.jsx): which built-in ratio template is active,
   // and per-role exercise overrides keyed by `${templateId}:${roleId}` — see
   // lib/structuralBalance.js's overrideKey(). An override (`{ id, _ts }`, `id: null` once

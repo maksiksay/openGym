@@ -180,7 +180,7 @@ describe('badges on a workout logged into the past', () => {
     expect(byDay['2026-09-14']).toContain(BENCH)
     expect(byDay['2026-09-15']).not.toContain(BENCH)   // 52.5 no longer leads what came before it
     expect(byDay['2026-09-11']).toContain(BENCH)
-    // The summary names it.
-    expect(mountTopSheet().textContent).toContain('New PR:')
+    // The summary names it, as a weight record among the day's wins (docs/dev/SCOREBOARD.md).
+    expect(mountTopSheet().textContent).toContain('weight 60 kg')
   })
 })

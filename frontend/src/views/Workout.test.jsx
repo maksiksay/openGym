@@ -171,7 +171,7 @@ async function pressNext() {
 }
 
 async function pressProgression(index = 0) {
-  const button = container.querySelectorAll('.progline')[index]
+  const button = container.querySelectorAll('.goalline')[index]
   expect(button).toBeTruthy()
   await act(async () => { button.dispatchEvent(new dom.Event('click', { bubbles: true })) })
   return button
@@ -235,7 +235,7 @@ it('edits a saved set without running live completion, rest or success feedback'
   expect(mocks.workoutCompleteSheet).not.toHaveBeenCalled()
   expect(mocks.toast).not.toHaveBeenCalled()
   expect(container.textContent).toContain('Editing a saved workout')
-  expect(container.querySelector('.progline')).toBeNull()
+  expect(container.querySelector('.goalline')).toBeNull()
   const more = container.querySelector('button[aria-label="More"]')
   await act(async () => { more.dispatchEvent(new dom.Event('click', { bubbles: true })) })
   expect(mocks.menuSheet.mock.calls.at(-1)[0].items.filter(Boolean).map(item => item.label)).not.toContain('Progression settings')
@@ -809,7 +809,7 @@ describe('Workout discard timer lifecycle', () => {
 })
 
 describe('progression guidance', () => {
-  it('labels the visible outcome with the policy that calculated it', async () => {
+  it('names the goal line after the policy that set it', async () => {
     await mount([exercise('plain-bench', [false, false, false], {
       plan: {
         policy: 'linear',
@@ -819,8 +819,9 @@ describe('progression guidance', () => {
       },
     })])
 
-    expect(container.querySelector('.progline')?.textContent)
-      .toContain('Linear progression · Every rep last time — 2.5 kg more.')
+    const line = container.querySelector('.goalline')
+    expect(line.getAttribute('title')).toBe('Linear progression · Every rep last time — 2.5 kg more.')
+    expect(line.getAttribute('aria-label')).toContain('Linear progression · Every rep last time — 2.5 kg more.')
   })
 
   it('is a keyboard-accessible button that opens settings for the pressed grouped entry', async () => {
@@ -839,7 +840,7 @@ describe('progression guidance', () => {
 
     expect(button.tagName).toBe('BUTTON')
     expect(button.getAttribute('type')).toBe('button')
-    expect(button.getAttribute('aria-label')).toBe('Open progression settings')
+    expect(button.getAttribute('aria-label')).toMatch(/\. Open progression settings$/)
     expect(mocks.exConfigSheet).toHaveBeenCalledOnce()
     // An entry with no stamped plan opens at its target.
     expect(mocks.exConfigSheet.mock.calls[0][1]).toEqual(second.target)
@@ -937,16 +938,17 @@ describe('progression guidance', () => {
     expect(saved.sets[0]).toEqual(completed)
     expect(saved.sets[0]).toEqual({ w: 60, r: 5, done: true })
     expect(saved.sets[1]).toEqual({ w: 62.5, r: 3, done: false })
-    expect(container.querySelector('.progline')?.textContent)
-      .toContain('Double progression · Top of the rep range in every set — 2.5 kg more, back to 3 reps.')
+    expect(container.querySelector('.goalline')?.getAttribute('title'))
+      .toBe('Double progression · Top of the rep range in every set — 2.5 kg more, back to 3 reps.')
+    expect(container.querySelector('.goalline')?.textContent).toBe('Beat: 62.5 kg × 3 · 3')
 
     const persisted = JSON.parse(JSON.stringify(mocks.S))
     await unmount()
     mocks.S = persisted
     installDom()
     await act(async () => { root.render(React.createElement(Workout)) })
-    expect(container.querySelector('.progline')?.textContent)
-      .toContain('Double progression · Top of the rep range in every set — 2.5 kg more, back to 3 reps.')
+    expect(container.querySelector('.goalline')?.getAttribute('title'))
+      .toBe('Double progression · Top of the rep range in every set — 2.5 kg more, back to 3 reps.')
   })
 })
 
@@ -1035,7 +1037,7 @@ describe('saving progression settings unchanged', () => {
     expect(after.plan.kind).toBe('up')
     expect(after.planned).toEqual(before.planned)
     expect(after.target).toMatchObject({ weight: 42.5, reps: 8, repsMin: 8 })
-    expect(container.querySelector('.planline')?.textContent).toBe('Plan: 3 × 8–12')
+    expect(container.querySelector('.goalline')?.textContent).toBe('Beat: 42.5 kg × 8 · 8 · 8')
     const following = next(st)
     expect(following.plan.why[0]).not.toBe('Plan changed — starting from your new target.')
     expect(rows(following)).toEqual([[42.5, 9], [42.5, 9], [42.5, 9]])
@@ -1053,14 +1055,14 @@ describe('saving progression settings unchanged', () => {
     expect(rows(following)).toEqual([[0, 14], [0, 14]])
   })
 
-  it('keeps a set the rep ceiling added, and the plan line still reads the plan', async () => {
+  it('keeps a set the rep ceiling added, and the goal line reads it', async () => {
     const st = history({ id: PUSHUP, sets: 2, reps: 10, repsMax: 11, weight: 0, bodyweight: true }, 2)
     const { before, opened, after } = await saveUnchanged(st)
     expect(rows(before)).toEqual([[0, 10], [0, 10], [0, 10]])
     expect(opened.sets).toBe(2)
     expect(rows(after)).toEqual([[0, 10], [0, 10], [0, 10]])
     expect(after.planned).toEqual(before.planned)
-    expect(container.querySelector('.planline')?.textContent).toBe('Plan: 2 × 10 · today 3 × 10')
+    expect(container.querySelector('.goalline')?.textContent).toBe('Beat: 10 · 10 · 10')
     expect(rows(next(st))).toEqual([[0, 11], [0, 11], [0, 11]])
   })
 
@@ -1529,7 +1531,7 @@ describe('workout list view', () => {
 
 // The card slid in during a swipe is the card that lands (renderPreview). Rendered without the
 // progression line, it grew by that line the moment it snapped into place.
-it('shows the progression line on the card a swipe slides in, as the card itself will', async () => {
+it('shows the goal line on the card a swipe slides in, as the card itself will', async () => {
   const planned = id => exercise(id, [false], {
     plan: { policy: 'linear', kind: 'up', weight: 62.5, why: ['Every rep last time — {0} {1} more.', 2.5, 'kg'] },
   })
@@ -1544,7 +1546,7 @@ it('shows the progression line on the card a swipe slides in, as the card itself
   await pointer('pointermove', 150)
   const preview = container.querySelector('.workout-swipe-preview')
   expect(preview).toBeTruthy()
-  expect(preview.querySelector('.progline')).toBeTruthy()
+  expect(preview.querySelector('.goalline')).toBeTruthy()
   await pointer('pointercancel', 150)
 })
 
@@ -1568,7 +1570,7 @@ describe('workout compact view', () => {
     expect(units()[0].textContent).toContain('Current')
   })
 
-  it('strips the progression line, tags and last-time recap that list mode shows', async () => {
+  it('keeps the goal line and strips the tags and last-time recap that list mode shows', async () => {
     const state = {
       workoutView: 'compact',
       exWeights: { 'plain-bench': { w: 80 } },
@@ -1576,7 +1578,7 @@ describe('workout compact view', () => {
     }
     await mount([withExtras([false])], 0, state)
 
-    expect(container.querySelector('.progline')).toBeNull()
+    expect(container.querySelector('.goalline')).toBeTruthy()
     expect(container.textContent).not.toContain('Best:')
     expect(container.textContent).not.toContain('Last time')
     // The sets card and the ⋯ menu button survive — nothing is truly unreachable.
@@ -1592,7 +1594,7 @@ describe('workout compact view', () => {
     }
     await mount([withExtras([false])], 0, state)
 
-    expect(container.querySelector('.progline')).toBeTruthy()
+    expect(container.querySelector('.goalline')).toBeTruthy()
     expect(container.textContent).toContain('Best:')
     expect(container.textContent).toContain('Last time')
   })
@@ -1610,52 +1612,105 @@ describe('workout compact view', () => {
   })
 })
 
-// Issue #275: the card says what the routine planned, in every view, and when the rows opened
-// somewhere else — progression moved them, or they carry last session's reps.
-describe('the plan line', () => {
-  const planned = (extra = {}) => exercise('plain-bench', [false, false], {
-    planned: { sets: 2, reps: 10, weight: 60 },
-    target: { mode: 'reps', sets: 2, reps: 10, weight: 62.5, bodyweight: false },
+// The goal line (docs/dev/SCOREBOARD.md) stands where the plan line (#275) and the progression
+// line were: the one number to beat today, how far it is past last time, what today has won so
+// far, and a mark on every set that beat the same set last time.
+describe('the goal line', () => {
+  const done = (w, r) => ({ w, r, done: true })
+  const open = (w, r) => ({ w, r, done: false })
+  const lastTime = (sets, target = { mode: 'reps', reps: 8, weight: 60 }) => ({
+    d: '2026-08-26', start: Date.parse('2026-08-26T18:00:00'), routineIds: ['A'],
+    entries: [{ id: 'plain-bench', rid: 'A', target, sets }],
+  })
+  const today = (rows, extra = {}) => exercise('plain-bench', [], {
+    rid: 'A',
+    target: { mode: 'reps', sets: 3, reps: 8, weight: 60, bodyweight: false },
+    plan: { policy: 'double', kind: 'hold', weight: 60, reps: 8, why: ['Same weight — aim for {0} reps this time.', 8] },
+    sets: rows,
     ...extra,
   })
-  const line = () => container.querySelector('.planline')?.textContent
+  const goal = () => container.querySelector('.goalline')
+  const ref = () => container.querySelector('.refline')
+  const beforeLast = [done(60, 8), done(60, 8), done(60, 7)]
 
-  it('shows the plan quietly when the rows are the plan', async () => {
-    await mount([planned()])
-    expect(line()).toBe('Plan: 2 × 10')
+  it('names the number to beat, and how far it is past last time', async () => {
+    await mount([today([open(60, 8), open(60, 8), open(60, 8)])], 0, { workouts: [lastTime(beforeLast)] })
+    expect(goal().textContent).toBe('Beat: 60 kg × 8 · 8 · 8')
+    expect(goal().getAttribute('title')).toBe('Double progression · Same weight — aim for 8 reps this time.')
+    expect(ref().textContent).toMatch(/^Last time \(.+\): 60×8, 60×8, 60×7 → \+1 rep$/)
   })
 
-  it('says when progression moved the sets or reps', async () => {
-    await mount([planned({ target: { mode: 'reps', sets: 3, reps: 10, weight: 0, bodyweight: true } })])
-    expect(line()).toBe('Plan: 2 × 10 · today 3 × 10')
+  it('says first time when there is nothing to beat yet', async () => {
+    await mount([today([open(60, 8)], { plan: { policy: 'double', kind: 'first', why: ['Nothing logged yet — this session sets the baseline.'] } })])
+    expect(goal().textContent).toBe('First time — this sets your baseline')
+    expect(ref()).toBeNull()
   })
 
-  it('says when the reps were carried over from the last session', async () => {
-    await mount([planned({ carried: true, sets: [{ w: 62.5, r: 15, done: false }, { w: 62.5, r: 15, done: false }] })])
-    expect(line()).toBe('Plan: 2 × 10 · reps from your last session')
+  it('calls a deload a deload, says why on the line, and measures nothing against it', async () => {
+    await mount([today([open(54, 8)], {
+      target: { mode: 'reps', sets: 3, reps: 8, weight: 54 },
+      plan: { policy: 'linear', kind: 'deload', weight: 54, why: ['Missed reps — reset to {0} {1} and work back up.', 54, 'kg'] },
+    })], 0, { workouts: [lastTime([done(60, 8), done(60, 6), done(60, 5)])] })
+    expect(goal().classList.contains('warn')).toBe(true)
+    expect(goal().textContent).toBe('Deload: 54 kg × 8 · 8 · 8 · Missed reps — reset to 54 kg and work back up.')
+    expect(ref().textContent).not.toContain('→')
   })
 
-  it('reads a double-progression aim inside the range as the plan', async () => {
-    await mount([planned({ planned: { sets: 3, reps: 12, repsMin: 8, weight: 40 }, target: { mode: 'reps', sets: 3, reps: 11, repsMin: 8, weight: 40 } })])
-    expect(line()).toBe('Plan: 3 × 8–12')
+  it('reads a bodyweight climb that added a set', async () => {
+    const bw = { mode: 'reps', sets: 3, reps: 10, weight: 0, bodyweight: true }
+    await mount([today([open(0, 10), open(0, 10), open(0, 10)], { target: bw })], 0,
+      { workouts: [lastTime([done(0, 10), done(0, 10)], { ...bw, sets: 2 })] })
+    expect(goal().textContent).toBe('Beat: 10 · 10 · 10')
+    expect(ref().textContent).toMatch(/→ \+10 reps$/)
   })
 
-  it('stays in compact view, where the last-time recap and progression line go', async () => {
-    await mount([planned()], 0, { workoutView: 'compact' })
-    expect(line()).toBe('Plan: 2 × 10')
+  it('says only today for an exercise kept out of progression', async () => {
+    await mount([today([open(40, 8)], {
+      noProg: true, target: { mode: 'reps', sets: 3, reps: 8, weight: 40 }, plan: { policy: 'off', kind: 'off' },
+    })], 0, { workouts: [lastTime([done(60, 8)])] })
+    expect(goal().textContent).toBe('Today: 40 kg × 8 · 8 · 8')
+    expect(goal().classList.contains('quiet')).toBe(true)
+  })
+
+  it('stays in compact view, where the last-time recap goes', async () => {
+    await mount([today([open(60, 8)])], 0, { workoutView: 'compact', workouts: [lastTime(beforeLast)] })
+    expect(goal().textContent).toBe('Beat: 60 kg × 8 · 8 · 8')
     expect(container.textContent).not.toContain('Last time')
   })
 
   it('sits next to a "Last time" that reads this routine\'s own last session (#216)', async () => {
     const session = (d, rid, w, r) => ({ d, routineIds: [rid], entries: [{ id: 'plain-bench', rid, target: { reps: r, weight: w }, sets: [{ w, r, done: true }] }] })
-    await mount([planned({ rid: 'A' })], 0, { workouts: [session('2026-08-24', 'A', 60, 10), session('2026-08-26', 'B', 40, 15)] })
+    await mount([today([open(60, 8)])], 0, { workouts: [session('2026-08-24', 'A', 60, 10), session('2026-08-26', 'B', 40, 15)] })
     expect(container.textContent).toContain('60×10')
     expect(container.textContent).not.toContain('40×15')
   })
 
-  it('is not there for an entry with no plan (freestyle, or started before plans were kept)', async () => {
-    await mount([exercise('plain-bench', [false])])
-    expect(container.querySelector('.planline')).toBeNull()
+  it('chips the card once today beats last time, and marks the set that did it', async () => {
+    await mount([today([done(60, 8), done(60, 8), done(60, 8)])], 0, { workouts: [lastTime(beforeLast)] })
+    // 24 reps at 60 is also the most volume yet: the trophy goes on the same chip
+    expect(container.querySelector('.winchip.rec')?.textContent).toBe('+1 rep')
+    expect([...container.querySelectorAll('.setmark')].map(m => m.textContent)).toEqual(['+1'])
+  })
+
+  it('ticks a beat that set no record', async () => {
+    const best = { d: '2026-08-20', start: Date.parse('2026-08-20T18:00:00'), routineIds: ['A'],
+      entries: [{ id: 'plain-bench', rid: 'A', target: { mode: 'reps', reps: 8, weight: 60 }, sets: [done(60, 10), done(60, 10), done(60, 10)] }] }
+    await mount([today([done(60, 8), done(60, 8), done(60, 8)])], 0, { workouts: [best, lastTime(beforeLast)] })
+    expect(container.querySelector('.winchip')?.className).toBe('winchip')
+    expect(container.querySelector('.winchip')?.textContent).toBe('+1 rep')
+  })
+
+  it('says record when today set one without beating last time', async () => {
+    const heavier = { d: '2026-08-27', start: Date.parse('2026-08-27T18:00:00'), routineIds: ['A'],
+      entries: [{ id: 'plain-bench', rid: 'A', target: { mode: 'reps', reps: 5, weight: 65 }, sets: [done(65, 5)] }] }
+    await mount([today([done(60, 9)])], 0, { workouts: [lastTime(beforeLast), heavier] })
+    expect(container.querySelector('.winchip.rec')?.textContent).toBe('Record')
+  })
+
+  it('has no chip and no mark before anything is better', async () => {
+    await mount([today([done(60, 8), open(60, 8), open(60, 8)])], 0, { workouts: [lastTime(beforeLast)] })
+    expect(container.querySelector('.winchip')).toBeNull()
+    expect(container.querySelector('.setmark')).toBeNull()
   })
 })
 
@@ -1941,7 +1996,8 @@ describe('the reference line: last time or best set', () => {
 
   it('reads last time in this routine by default, and the best set once switched', async () => {
     await mount([exercise('plain-bench', [false], { rid: 'A' })], 0, { workouts: history })
-    expect(line().textContent).toMatch(/^Last time \(.+\): 55×8$/)
+    // today's 60 × 5 is 5 kg past it
+    expect(line().textContent).toMatch(/^Last time \(.+\): 55×8 → \+5 kg$/)
     await act(async () => { line().dispatchEvent(new dom.Event('click', { bubbles: true })) })
     expect(mocks.S.logRef).toBe('best')
     await rerender()
@@ -2016,7 +2072,7 @@ describe('the reference line: last time or best set', () => {
   // The text is the reference; the name also says what a tap does, after the text it shows.
   it('names the switch a tap makes', async () => {
     await mount([exercise('plain-bench', [false], { rid: 'A' })], 0, { workouts: history })
-    expect(line().getAttribute('aria-label')).toMatch(/^Last time \(.+\): 55×8\. Show your best set instead$/)
+    expect(line().getAttribute('aria-label')).toMatch(/^Last time \(.+\): 55×8 → \+5 kg\. Show your best set instead$/)
     await act(async () => { line().dispatchEvent(new dom.Event('click', { bubbles: true })) })
     await rerender()
     expect(line().getAttribute('aria-label')).toMatch(/^Best set \(.+\): 80×5\. Show last time instead$/)

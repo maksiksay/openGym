@@ -58,6 +58,11 @@ describe('the month', () => {
     expect(monthQuota(any, '2026-10-05').done).toBe(3)
   })
 
+  it('reads the day of a record whose date got mangled from its start', () => {
+    const odd = { workouts: [{ id: 'x', d: 'not a day', start: Date.parse('2026-10-03T18:00:00'), entries: [] }] }
+    expect(monthQuota(odd, '2026-10-05').done).toBe(1)
+  })
+
   it('reads an empty profile as nothing done', () => {
     expect(monthQuota({}, '2026-10-05')).toMatchObject({ done: 0, goal: 8, met: false, prevDone: 0 })
   })

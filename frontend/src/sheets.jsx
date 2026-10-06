@@ -29,7 +29,10 @@ import { exerciseMuscleSnapshot, loadOfWorkouts, MUSCLES, MUSCLE_NAME, normalize
 import { parseImport, mergeImport } from './lib/import-csv.js'
 import { importHevyData, HevyApiError, HEVY_DEV_SETTINGS, mergeHevyRoutines } from './lib/import-hevy.js'
 import { buildPlanBundle, parsePlan, mergePlan, printPlan, planPrintHTML } from './lib/plan-share.js'
-import { estimate1RM, best1RM, is1RMRecord, REP_CAP } from './lib/onerm.js'
+import { estimate1RM, best1RM, REP_CAP } from './lib/onerm.js'
+import { winsOf } from './lib/scoreboard.js'
+import { monthQuota, monthGoalOf, autoMonthGoal, MAX_MONTH_GOAL } from './lib/quota.js'
+import { ts, nWins, winChips, monthLabel } from './lib/score-i18n.js'
 import { exerciseHistory } from './lib/exercise-history.js'
 import { policyFor, defaultIncrement, POLICIES_FOR, POLICY_NAME, POLICY_DESC, MAX_BW_SETS, weightIncrement } from './lib/progression.js'
 import { normalizeRepRange } from './lib/rep-range.js'
@@ -1993,13 +1996,24 @@ function WorkoutDetail({ w, close }) {
     })
   }, [])
   const nameOf = e => (EXIDX[e.id] ? exerciseNameFor(EXIDX[e.id]) : (e.n || e.id))
+  // What each exercise won in this session (docs/dev/SCOREBOARD.md), read from the history as it
+  // is now; an exercise done twice on a combined day shows it once, on its first row.
+  const wins = winsOf(st.workouts, w)
+  const winShown = new Set()
+  const winLine = e => {
+    const win = winShown.has(e.id) ? null : wins.find(x => x.id === e.id)
+    if (!win) return null
+    winShown.add(e.id)
+    return <div className="winline small"><Icon name="trophy" />{winChips(win, st.unit).join(' · ')}</div>
+  }
   // Tapping an exercise opens its history (Discord 'Improvement ideas'): from one session to the
   // curve it sits on, which is the question a past workout raises most often.
   const entryRow = (e, i) => {
     const ex = EXIDX[e.id]
     return <div key={i} className="row wd-ex" style={{ alignItems: 'flex-start' }} {...tappable(() => exerciseHistorySheet(e.id))}>
       {ex && <Thumb ex={ex} />}
-      <div className="grow"><div className={`tt ${exerciseNameClass(ex)}`} style={{ fontWeight: 600 }}>{nameOf(e)} {w.prs && w.prs.includes(e.id) && <span className="pr"><Icon name="trophy" />PR</span>}</div>
+      <div className="grow"><div className={`tt ${exerciseNameClass(ex)}`} style={{ fontWeight: 600 }}>{nameOf(e)}</div>
+        {winLine(e)}
         <div className="ss">{e.sets.filter(hasCompletedWork).map(s => setLabel(e.id, s, e.target, speedUnitOf(st))).join('  ·  ') || t('no sets')}</div>
         {e.note && <div className="small dim" style={{ marginTop: 3 }}>
           {e.notePin && <Icon name="flag" style={{ fontSize: 12, marginInlineEnd: 4, verticalAlign: '-1px', color: 'var(--yellow)' }} />}{e.note}
@@ -2150,17 +2164,36 @@ function Calendar({ start, close }) {
 }
 export const calendarSheet = start => ui().openSheet(close => <Calendar start={start} close={close} />)
 
+/* the month's quota goal (lib/quota.js, docs/dev/SCOREBOARD.md) */
+function MonthGoal({ close }) {
+  const S = useStore(s => s.S)
+  const update = useStore(s => s.update)
+  const [v, setV] = useState(monthGoalOf(S))
+  const auto = autoMonthGoal(S)
+  return <>
+    <h3>{ts('Training days a month')}</h3>
+    <p className="muted small">{ts('Counted on the days you train, from one set up. A missed session costs nothing: the month starts fresh on the first.')}</p>
+    <Stepper value={v} min={1} max={MAX_MONTH_GOAL} step={1} decimal={false} onChange={setV} />
+    <div style={{ height: 14 }} />
+    <Button variant="primary" onClick={() => { update(s => { s.monthGoal = v }); close() }}>{t('Save')}</Button>
+    <div style={{ height: 8 }} />
+    <Button onClick={() => { update(s => { s.monthGoal = null }); close() }}>{ts('Auto — {0} from your plan', auto)}</Button>
+  </>
+}
+export const monthGoalSheet = () => ui().openSheet(close => <MonthGoal close={close} />)
+
 /* shared small workout row (used in lists) */
 export function WorkoutRow({ w, onClick }) {
   const st = useStore(s => s.S)
   const glyph = glyphOf((st.routines.find(r => r.id === w.routineId) || {}).emoji)
   const mediaN = workoutMediaCount(w)
+  const wins = winsOf(st.workouts, w).length
   return <div className="item" {...tappable(onClick)}>
     <span className="lrow-i" style={{ width: 34, height: 34, borderRadius: 8, fontSize: 19 }}><Icon name={glyph} /></span>
     <div className="grow"><div className="tt">{w.name}</div>
       <div className="ss">{[fmtDate(w.d, true), ...durPart(w.end - w.start), t('{0} sets', setsDone(w)), fmtVol(w.vol, st.unit)].join(' · ')}</div></div>
     {mediaN > 0 && <span className="wrow-media" title={t(mediaN === 1 ? '{0} photo or video' : '{0} photos or videos', mediaN)} aria-label={t(mediaN === 1 ? '{0} photo or video' : '{0} photos or videos', mediaN)}><Icon name="image" />{mediaN}</span>}
-    {w.prs && w.prs.length > 0 && <span className="pr"><Icon name="trophy" />{w.prs.length} PR</span>}
+    {wins > 0 && <span className="pr" title={nWins(wins)} aria-label={nWins(wins)}><Icon name="trophy" />{wins}</span>}
     <Icon name="chevronRight" className="chev" />
   </div>
 }
@@ -2603,8 +2636,15 @@ export function exitWorkoutEdit(onExit = () => nav('/history')) {
   </>, { kind: 'center' })
 }
 
-function FinishSummary({ w, prs, e1prs = [], close }) {
+function FinishSummary({ w, close }) {
   const st = useStore(s => s.S)
+  // The wins come from the saved history (docs/dev/SCOREBOARD.md), so a workout logged into the
+  // past is judged against what came before its own day, and the sheet says what History will.
+  const wins = winsOf(st.workouts, w)
+  const q = monthQuota(st, w.d)
+  const month = monthLabel(q.month)
+  const tally = q.met ? ts('{0}: {1} of {2} — quota met ✓', month, q.done, q.goal) : ts('{0}: {1} of {2}', month, q.done, q.goal)
+  const nameOf = id => (EXIDX[id] ? exerciseNameFor(EXIDX[id]) : id)
   return <div style={{ textAlign: 'center', padding: '8px 0' }}>
     <div style={{ fontSize: 44, display: 'flex', justifyContent: 'center', color: 'var(--acc)' }}><Icon name="trophy" /></div>
     <h3 style={{ margin: '8px 0' }}>{t('Workout complete!')}</h3>
@@ -2612,12 +2652,16 @@ function FinishSummary({ w, prs, e1prs = [], close }) {
       <div className="tile"><div className="l">{t('Duration')}</div><div className="v" style={{ fontSize: '1.1rem' }}>{fmtDur(w.end - w.start)}</div></div>
       <div className="tile"><div className="l">{t('Volume')}</div><div className="v" style={{ fontSize: '1.1rem' }}>{fmtVol(w.vol, st.unit)}</div></div>
       <div className="tile"><div className="l">{t('Sets')}</div><div className="v" style={{ fontSize: '1.1rem' }}>{setsWorkCount(setsDone(w), workSetsDone(w))}</div></div>
-      <div className="tile"><div className="l">{t('PRs')}</div><div className="v" style={{ fontSize: 20 }}>{prs.length || '—'}</div></div>
+      <div className="tile"><div className="l">{ts('Wins')}</div><div className="v" style={{ fontSize: 20 }}>{wins.length || '—'}</div></div>
     </div>
-    {(prs.length > 0 || e1prs.length > 0) && <div style={{ textAlign: 'start', marginBottom: 12 }}>
-      {prs.map(id => <div key={id} className="small accent row" style={{ gap: 5 }}><Icon name="trophy" style={{ fontSize: 13 }} />{t('New PR:')} <span className={exerciseNameClass(EXIDX[id])}>{EXIDX[id] ? exerciseNameFor(EXIDX[id]) : id}</span></div>)}
-      {e1prs.map(p => <div key={p.id} className="small accent row" style={{ gap: 5 }}><Icon name="chartLine" style={{ fontSize: 13 }} />{t('Best estimated 1RM:')} <span className={exerciseNameClass(EXIDX[p.id])}>{EXIDX[p.id] ? exerciseNameFor(EXIDX[p.id]) : p.id}</span> · {fmtNum(p.est)} {st.unit}</div>)}
-    </div>}
+    {/* A session with nothing better than before still counts, and the sheet says only that:
+        a bad day is not a loss, and saying so is how a habit survives one. */}
+    <div className="finwins">
+      {wins.map(win => <div key={win.id} className="small winrow"><Icon name="trophy" />
+        <span><span className={exerciseNameClass(EXIDX[win.id])}>{nameOf(win.id)}</span> — {winChips(win, st.unit).join(' · ')}</span>
+      </div>)}
+      <div className="small dim">{wins.length ? tally : ts('Session banked · {0}', tally)}</div>
+    </div>
     <h4 className="sec" style={{ textAlign: 'start' }}>{t('What you just trained')}</h4>
     <BodyMap load={loadOfWorkouts([w])} body={st.body} />
     <div style={{ height: 14 }} />
@@ -2643,7 +2687,6 @@ function doFinishWorkout() {
   if (!A) return
   const past = !!A.backfill
   const prs = []
-  const e1prs = []
   // A workout logged into the past is held against the history before it, the way an edit of a
   // saved one is (rebuildPrHistory, below): it gains a badge it leads with, and a later session
   // it outdoes loses its own. It used to report none at all while the editor's Save awarded them
@@ -2652,10 +2695,6 @@ function doFinishWorkout() {
     const loads = e.sets.filter(s => s.done && !isWarmupRow(s)).map(s => s.w).filter(w => w > 0)
     const mx = loads.length ? loads.reduce((a, b) => betterWeight(e.id, a, b)) : 0
     if (beatsWeight(e.id, mx, bestWeightFor(st, e.id))) prs.push(e.id)
-    // A heavier estimate without a heavier top set is its own kind of progress —
-    // same weight for more reps. Reported separately so it can't be read as a load PR.
-    const rec = is1RMRecord(st, e.id, e)
-    if (rec && !prs.includes(e.id)) e1prs.push({ id: e.id, ...rec })
   })
   const w = buildCompletedWorkout(A, {
     end: past ? backfillEnd(A) : Date.now(),
@@ -2673,7 +2712,6 @@ function doFinishWorkout() {
       const touched = [...new Set([...(replaced?.entries || []), ...w.entries].map(e => e?.id).filter(id => id != null))]
       s.workouts = rebuildPrHistory(completeBackfill(s.workouts, A, w), touched, w)
       shown = s.workouts.find(x => x === w || (w.id != null && x.id === w.id)) || w
-      prs.push(...[...(shown.prs || [])])
     } else {
       w.entries.forEach(e => {
         const mx = bestWeightForEntry(e)
@@ -2686,5 +2724,5 @@ function doFinishWorkout() {
   useStore.getState().autoBackupNow()
   useUI.getState().stopRest()
   beep(snd(), 880, 0.15); beep(snd(), 1100, 0.15, 0.18); beep(snd(), 1320, 0.3, 0.36)
-  ui().openSheet(close => <FinishSummary w={shown} prs={prs} e1prs={e1prs} close={close} />, { kind: 'center', locked: true })
+  ui().openSheet(close => <FinishSummary w={shown} close={close} />, { kind: 'center', locked: true })
 }

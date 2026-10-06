@@ -177,9 +177,11 @@ Tapping the line toggles last time and best set, as now.
 - While editing a saved workout there is no prescription, so only line 2 shows, and neither the
   chip nor the marks do.
 
-**The chip** sits in the card header beside ⋯ and comes from `liveWins`. Any record gives
-`🏆 Record`. Otherwise a beat gives `✓ +1 rep`, `✓ +2.5 kg` or `✓ +1 on the weakest set`.
-Otherwise there is no chip.
+**The chip** sits in the card header beside ⋯ and comes from `scoreExercise`. A beat shows
+its delta: `✓ +1 rep`, `✓ +2.5 kg` or `✓ +1 on the weakest set`. When a record came with it,
+the tick becomes a trophy, because the delta is the number this is all about and a volume record
+rides along with most beats. A record without a beat reads `🏆 Record`. With neither there is no
+chip.
 
 ## The finish sheet (`sheets.jsx`, `FinishSummary`)
 

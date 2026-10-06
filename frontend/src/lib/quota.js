@@ -3,6 +3,7 @@
 // ends it. Here a missed session costs nothing: the count only goes up, and a new month starts a
 // fresh one.
 import { todayISO } from './format.js'
+import { workoutDay } from './history.js'
 
 export const DEFAULT_MONTH_GOAL = 8
 export const MAX_MONTH_GOAL = 31
@@ -29,8 +30,9 @@ export function prevMonth(month) {
 }
 
 // Training days, not workouts: the gym and a ten-minute session at home on one day are one day.
+// workoutDay reads a record whose day got mangled from its start, as every other count does.
 const daysIn = (workouts, month) =>
-  new Set((workouts || []).map(w => w?.d).filter(d => typeof d === 'string' && d.startsWith(month + '-'))).size
+  new Set((workouts || []).map(workoutDay).filter(d => d && d.startsWith(month + '-'))).size
 
 /**
  * The quota of the calendar month `iso` falls in. Every workout counts towards it: planned or

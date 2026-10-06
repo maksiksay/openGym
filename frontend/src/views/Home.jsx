@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../store/useStore.js'
-import { effectiveRoutines, effectiveRoutineIds, nextTrainingDay, streakWeeks, lastBW, setsDoneActive } from '../lib/history.js'
-import { fmtNum, fmtDate, todayISO, isoOf, weekKey, weekStartOf, weekDayOffset, DAYS, DAYN } from '../lib/format.js'
+import { effectiveRoutines, effectiveRoutineIds, nextTrainingDay, lastBW, setsDoneActive } from '../lib/history.js'
+import { fmtNum, fmtDate, todayISO, isoOf, weekStartOf, weekDayOffset, DAYS, DAYN } from '../lib/format.js'
 import { t, dateLocale } from '../lib/i18n.js'
 import { bwSheet, goalSheet, dayOverrideSheet, calendarSheet, startFlow, starterPlanSheet, bwDeltaColor, weighInsSheet } from '../sheets.jsx'
 import LineChart from '../components/LineChart.jsx'
@@ -15,6 +15,19 @@ import { healthOn } from '../lib/health.js'
 import { dayTotals } from '../lib/nutrition.js'
 import { checkInSheet, addFoodSheet, fmt1 } from '../sheets-health.jsx'
 import { MacroBar } from './Health.jsx'
+import { monthQuota, prevMonth } from '../lib/quota.js'
+import { monthWins } from '../lib/scoreboard.js'
+import { ts, monthLabel } from '../lib/score-i18n.js'
+
+// The month's training days against the goal (docs/dev/SCOREBOARD.md), one dot a day: filled as
+// they are trained, past the goal in the second colour. A long goal reads as a bar instead.
+function QuotaDots({ q }) {
+  const total = Math.max(q.goal, q.done)
+  if (total > 16) return <div className="quota-bar" aria-hidden="true"><i style={{ width: Math.min(100, (q.done / q.goal) * 100) + '%' }} /></div>
+  return <div className="quota-dots" aria-hidden="true">
+    {Array.from({ length: total }, (_, i) => <i key={i} className={i >= q.goal ? 'extra' : i < q.done ? 'on' : ''} />)}
+  </div>
+}
 
 // Today's health at a glance: the morning check-in (or the question, before it is answered) and
 // the food so far against the goals. The card opens the Health screen; its two buttons go
@@ -94,9 +107,16 @@ export default function Home() {
   const wkEnd = new Date(wkStart); wkEnd.setDate(wkStart.getDate() + 6)
   const wkLabel = weekOffset === 0 ? t('This week') : `${wkStart.getDate()} ${wkStart.toLocaleDateString(dateLocale(), { month: 'short' })} – ${wkEnd.getDate()} ${wkEnd.toLocaleDateString(dateLocale(), { month: 'short' })}`
 
-  const wThisWeek = S.workouts.filter(w => weekKey(w.d, ws) === weekKey(todayISO(), ws)).length
-  // Days scheduled, not routines — a combined day counts as 1, matching wThisWeek (one w).
-  const plannedPerWeek = Object.values(S.week).filter(ids => ids?.length).length
+  // The quota stands where the week streak was: a streak is kept alive by the fear of losing it,
+  // and one missed week ends it; a month's count only goes up, and a miss costs nothing.
+  const quota = monthQuota(S)
+  const wins = monthWins(S.workouts, quota.month)
+  const quotaSub = [
+    quota.met && ts('Quota met ✓'),
+    ts('Wins: {0}', wins),
+    // last month as a count only: the goal may have changed since, and a past month is not judged
+    quota.prevDone > 0 && `${monthLabel(prevMonth(quota.month))}: ${quota.prevDone}`,
+  ].filter(Boolean).join(' · ')
   const bwPoints = S.bodyweight.slice(-30).map(b => ({ t: b.t || new Date(b.d).getTime(), y: b.w, d: b.d }))
 
   // today's session shown right under the week strip
@@ -221,12 +241,13 @@ export default function Home() {
 
     <div className="card tappable" style={{ cursor: 'pointer' }} {...tappable(() => calendarSheet())}>
       <div className="row between">
-        <div>
+        <div className="grow">
           <div className="row" style={{ gap: 7, fontSize: 22, fontWeight: 600, letterSpacing: '-.021em' }}>
-            <Icon name="flame" style={{ color: 'var(--orange)' }} />
-            {t('{0} week streak', streakWeeks(S))}
+            <Icon name="target" style={{ color: 'var(--acc)' }} />
+            {ts('{0} · {1} of {2}', monthLabel(quota.month), quota.done, quota.goal)}
           </div>
-          <div className="muted small" style={{ marginTop: 2 }}>{wThisWeek}{plannedPerWeek ? ' / ' + plannedPerWeek : ''} {t('this week')} · {t(S.workouts.length === 1 ? '{0} workout total' : '{0} workouts total', S.workouts.length)}</div>
+          <QuotaDots q={quota} />
+          <div className="muted small" style={{ marginTop: 7 }}>{quotaSub}</div>
         </div>
         <Icon name="calendar" className="chev" style={{ fontSize: 20 }} />
       </div>

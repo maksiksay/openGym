@@ -24,7 +24,9 @@ import { limitsFrom, fmtMB, MB } from '../lib/media-limits.js'
 import { setRestAccent } from '../lib/rest-alert.js'
 import { checkForUpdate, downloadAndInstall } from '../lib/update.js'
 import { forgetCoach } from '../lib/coach-api.js'
-import { starterPlanSheet, confirmSheet, importFromApp, importFromHevy, equipmentProfileSheet, plateInventorySheet, menuSheet } from '../sheets.jsx'
+import { starterPlanSheet, confirmSheet, importFromApp, importFromHevy, equipmentProfileSheet, plateInventorySheet, menuSheet, monthGoalSheet } from '../sheets.jsx'
+import { monthGoalOf, autoMonthGoal } from '../lib/quota.js'
+import { ts } from '../lib/score-i18n.js'
 import Icon from '../components/Icon.jsx'
 import { ServerSyncSection, KeptChangesRows, leaveServer, connectServer, passkeySignIn } from '../components/ServerSync.jsx'
 import { passwordOn, PasswordRow, openPasswordSignIn, openPasswordRegister } from '../components/PasswordAuth.jsx'
@@ -386,6 +388,11 @@ export default function Settings() {
           options={[{ value: MONDAY, label: t('Monday') }, { value: SUNDAY, label: t('Sunday') }]}
           value={weekStartOf(S)} onChange={v => update(s => { s.weekStart = v })} />
       </Row>
+      {/* The month's quota on Home (lib/quota.js): auto is four weeks of the plan's training days. */}
+      <Row icon="target" iconTint="var(--green)" title={ts('Training days a month')} accessory="chevron"
+        value={String(monthGoalOf(S))}
+        subtitle={S.monthGoal ? null : ts('Auto — {0} from your plan', autoMonthGoal(S))}
+        onClick={() => monthGoalSheet()} />
       {/* Membership QR codes on Home (views/CheckIn.jsx); off = no Home card, no route. */}
       <Row icon="qr" iconTint="var(--blue)" title={t('Gym check-in')}
         subtitle={t('Show a card on Home with your membership QR codes.')}>

@@ -4,7 +4,7 @@
 // Nothing here is stored. Every win is derived from the workouts as they are now, so an edit, a
 // move, a deleted session or a sync that brings one in can never leave a win behind that the
 // history no longer supports. The `prs` list a workout carries is upstream's and is left alone.
-import { metricEntriesForExercise, bestWeightForEntry, entryExcluded, entryRoutineId, isBw, isPerSide, modeOf } from './history.js'
+import { metricEntriesForExercise, bestWeightForEntry, entryExcluded, entryRoutineId, isBw, isPerSide, modeOf, workoutDay } from './history.js'
 import { isSideSet, completedVolumeOf, isWarmupRow } from './workout-model.js'
 import { beatsWeight, isAssisted } from './exercises.js'
 import { bestSetOf } from './onerm.js'
@@ -262,7 +262,7 @@ export const winsOf = (workouts, w) => winsTimeline(workouts).get(workoutKey(w))
 export function monthWins(workouts, month) {
   const map = winsTimeline(workouts)
   let n = 0
-  for (const w of workouts || []) if (String(w?.d || '').startsWith(month)) n += (map.get(workoutKey(w)) || []).length
+  for (const w of workouts || []) if ((workoutDay(w) || '').startsWith(month + '-')) n += (map.get(workoutKey(w)) || []).length
   return n
 }
 
@@ -316,7 +316,9 @@ export function goalOf(entry, last) {
 export function scoreExercise(history, entry, rid = entry?.rid) {
   const exId = entry?.id
   const tr = tracker(exId)
-  for (const w of chronological(history?.workouts || [])) {
+  // Every card asks on every render, so only the sessions of this exercise are put in order.
+  const own = (history?.workouts || []).filter(w => (w?.entries || []).some(e => e?.id === exId))
+  for (const w of chronological(own)) {
     const read = readExercise(w, exId)
     if (read) tr.add(read)
   }

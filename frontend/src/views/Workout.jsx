@@ -7,7 +7,7 @@ import { useUI } from '../store/useUI.js'
 import { exOr, betterWeight } from '../lib/exercises.js'
 import { usesBar } from '../lib/bar.js'
 import { loadKindFor, baseWeightFor, inventoryFor, rowLoad, sameLoad, plateDelta, dropGrid } from '../lib/plates.js'
-import { effectiveRoutines, effectiveRoutineIds, lastEntryFor, bestWeightFor, bestWeightForEntry, buildSets, freestyleConfig, defaultConfig, setsDoneActive, setUnitsTotal, supersetUnits, unitOf, setLabel, modeOf, isBw, isPerSide, repStep, EFFORT, effortOf, stepEffort, capEffort, cascadeWeight, insertWarmupRow, removeRowAt, pairAdjacent, unpairSuperset, cleanupSg, applyIntensifierPlan, pinnedNoteFor, exNoteFor, setsRepsOf } from '../lib/history.js'
+import { effectiveRoutines, effectiveRoutineIds, lastEntryFor, bestWeightFor, bestWeightForEntry, buildSets, freestyleConfig, defaultConfig, setsDoneActive, setUnitsTotal, supersetUnits, unitOf, setLabel, modeOf, isBw, isPerSide, repStep, EFFORT, effortOf, stepEffort, capEffort, cascadeWeight, insertWarmupRow, removeRowAt, pairAdjacent, unpairSuperset, cleanupSg, applyIntensifierPlan, pinnedNoteFor, exNoteFor } from '../lib/history.js'
 import { fmtNum, fmtPlate, exerciseNameText, fmtDate, todayISO, exCount, DAYN } from '../lib/format.js'
 import { speedUnitOf, toSpeed, fromSpeed } from '../lib/speed.js'
 import { beep, vibrate, unlock } from '../lib/sound.js'
@@ -26,6 +26,8 @@ import { sessionNoProg, setSessionNoProg, setEntryNoProg, joinSessionNoProg } fr
 import { glyphOf } from '../lib/glyphs.js'
 import { markAllSetsDone, sessionHistory } from '../lib/backfill.js'
 import { bestSetFor } from '../lib/exercise-history.js'
+import { scoreExercise, rowMarks } from '../lib/scoreboard.js'
+import { ts, deltaText, markText, goalText } from '../lib/score-i18n.js'
 import { isWarmupRow, isDropSet, isRestPauseSet, dropsOf, clustersOf, addDrop, addCluster, removeDropAt, removeClusterAt, setDropAt, setClusterAt, nextDropWeight, nextBurstReps, isSideSet, makeSideSet, setSideField, toggleSide, addSideDrop, removeSideDropAt, setSideDropAt, addSideCluster, removeSideClusterAt, setSideClusterAt, WEIGHT_ORIGIN_MANUAL } from '../lib/workout-model.js'
 import { canMoveActiveWorkoutUnit, moveActiveWorkoutUnit } from '../lib/active-workout-order.js'
 import { nextOpenSet, workoutKeyAction } from '../lib/workout-keys.js'
@@ -86,11 +88,15 @@ const viewOf = (col, value) => (col.view && value != null && value !== '' ? col.
 // on the wrong side of their numbers and the numbers after them turned round (8×15).
 const RTL_LETTER = /[֐-ࣿיִ-﷿ﹰ-﻿]/
 
+// A per-side row has one mark under its number: the better side's, a heavier one first.
+const betterMark = (a, b) => ((a.w ?? 0) !== (b.w ?? 0) ? ((a.w ?? 0) > (b.w ?? 0) ? a : b) : (a.r ?? 0) >= (b.r ?? 0) ? a : b)
+const sideMark = m => (m.L && m.R ? betterMark(m.L, m.R) : m.L || m.R)
+
 /* ---------- one exercise block (reps: weight×reps · time: a held duration · cardio: duration+speed) ---------- */
 // `compact` shrinks the block for a superset member; `dense` (compact view) goes further and
-// drops everything that is not a set you are logging — media, tag chips, the note lines, the
-// "last time" recap and the progression line — leaving the name, the ⋯ menu, the one-line plan
-// the rows are measured against, and the sets.
+// drops everything that is not a set you are logging — media, tag chips, the note lines and the
+// "last time" recap — leaving the name, the ⋯ menu, the goal line the rows are measured
+// against, and the sets.
 // Nothing dropped is lost: it is all still on the ⋯ menu, or one ⋮ switch back to list/cards.
 function ExerciseBlock({ entryIdx, compact, dense, editing, onToggle, onToggleSide, onField, onAddSet, onRemoveSet, onAddWarmup, onRemoveSetAt, onStartTimed, onPairPrev, onPairNext, onSetRowRef, onProgressionSettings, onNoProg, onSwap, onMoveUp, onMoveDown, canMoveUp, canMoveDown, onRemoveExercise, busy }) {
   const S = useStore(s => s.S)
@@ -163,6 +169,13 @@ function ExerciseBlock({ entryIdx, compact, dense, editing, onToggle, onToggleSi
   // The routine's own last session of this exercise (or any, for a routine that has none), the
   // same one the rows and the progression line were built from (#216).
   const last = lastEntryFor(H, entry.id, entry.rid)
+  // The scoreboard (docs/dev/SCOREBOARD.md): the number to beat, how far it is past last time,
+  // and what today has won so far, read against the same history as the rows. A saved workout
+  // being corrected has no prescription and nothing to win against, so it gets none of it.
+  const score = editing ? null : scoreExercise(H, entry)
+  const goal = score?.goal || null
+  const live = score?.live || null
+  const marks = score ? rowMarks(score.last, entry) : []
   const standingNote = exNoteFor(S, entry.id)
   // Only worth surfacing while there is still work left: once the exercise is finished, a note
   // telling you what to do in it is behind you, and the block is already long.
@@ -178,26 +191,34 @@ function ExerciseBlock({ entryIdx, compact, dense, editing, onToggle, onToggleSi
   // the session was built so the reason matches the numbers already in the rows.
   const plan = entry.plan
   const guidance = progressionGuidance(plan)
-  // The plan this exercise was built from (issue #275), on one quiet line in every view — the
-  // routine's "2 × 10" is the thing the rows are measured against. When today's rows open
-  // somewhere else, the same line says so: progression moved the sets or reps (a bodyweight
-  // climb, a deload, an added set), or they carry last session's reps ("Your last session").
-  // An entry built before plans were stamped, and a freestyle one, has no plan to show.
-  const planned = entry.planned && mode !== 'cardio' ? entry.planned : null
-  const planLine = (() => {
-    if (!planned) return null
-    const today = entry.target || {}
-    const todaySets = today.sets || planned.sets || 1
-    const inPlan = timed
-      ? today.sec == null || today.sec === planned.sec
-      : today.reps == null || (planned.repsMin > 0 ? today.reps >= planned.repsMin && today.reps <= planned.reps : today.reps === planned.reps)
-    const note = todaySets !== (planned.sets || 1) || !inPlan
-      ? t('today {0}', setsRepsOf({ mode, sets: todaySets, reps: today.reps, sec: today.sec }))
-      : entry.carried ? t('reps from your last session') : null
-    return <div className="small dim planline" style={{ marginBottom: 4 }}>
-      {t('Plan: {0}', setsRepsOf({ ...planned, mode }))}{note ? ' · ' + note : ''}
-    </div>
+  // The goal line (docs/dev/SCOREBOARD.md) stands where the plan line and the progression line
+  // were: the one number to beat today, from the target the session was built with. The policy
+  // and its reason are the line's name and one tap away (the progression settings); a deload
+  // still gives its reason on the line, because that one is news.
+  const goalLine = (() => {
+    if (!goal) return null
+    const nums = goalText(goal, S.unit)
+    const text = goal.kind === 'first' ? ts('First time — this sets your baseline')
+      : goal.kind === 'deload' ? ts('Deload: {0}', nums)
+        : goal.kind === 'plain' ? ts('Today: {0}', nums)
+          : ts('Beat: {0}', nums)
+    const why = guidance ? `${t(guidance.policyLabel)} · ${t(...guidance.why)}` : null
+    const cls = 'goalline' + (goal.kind === 'deload' ? ' warn' : goal.kind === 'goal' ? '' : ' quiet')
+    const body = <>
+      <Icon name={goal.kind === 'deload' ? 'arrowDown' : 'target'} />
+      <span>{text}{goal.kind === 'deload' && guidance && <span className="why"> · {t(...guidance.why)}</span>}</span>
+    </>
+    return onProgressionSettings
+      ? <button type="button" className={cls} title={why || undefined}
+        aria-label={[text, why, t('Open progression settings')].filter(Boolean).join('. ')} onClick={onProgressionSettings}>{body}</button>
+      : <div className={cls} title={why || undefined}>{body}</div>
   })()
+  // What today has won so far, once it has: how far past last time, the number this is all about,
+  // with a trophy instead of the tick when a record came with it; a record alone says so.
+  const record = !!live && Object.keys(live.records).length > 0
+  const winChip = !live ? null : <span className={'winchip' + (record ? ' rec' : '')}>
+    <Icon name={record ? 'trophy' : 'check'} />{live.beat ? deltaText(live.beat, S.unit) : ts('Record')}
+  </span>
   // What the rows are held against (#173): the last time in this routine (#216), or the best set
   // of the exercise ever logged — after a bad day, "last time" puts the bad day on the screen as
   // the number to beat. Tapping the line switches between the two, and the choice is the
@@ -211,15 +232,17 @@ function ExerciseBlock({ entryIdx, compact, dense, editing, onToggle, onToggleSi
   const refSets = ref ? (refBest ? [ref.set] : ref.sets).map(s => setLabel(entry.id, s, ref.target, speedUnitOf(S))) : []
   const refText = ref ? refHead + refSets.join(', ') : refBest && last ? t('Best set: nothing logged this way yet') : null
   const refAction = refBest ? t('Show last time instead') : t('Show your best set instead')
+  // How far today's goal is past that last time; the best set is a record, not a step from it.
+  const refDelta = !refBest && ref && goal?.kind === 'goal' ? deltaText(goal.delta, S.unit) : ''
   // The button's text is the reference, which says nothing about what a tap does; its name
   // carries both, the reference first as it reads on screen, then the switch.
   const refLine = refText ? <button type="button" className="refline small dim"
-    title={refAction} aria-label={`${refText}. ${refAction}`}
+    title={refAction} aria-label={`${refText}${refDelta ? ' → ' + refDelta : ''}. ${refAction}`}
     onClick={() => update(s => { s.logRef = refBest ? 'last' : 'best' })}>
     {/* Each set on its own left-to-right island. In Arabic the first one followed the label's
         direction and read 8×60, while those after a Latin "RIR" read 60×8. A set that carries
         words of a right-to-left script keeps its own direction, still isolated (RTL_LETTER). */}
-    <span>{ref ? <>{refHead}{refSets.map((l, i) => <Fragment key={i}>{i ? ', ' : ''}<bdi dir={RTL_LETTER.test(l) ? 'auto' : 'ltr'}>{l}</bdi></Fragment>)}</> : refText}</span>
+    <span>{ref ? <>{refHead}{refSets.map((l, i) => <Fragment key={i}>{i ? ', ' : ''}<bdi dir={RTL_LETTER.test(l) ? 'auto' : 'ltr'}>{l}</bdi></Fragment>)}</> : refText}{refDelta && <span className="goaldelta"> → {refDelta}</span>}</span>
     <Icon name="shuffle" />
   </button> : null
   // A bodyweight set has no weight to type, so the column is not there (issue #32) — one
@@ -500,6 +523,7 @@ function ExerciseBlock({ entryIdx, compact, dense, editing, onToggle, onToggleSi
     <div className="row between" style={{ marginBottom: 6 }}>
       <div style={{ fontSize: (compact || dense) ? 17 : 20, fontWeight: 600, letterSpacing: '-.02em', lineHeight: 1.2 }} className={exerciseNameClass(ex)}>{exerciseNameFor(ex)}</div>
       <div className="row" style={{ gap: 2, flex: 'none' }}>
+        {winChip}
         {entry.note && <button className="iconbtn" aria-label={t('Note')} title={t('Note')} style={{ color: 'var(--acc)' }}
           onClick={() => exerciseNoteSheet(entryIdx)}><Icon name="pencil" /></button>}
         <button className="iconbtn" aria-label={t('More')} title={t('More')} onClick={openMore}><Icon name="more" /></button>
@@ -512,8 +536,8 @@ function ExerciseBlock({ entryIdx, compact, dense, editing, onToggle, onToggleSi
       <Icon name="pause" /><span>{t('Not counted for progression')}</span>
       {onNoProg && <button type="button" className="chip" onClick={() => onNoProg(false)}>{t('Undo')}</button>}
     </div>}
-    {/* compact view keeps the plan line: it is what the rows are measured against */}
-    {dense && planLine}
+    {/* compact view keeps the goal line: it is what the rows are measured against */}
+    {dense && goalLine}
     {wc.pairButtons && !compact && !dense && (onPairPrev || onPairNext) && <div className="row" style={{ gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
       {onPairPrev && <Button size="xs" variant="tinted" icon="link" title={t('Make superset with previous')} onClick={onPairPrev}>{t('Make superset with previous')}</Button>}
       {onPairNext && <Button size="xs" variant="tinted" icon="link" title={t('Make superset with next')} onClick={onPairNext}>{t('Make superset with next')}</Button>}
@@ -542,13 +566,8 @@ function ExerciseBlock({ entryIdx, compact, dense, editing, onToggle, onToggleSi
       {t('From {0}:', fmtDate(pinnedNote.d, true))} {pinnedNote.note}
     </div>}
     {entry.note && <div className="exnote">{entry.note}</div>}
-    {planLine}
+    {goalLine}
     {refLine}
-    {guidance && onProgressionSettings && <button type="button" className={'progline' + (plan.kind === 'deload' ? ' warn' : '')}
-      aria-label={t('Open progression settings')} onClick={onProgressionSettings}>
-      <Icon name={plan.kind === 'up' ? 'arrowUp' : plan.kind === 'deload' ? 'arrowDown' : 'lightbulb'} />
-      <span><strong>{t(guidance.policyLabel)}</strong> · {t(...guidance.why)}</span>
-    </button>}
     </>}
     <div className="card" style={{ marginTop: 10, marginBottom: 0 }}>
       {/* the header carries the same eff3/timed sizing as the rows, or the labels drift off their
@@ -568,6 +587,7 @@ function ExerciseBlock({ entryIdx, compact, dense, editing, onToggle, onToggleSi
             // and ticked on its own (issue #60).
             <div ref={el => onSetRowRef?.(i, el)} className={'setrow-side' + (s.done ? ' done' : '')}>
               <button type="button" className="n" aria-label={t('Set {0}', phaseNum)} title={t('More')} onClick={() => openSetMenu(s, i)}>{phaseNum}</button>
+              {marks[i] && <span className="setmark">{markText(sideMark(marks[i]))}</span>}
               <div className="side-rows">
                 {sideRow(s, i, 'L', col1, col2, col3)}
                 {sideExtras(s, i, 'L')}
@@ -576,6 +596,7 @@ function ExerciseBlock({ entryIdx, compact, dense, editing, onToggle, onToggleSi
               </div>
             </div>
           ) : (
+          <div className="setline">
           <div ref={el => onSetRowRef?.(i, el)} className={'setrow' + (s.done ? ' done' : '') + (col3 ? ' eff3' : '') + (timed ? ' timed' : '')}>
             <button type="button" className="n" aria-label={t('Set {0}', phaseNum)} title={t('More')} onClick={() => openSetMenu(s, i)}>{phaseNum}</button>
             {cell(s, i, col1, 'w')}
@@ -586,6 +607,9 @@ function ExerciseBlock({ entryIdx, compact, dense, editing, onToggle, onToggleSi
             {timed && !editing && <button className="setgo" aria-label={t('Start set')} disabled={s.done || !!working}
               onClick={() => onStartTimed(i)}><Icon name="play" /></button>}
             <Check checked={s.done} onChange={() => onToggle(i)} />
+          </div>
+          {/* outside the row, which fades once ticked: a win should not */}
+          {marks[i] && <span className="setmark">{markText(marks[i])}</span>}
           </div>
           )}
           {loadLine(String(i))}
