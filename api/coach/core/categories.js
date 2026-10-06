@@ -10,5 +10,6 @@ export const DATA_CATEGORIES = Object.freeze([
   'bodyweight',  // weigh-ins in the window and your goal weight
   'profile',     // the intake answers you gave the Coach, including any limitations
   'health',      // sleep, energy, stress, steps and daily food totals in the window, with food goals
-  'prefs'        // unit, language, effort scale
+  'prefs',       // unit, language, effort scale
+  'photos'       // a photo attached to a chat message, for that message only (docs/dev/COACH_VOICE_PHOTO.md)
 ]);

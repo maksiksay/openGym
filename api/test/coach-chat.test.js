@@ -120,6 +120,23 @@ test('the payload carries the message and the last eight turns, and what a revie
   assert.ok(!json.includes('private note'), 'no notes');
 });
 
+test('the conversation marks where a photo was, and what a meal card counted', () => {
+  const chat = [
+    { id: 'a', at: 1, role: 'user', kind: 'text', text: '', photo: true },
+    { id: 'b', at: 2, role: 'coach', kind: 'meal', text: 'Read off the photo.', status: 'added', meal: { items: [{ name: 'Buckwheat', g: 200 }, { name: 'Chicken', g: 150.4 }] } },
+    { id: 'c', at: 3, role: 'user', kind: 'text', text: 'And the bread?', photo: true },
+    { id: 'd', at: 4, role: 'coach', kind: 'meal', text: '', status: 'open', meal: { items: [{ name: 'Bread', g: 40 }] } },
+    { id: 'e', at: 5, role: 'coach', kind: 'applied', text: 'Applied' },
+  ];
+  const p = payload.build(sampleState({ coach: { ...sampleState().coach, chat } }), { handle: 'h', kind: 'chat', message: 'Thanks' });
+  assert.deepEqual(p.conversation, [
+    { who: 'user', text: '[photo]' },
+    { who: 'coach', text: 'Read off the photo. [meal card: Buckwheat 200 g, Chicken 150 g; added to the food log]' },
+    { who: 'user', text: 'And the bread? [photo]' },
+    { who: 'coach', text: '[meal card: Bread 40 g; not added yet]' },
+  ]);
+});
+
 test('a chat reads the whole twelve weeks, where a review reads only what came after the last one', () => {
   const S = sampleState({
     workouts: [10, 40].map(n => ({ ...sampleState().workouts[0], id: 'w' + n, d: daysAgo(n) })),

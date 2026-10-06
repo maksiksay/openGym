@@ -4,17 +4,18 @@ import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import CoachChat from './CoachChat.jsx'
 import { refinePlan, requestReview, sendChat } from '../lib/coach-api.js'
+import { preparePhoto } from '../lib/coach-photo.js'
 
 // Where a typed message goes (docs/dev/COACH_CHAT.md): to the Coach as a chat message, which
 // decides itself whether to answer, propose a change or ask back, except while a new plan is
 // pending or there is no plan at all, where it still refines the plan.
 const mocks = vi.hoisted(() => {
-  const state = { S: null, pending: null, job: null, last: null, nav: vi.fn(), toast: vi.fn(), openSheet: vi.fn(), refresh: vi.fn() }
+  const state = { S: null, pending: null, job: null, last: null, vision: false, nav: vi.fn(), toast: vi.fn(), openSheet: vi.fn(), refresh: vi.fn() }
   state.storeSnapshot = () => ({
     S: state.S,
     user: { id: 'u1' },
     ready: true,
-    config: { coach: { enabled: true } },
+    config: { coach: { enabled: true, vision: state.vision } },
     coachLocal: null,
     update: mut => mut(state.S),
   })
@@ -54,6 +55,9 @@ vi.mock('../lib/api.js', () => ({
   IS_APPLE: false, IS_ANDROID: false, BIO: 'biometrics',
 }))
 vi.mock('../coach.css', () => ({}))
+vi.mock('../lib/coach-photo.js', () => ({
+  preparePhoto: vi.fn(async () => ({ type: 'image/jpeg', data: 'QUJD', bytes: 180 * 1024, width: 1280, height: 960, blob: new Blob(['x']) })),
+}))
 
 const routine = { id: 'r1', name: 'Strength A', emoji: '💪', ex: [{ id: '0001', sets: 3, reps: 10, mode: 'reps' }] }
 const MEAL = {
@@ -68,7 +72,7 @@ const state = ({ routines = [routine], chat = [] } = {}) => ({
   unit: 'kg', lang: 'en', customEx: [], workouts: [], bodyweight: [], exWeights: {},
   dayPlan: {}, routines, week: {},
   coach: {
-    consent: { agreedAt: '2026-07-01T00:00:00Z', version: 2 },
+    consent: { agreedAt: '2026-07-01T00:00:00Z', version: 3 },
     profile: { goal: 'muscle', experience: 'new', daysPerWeek: 3, sessionMin: 60, preferredDays: [1, 3, 5], equipment: [] },
     log: [], snapshots: [], chat: [{ id: 'c1', role: 'user', kind: 'intake', at: 1 }, ...chat], timings: []
   },
@@ -104,7 +108,7 @@ describe('a message typed in the Coach chat', () => {
   it('goes to the Coach as a chat message when there is a plan and nothing pending', async () => {
     await mount()
     await say('How much protein should I eat?')
-    expect(sendChat).toHaveBeenCalledWith('How much protein should I eat?')
+    expect(sendChat).toHaveBeenCalledWith('How much protein should I eat?', null)
     expect(requestReview).not.toHaveBeenCalled()
     expect(refinePlan).not.toHaveBeenCalled()
     expect(mocks.S.coach.chat.at(-1)).toMatchObject({ role: 'user', kind: 'text', text: 'How much protein should I eat?' })
@@ -113,7 +117,7 @@ describe('a message typed in the Coach chat', () => {
   it('goes to the Coach as a chat message while a review waits, too', async () => {
     await mount({ pending: { id: 'r1', kind: 'review', summary: 's', changes: [] } })
     await say('Why fewer sets?')
-    expect(sendChat).toHaveBeenCalledWith('Why fewer sets?')
+    expect(sendChat).toHaveBeenCalledWith('Why fewer sets?', null)
   })
 
   it('still refines a new plan that is pending', async () => {
@@ -207,7 +211,7 @@ describe('dictation', () => {
     expect(mic.getAttribute('aria-pressed')).toBe('false')
     expect(sendChat).not.toHaveBeenCalled()
     await act(async () => { host.querySelector('.composer .send').click() })
-    expect(sendChat).toHaveBeenCalledWith('Привет. Сколько белка мне нужно?')
+    expect(sendChat).toHaveBeenCalledWith('Привет. Сколько белка мне нужно?', null)
   })
 
   it('stops listening when the message is sent, and takes no more words', async () => {
@@ -218,7 +222,7 @@ describe('dictation', () => {
     const r = FakeRecognizer.last
     r.stop = function () { this.stopped = true }   // a recognizer that ends a little later
     await act(async () => { host.querySelector('.composer .send').click() })
-    expect(sendChat).toHaveBeenCalledWith('Сколько белка')
+    expect(sendChat).toHaveBeenCalledWith('Сколько белка', null)
     await act(async () => { r.say('Сколько белка мне'); r.onend() })
     expect(host.querySelector('.composer textarea').value).toBe('')
   })
@@ -289,6 +293,71 @@ describe('a meal card', () => {
     expect(card.querySelector('.pcard-h').textContent).toContain('558')
     expect(card.textContent).toContain('Settings → Health & food')
     expect([...card.querySelectorAll('button')].some(b => /Add to the food log/.test(b.textContent))).toBe(false)
+  })
+})
+
+describe('a photo', () => {
+  beforeEach(() => {
+    URL.createObjectURL = vi.fn(() => 'blob:preview')
+    URL.revokeObjectURL = vi.fn()
+  })
+  afterEach(() => { mocks.vision = false })
+  const pick = async () => {
+    const input = host.querySelector('.composer input[type="file"]')
+    Object.defineProperty(input, 'files', { configurable: true, value: [new Blob(['raw'], { type: 'image/jpeg' })] })
+    await act(async () => { input.dispatchEvent(new Event('change', { bubbles: true })) })
+  }
+
+  it('can be attached only where the provider can see it', async () => {
+    await mount()
+    expect(host.querySelector('.composer .attach')).toBeNull()
+  })
+
+  it('is not offered while a new plan is being refined, which takes text only', async () => {
+    mocks.vision = true
+    await mount({ S: state({ routines: [] }) })
+    expect(host.querySelector('.composer .attach')).toBeNull()
+  })
+
+  it('is prepared on the device, previewed, and sent with the message or on its own', async () => {
+    mocks.vision = true
+    await mount()
+    expect(host.querySelector('.composer .attach')).toBeTruthy()
+    await pick()
+    expect(preparePhoto).toHaveBeenCalledTimes(1)
+    expect(host.querySelector('.attach-preview img').getAttribute('src')).toBe('blob:preview')
+    expect(host.querySelector('.attach-preview').textContent).toContain('180 KB')
+    const send = host.querySelector('.composer .send')
+    expect(send.disabled).toBe(false)
+    await act(async () => { send.click() })
+    expect(sendChat).toHaveBeenCalledWith('', expect.objectContaining({ type: 'image/jpeg', data: 'QUJD' }))
+    expect(mocks.S.coach.chat.at(-1)).toMatchObject({ role: 'user', kind: 'text', text: '', photo: true })
+    expect(host.querySelector('.attach-preview')).toBeNull()
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:preview')
+  })
+
+  it('can be taken off again before sending', async () => {
+    mocks.vision = true
+    await mount()
+    await pick()
+    await act(async () => { host.querySelector('.attach-preview button').click() })
+    expect(host.querySelector('.attach-preview')).toBeNull()
+    expect(host.querySelector('.composer .send').disabled).toBe(true)
+  })
+
+  it('says so when the file is not a photo it can read', async () => {
+    mocks.vision = true
+    vi.mocked(preparePhoto).mockRejectedValueOnce(Object.assign(new Error('unreadable'), { code: 'unreadable' }))
+    await mount()
+    await pick()
+    expect(mocks.toast).toHaveBeenCalledWith('That file could not be read as a photo.')
+    expect(host.querySelector('.attach-preview')).toBeNull()
+  })
+
+  it('leaves a mark in the thread where it went, since it is not kept', async () => {
+    await mount({ S: state({ chat: [{ id: 'p1', role: 'user', kind: 'text', text: '', photo: true, at: 2 }, { id: 'p2', role: 'user', kind: 'text', text: 'Lunch', photo: true, at: 3 }] }) })
+    const bubbles = [...host.querySelectorAll('.msg.user .bub')].slice(-2)
+    expect(bubbles.map(b => [b.textContent, !!b.querySelector('[data-icon="camera"]')])).toEqual([['Photo', true], ['Lunch', true]])
   })
 })
 

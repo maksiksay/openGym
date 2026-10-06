@@ -28,6 +28,9 @@ const FIXTURE = new URL('../fixture-cli.mjs', import.meta.url).pathname;
 const fixture = {
   id: 'fixture',
   spawns: true,
+  // It reads only the payload's `photo: true`, never the photo, so the whole photo path can be
+  // walked without an account.
+  vision: true,
   cli: process.execPath,
   async check() { return { ok: true, version: 'fixture' }; },
   async invoke({ prompt, jobDir, env, timeoutMs }) {

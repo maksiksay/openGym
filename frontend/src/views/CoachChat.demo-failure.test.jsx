@@ -43,6 +43,12 @@ vi.mock('../coach.css', () => ({}))
 const DELAY = 2200        // coach-demo.js's thinking time
 const POLL_MS = 3000      // coach-api.js's cadence while a job is in flight
 
+// coach-api.js loads the demo provider lazily, and a module's first load takes longer than the
+// microtasks a click is given below (flush). Loaded once up front, the import inside a request
+// resolves at once, so the test times the request rather than the module graph; on a cold cache
+// it failed more often than it passed.
+await import('../lib/coach-demo.js')
+
 let dom, root, container
 
 function installDom() {
@@ -74,7 +80,7 @@ const state = () => ({
   unit: 'kg', lang: 'en', customEx: [], workouts: [brokenWorkout()], bodyweight: [], exWeights: {},
   dayPlan: {}, routines: [], week: {},
   coach: {
-    consent: { agreedAt: '2026-07-01T00:00:00Z', version: 2 },
+    consent: { agreedAt: '2026-07-01T00:00:00Z', version: 3 },
     profile: { goal: 'muscle', experience: 'new', daysPerWeek: 3, sessionMin: 60, preferredDays: [1, 3, 5], equipment: [] },
     log: [], snapshots: [], chat: [{ id: 'c1', role: 'user', kind: 'intake', at: 1 }], timings: []
   },

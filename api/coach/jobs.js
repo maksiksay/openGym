@@ -205,6 +205,12 @@ export function enqueue(uid, opts) {
   // Consent is enforced here, server-side, not by the screen that collects it: a UI-only gate
   // is not a gate (FR-08/13).
   if (!S?.coach?.consent?.agreedAt) throw new CoachError('consent', 'the Coach needs your go-ahead first');
+  // A photo goes only to a provider that can see it, and only with the consent that names photos
+  // (docs/dev/COACH_VOICE_PHOTO.md).
+  if (opts.photo) {
+    if (!cfgStore.visionCapable()) throw new CoachError('novision', 'the Coach on this instance cannot see photos');
+    if ((Number(S.coach.consent.version) || 0) < payloadLib.PHOTO_CONSENT_VERSION) throw new CoachError('photoconsent', 'the Coach needs your go-ahead for photos first');
+  }
 
   // Whose account pays. In instance mode the credential binds to the first profile that spends
   // it and every other profile is refused outright — not warned. A warning would move the
@@ -249,6 +255,9 @@ export function enqueue(uid, opts) {
     note: clampMessage(opts.note),
     refine: clampMessage(opts.refine),
     message: clampMessage(opts.message),              // a chat job's message (docs/dev/COACH_CHAT.md)
+    // A photo with it, in memory only: never in the user record, the history or a file, and
+    // dropped when the job ends (docs/dev/COACH_VOICE_PHOTO.md).
+    photo: opts.photo && typeof opts.photo.data === 'string' ? { mediaType: opts.photo.mediaType, data: opts.photo.data } : null,
     lang: payloadLib.langTag(opts.lang),              // the language the app was showing (#303)
     state: 'queued',
     startedAt: Date.now()
@@ -340,6 +349,7 @@ async function execute(job) {
     refine: job.refine,
     message: job.message,
     waiting,
+    photo: !!job.photo,
     previous: pendingCreate?.bundle || null,
     workoutId: job.workoutId,
     // The app says which language it is in. A scheduled review has no app behind it: a profile
@@ -370,7 +380,7 @@ async function execute(job) {
       adapter, cfg, kind: job.kind, payload, model: cfgStore.modelFor(cfg), timeoutMs: TIMEOUT_MS,
       // The HTTP adapters take the fetch and the abort signal they are given; the runtime
       // adapters ignore both. A consultation may also search the web (webOptionsFor).
-      invokeOpts: { jobDir, env, fetch: fetchFor(TIMEOUT_MS), signal: ctl.signal, ...webOptionsFor(cfg, job.kind) }
+      invokeOpts: { jobDir, env, fetch: fetchFor(TIMEOUT_MS), signal: ctl.signal, ...webOptionsFor(cfg, job.kind), ...(job.photo ? { image: job.photo } : {}) }
     });
     if (!attempt.ok) {
       // Cancelled by a forget, not failed by the provider: the log must not blame the job budget.
@@ -404,6 +414,7 @@ async function execute(job) {
     return finish(job, { outcome: 'ready', pending });
   } finally {
     aborts.delete(job.uid);
+    job.photo = null;
     if (jobDir) removeJobDir(jobDir, unprivilegedIds());
   }
 }

@@ -83,6 +83,10 @@ export default function CoachIntake() {
 
   const agree = () => {
     update(s => { s.coach = { ...(s.coach || emptyCoach()), consent: { agreedAt: new Date().toISOString(), version: CONSENT_VERSION } } })
+    // Asked again because what the Coach shares changed (CONSENT_VERSION): a profile that has
+    // answered the questions before goes back to its chat, not through them again and on to a
+    // fresh plan it never asked for.
+    if (S.coach?.profile) { nav('/coach', { replace: true }); return }
     setStep(step + 1)
   }
 

@@ -414,6 +414,10 @@ function weighIns(S, from, to) {
  * Sent only when the module is on (`healthOn`) and the person agreed to the consent version that
  * names this category (2); a profile still on the first consent keeps the payload it agreed to. */
 export const HEALTH_CONSENT_VERSION = 2;
+// A photo attached in the chat leaves with its message only once the person has agreed to the
+// consent version that names photos (docs/dev/COACH_VOICE_PHOTO.md). The photo itself never
+// passes through this module: the payload says only that there is one.
+export const PHOTO_CONSENT_VERSION = 3;
 const HEALTH_DAYS_MAX = 84;
 const healthAllowed = S => S.healthOn !== false && (Number(S.coach?.consent?.version) || 0) >= HEALTH_CONSENT_VERSION;
 const scale = v => (Number.isInteger(v) && v >= 1 && v <= 5 ? v : undefined);
@@ -536,7 +540,7 @@ export function workoutMeta(S, workoutId) {
  * Build a job payload.
  *
  * @param {object} S      the profile's synced state
- * @param {object} opts   { handle, kind, intake?, note?, refine?, message?, waiting?, previous?, workoutId?, cohort?, lang? }
+ * @param {object} opts   { handle, kind, intake?, note?, refine?, message?, waiting?, photo?, previous?, workoutId?, cohort?, lang? }
  *
  * `handle` is the opaque per-profile pseudonym the payload carries instead of a uid. It is
  * supplied rather than derived because the two runtimes mint it differently: the server keys
@@ -623,6 +627,7 @@ export function build(S, opts = {}) {
     if (opts.note) p.userNote = String(opts.note).slice(0, MAX_NOTE_CHARS);
     if (opts.kind === 'chat' && opts.message) p.message = String(opts.message).slice(0, MAX_NOTE_CHARS);
     if (opts.kind === 'chat') { const w = waitingSlice(opts.waiting); if (w) p.waiting = w; }
+    if (opts.kind === 'chat' && opts.photo) p.photo = true;
     if (opts.cohort) p.cohort = cleanCohort(opts.cohort);
     // A review names mostly what is already trained; 60 candidates is plenty for a swap.
     p.library = librarySlice(S, p.coachProfile?.equipment, { keep: trainedIds(S, workouts), max: 60 });
@@ -670,10 +675,24 @@ export const CHAT_CONVERSATION = Object.freeze({ lines: 8, chars: 500 });
 function conversation(coach, current, size) {
   const { lines, chars } = size || { lines: CONVERSATION_LINES, chars: CONVERSATION_CHARS };
   const now = new Set((current || []).filter(Boolean).map(x => String(x).trim()));
-  return (coach.chat || [])
-    .filter(m => m && typeof m.text === 'string' && m.text.trim()
-      && ((m.role === 'user' && m.kind === 'text') || (m.role === 'coach' && (m.kind === 'nochange' || m.kind === 'text'))))
-    .filter(m => !(m.role === 'user' && now.has(m.text.trim())))
+  return list(coach.chat)
+    .filter(m => m && typeof m === 'object' && !(m.role === 'user' && typeof m.text === 'string' && !m.photo && now.has(m.text.trim())))
+    .map(m => ({ who: m.role === 'user' ? 'user' : 'coach', text: lineText(m) }))
+    .filter(l => l.text)
     .slice(-lines)
-    .map(m => ({ who: m.role === 'user' ? 'user' : 'coach', text: m.text.trim().slice(0, chars) }));
+    .map(l => ({ who: l.who, text: l.text.slice(0, chars) }));
+}
+// A line as the model reads it back. A photo that went with a message is not kept, so the line
+// says there was one; a meal card is what was counted, and whether it was added
+// (docs/dev/COACH_VOICE_PHOTO.md). Anything else in the thread is not conversation.
+function lineText(m) {
+  const said = typeof m.text === 'string' ? m.text.trim() : '';
+  if (m.role === 'user' && m.kind === 'text') return m.photo ? (said ? said + ' ' : '') + '[photo]' : said;
+  if (m.role !== 'coach') return '';
+  if (m.kind === 'nochange' || m.kind === 'text') return said;
+  if (m.kind !== 'meal') return '';
+  const items = list(m.meal?.items).slice(0, 12).filter(i => i && typeof i === 'object')
+    .map(i => `${text(i.name, 60)} ${Number.isFinite(Number(i.g)) ? Math.round(Number(i.g)) : '?'} g`).join(', ');
+  const fate = m.status === 'added' ? 'added to the food log' : m.status === 'dismissed' ? 'not added' : 'not added yet';
+  return [said, items && `[meal card: ${items}; ${fate}]`].filter(Boolean).join(' ');
 }

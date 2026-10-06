@@ -70,6 +70,28 @@ export function sdkOptions({ web } = {}) {
   return { ...WEB_LOCKDOWN, systemPrompt: web.note ? SYSTEM_PROMPT + '\n\n' + web.note : SYSTEM_PROMPT };
 }
 
+/**
+ * The prompt with a photo before it (docs/dev/COACH_VOICE_PHOTO.md): one streamed user message
+ * holding the image and the text, the shape the Agent SDK takes for anything but plain text.
+ * The SDK writes it to the runtime's stdin and closes it; nothing is written to a file, and the
+ * session is not kept (`persistSession: false`). Exported so a test can assert the shape.
+ */
+export function promptWithImage(prompt, image) {
+  const message = {
+    type: 'user',
+    session_id: '',
+    parent_tool_use_id: null,
+    message: {
+      role: 'user',
+      content: [
+        { type: 'image', source: { type: 'base64', media_type: image.mediaType, data: image.data } },
+        { type: 'text', text: prompt }
+      ]
+    }
+  };
+  return (async function* one() { yield message; })();
+}
+
 let cached;
 /** Resolve the SDK, or null when this image was built without it. Never throws. */
 async function sdk() {
@@ -99,6 +121,7 @@ function spawnAsCoach({ command, args, cwd, env, signal }) {
 export default {
   id: 'claude',
   spawns: true,
+  vision: true,
   runtime: 'Claude Agent SDK',
 
   /* Importing the package is the check: it is exactly what a job will do, and it is the one
@@ -112,7 +135,7 @@ export default {
     return { ok: true, version: v ? `Claude Agent SDK ${v}` : 'Claude Agent SDK' };
   },
 
-  async invoke({ prompt, jobDir, env, model, timeoutMs, web }) {
+  async invoke({ prompt, jobDir, env, model, timeoutMs, web, image }) {
     const m = await sdk();
     if (!m) return { code: -1, text: '', stderr: `${PKG} is not installed`, timedOut: false, spawnError: true };
 
@@ -122,7 +145,7 @@ export default {
 
     try {
       for await (const message of m.query({
-        prompt,
+        prompt: image ? promptWithImage(prompt, image) : prompt,
         options: {
           ...sdkOptions({ web }),
           abortController,

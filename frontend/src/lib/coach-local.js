@@ -26,6 +26,7 @@ import { nativeFetch } from './capacitor-fetch.js'
 import { getApiKey } from './coach-secrets.js'
 import { loadCoachDevice, saveCoachDevice } from './coach-device.js'
 import { planHash } from './coach.js'
+import { tco } from './coach-i18n.js'
 import { todayISO } from './format.js'
 import { t, getLang } from './i18n.js'
 
@@ -89,8 +90,20 @@ export async function localStatus() {
 }
 
 export const localReview = (S, note) => start(S, 'review', { note: note ? String(note).slice(0, 1000) : null })
-// A chat reads the proposal still waiting on this phone, as the server's does.
-export const localChat = async (S, message) => start(S, 'chat', { message: String(message || '').slice(0, 1000), waiting: (await loadCoachDevice()).pending || null })
+// A chat reads the proposal still waiting on this phone, as the server's does. A photo goes only to
+// a provider that can see it, and only with the consent that names photos (docs/dev/COACH_VOICE_PHOTO.md).
+export const localChat = async (S, message, photo) => {
+  if (photo) {
+    const d = await loadCoachDevice()
+    if (ADAPTERS[d.provider]?.vision !== true) throw Object.assign(new Error(tco('This AI provider cannot see photos.')), { status: 409, code: 'novision' })
+    if ((Number(S?.coach?.consent?.version) || 0) < payloadLib.PHOTO_CONSENT_VERSION) throw Object.assign(new Error(tco('The Coach needs your go-ahead for photos first.')), { status: 403, code: 'photoconsent' })
+  }
+  return start(S, 'chat', {
+    message: String(message || '').slice(0, 1000),
+    waiting: (await loadCoachDevice()).pending || null,
+    photo: photo ? { mediaType: photo.type, data: photo.data } : null
+  })
+}
 export const localPlan = (S, intake) => start(S, 'create', { intake: intake || null })
 export const localRefine = async (S, text) => {
   const d = await loadCoachDevice()
@@ -144,13 +157,13 @@ async function start(S, kind, opts) {
 async function run(S, kind, opts, d, adapter) {
   const key = await getApiKey()
   const payload = payloadLib.build(S, {
-    handle: await handle(), kind, intake: opts.intake, note: opts.note, refine: opts.refine, message: opts.message, waiting: opts.waiting, previous: opts.previous, workoutId: opts.workoutId,
+    handle: await handle(), kind, intake: opts.intake, note: opts.note, refine: opts.refine, message: opts.message, waiting: opts.waiting, photo: !!opts.photo, previous: opts.previous, workoutId: opts.workoutId,
     lang: getLang()   // what the app shows, which a profile that never picked a language does not store (#303)
   })
   const attempt = await runPipeline({
     adapter, cfg: cfgOf(d), kind, payload,
     model: d.model || HTTP_PROVIDERS[d.provider].defaultModel, timeoutMs: timeoutFor(d.provider),
-    invokeOpts: { env: envOf(d, key), fetch: nativeFetch }
+    invokeOpts: { env: envOf(d, key), fetch: nativeFetch, ...(opts.photo ? { image: opts.photo } : {}) }
   })
   if (!attempt.ok) {
     // There is no admin card on a phone, so the reason has to reach the person holding it:

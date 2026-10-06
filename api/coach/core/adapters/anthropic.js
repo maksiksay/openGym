@@ -9,6 +9,8 @@ export const FOOD_WEB_NOTE = ' For this task only, a web search tool is availabl
 
 export const anthropicSpec = {
   id: 'anthropic',
+  // A photo sent with a chat message goes as an image block before the text.
+  vision: true,
   path: () => '/v1/messages',
   modelsPath: '/v1/models',
   headers: key => ({
@@ -20,13 +22,18 @@ export const anthropicSpec = {
   }),
   // The rules block is marked cacheable: identical for every job of a task, so subsequent
   // jobs read it from Anthropic's prompt cache at a tenth of the input price.
-  body: ({ model, prompt, system, tools, webNote, maxTokens }) => ({
+  body: ({ model, prompt, system, tools, webNote, image, maxTokens }) => ({
     model,
     max_tokens: maxTokens,
     system: system
       ? [{ type: 'text', text: SYSTEM_PROMPT + (Array.isArray(tools) && tools.length ? (webNote ? ' ' + String(webNote).trim() : FOOD_WEB_NOTE) : '') + '\n\n' + system, cache_control: { type: 'ephemeral' } }]
       : SYSTEM_PROMPT,
-    messages: [{ role: 'user', content: prompt }],
+    messages: [{
+      role: 'user',
+      content: image
+        ? [{ type: 'image', source: { type: 'base64', media_type: image.mediaType, data: image.data } }, { type: 'text', text: prompt }]
+        : prompt
+    }],
     // Server tools only (web search, run by Anthropic): the model gets no tool of ours to call.
     ...(Array.isArray(tools) && tools.length ? { tools } : {})
   }),

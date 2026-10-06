@@ -112,8 +112,10 @@ The thread stores the card as a chat line: `{ role: 'coach', kind: 'meal', text,
 
 - A camera button in the composer opens the camera or the photo library
   (`<input type="file" accept="image/*">`).
-- The photo is decoded and re-encoded on the device by `lib/media-ingest.js`, to at most 1280 px
-  on the longest side.
+- The photo is decoded and re-encoded on the device (`lib/coach-photo.js`, with
+  `lib/media-ingest.js`'s helpers), to at most 1280 px on the longest side. What leaves is a new
+  JPEG or WebP: none of the original file's metadata (where and with what it was taken) goes
+  with it.
 - It shows as a thumbnail above the box until it is sent or removed.
 
 ### On its way
@@ -127,6 +129,8 @@ The thread stores the card as a chat line: `{ role: 'coach', kind: 'meal', text,
   carries only `photo: true`.
 - The photo is never written to a file, the job's history, the chat or the synced state. The
   thread shows the message with a camera mark.
+- The conversation the next message carries says where a photo was (`[photo]`) and what a meal
+  card counted, with whether it was added, so "and the bread?" has something to point at.
 - The Claude runtime runs with `persistSession: false`, in a temporary home that is removed after
   the job.
 
@@ -151,6 +155,9 @@ is `photos`, described as: "Photos you attach — a photo you attach to a messag
 only; it is not kept".
 
 - The consent version moves to 3, and everyone is asked again, once.
+- A profile that has answered the questions before goes back to its chat once it agrees. Before
+  this, a profile asked again walked the whole questionnaire and ended on a request for a fresh
+  plan.
 - Until then a photo is refused.
 - Text, voice and meals need nothing new: a meal is what the person wrote.
 
@@ -184,6 +191,7 @@ only; it is not kept".
 - **`frontend/src/lib/`**:
   - `speech.js`;
   - `coach-meal.js`, pure: a card's rows for `S.meals`;
+  - `coach-photo.js`: the photo drawn again on the device, as base64;
   - `coach-api.js`: `sendChat(message, photo)`;
   - `coach-local.js`: `waiting`, the photo, the `meal` outcome;
   - `coach.js`: the `photos` category text; `CONSENT_VERSION` 3;
@@ -192,6 +200,7 @@ only; it is not kept".
   - the microphone and camera buttons, and the attachment;
   - the meal card;
   - the reply written from the run's outcome.
+- **`frontend/src/views/CoachIntake.jsx`**: agreeing again goes back to the chat.
 - **`frontend/src/components/Icon.jsx`**: `mic`.
 
 ## Tests
@@ -219,7 +228,9 @@ only; it is not kept".
   - Not now;
   - tracking off: no Add.
 - A photo goes with the message, and the thread keeps only its mark.
-- The consent screen lists photos.
+- The consent screen lists photos, and a profile asked again goes back to its chat.
+- `CoachChat.demo-failure.test.jsx` loads the demo module before it starts timing a request. On a
+  cold cache it used to fail more often than it passed.
 
 ### For real, on the instance
 

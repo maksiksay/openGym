@@ -33,6 +33,7 @@ import { tco } from '../lib/coach-i18n.js'
 import { splitLinks } from '../lib/links.js'
 import { canDictate, dictate, speechLang } from '../lib/speech.js'
 import { cardMeals, cardPortions, cardStart } from '../lib/coach-meal.js'
+import { preparePhoto } from '../lib/coach-photo.js'
 import { th } from '../lib/health-i18n.js'
 import { SLOTS, SLOT_NAMES } from '../lib/nutrition.js'
 import { confirmSheet } from '../sheets.jsx'
@@ -57,6 +58,11 @@ export default function CoachChat() {
   const [busy, setBusy] = useState(false)
   const [listening, setListening] = useState(false)
   const dictation = useRef(null)   // { stop, mute } while listening
+  const [photo, setPhoto] = useState(null)   // { type, data, bytes, url } until sent or removed
+  const [preparing, setPreparing] = useState(false)
+  const fileRef = useRef(null)
+  // A photo's preview lives as long as the photo does: dropped, replaced or sent, it is released.
+  useEffect(() => () => { if (photo?.url) URL.revokeObjectURL(photo.url) }, [photo])
   const endRef = useRef(null)
   const prevJob = useRef(null)
   useEffect(() => () => dictation.current?.mute(), [])
@@ -139,21 +145,40 @@ export default function CoachChat() {
     setListening(true)
   }
 
+  // A message about a proposed plan refines it. With no plan at all — the first attempt failed,
+  // or nothing was ever built — the message asks for one; a review would only answer that there
+  // is no workout to look at, which is how people got stuck. Anything else goes to the Coach as
+  // it is, and the Coach decides whether to answer it, propose a change or ask what was meant
+  // (docs/dev/COACH_CHAT.md), and takes a photo with it (docs/dev/COACH_VOICE_PHOTO.md).
+  const refining = pending?.kind === 'create' || !(S.routines || []).length
+  const photosOn = !refining && !DEMO && (MOBILE && coachMode === 'byok' ? LOCAL_VISION.has(coachLocal?.provider) : !!config?.coach?.vision)
+
+  const pickPhoto = async e => {
+    const file = e.target.files?.[0]
+    e.target.value = ''   // so the same photo can be picked again
+    if (!file) return
+    setPreparing(true)
+    try {
+      const p = await preparePhoto(file)
+      setPhoto({ type: p.type, data: p.data, bytes: p.bytes, url: URL.createObjectURL(p.blob) })
+    } catch (err) {
+      toast(tco(err?.code === 'toolarge' ? 'That photo is too large to send.' : 'That file could not be read as a photo.'))
+    }
+    setPreparing(false)
+  }
+
   const send = async () => {
     dictation.current?.mute()
     const msg = text.trim()
-    if (!msg || busy) return
+    const pic = photosOn ? photo : null
+    if ((!msg && !pic) || busy || preparing) return
     setBusy(true)
     try {
-      // A message about a proposed plan refines it. With no plan at all — the first attempt
-      // failed, or nothing was ever built — the message asks for one; a review would only
-      // answer that there is no workout to look at, which is how people got stuck. Anything
-      // else goes to the Coach as it is, and the Coach decides whether to answer it, propose a
-      // change or ask what was meant (docs/dev/COACH_CHAT.md).
-      if (pending?.kind === 'create' || !(S.routines || []).length) await refinePlan(msg)
-      else await sendChat(msg)
-      update(s => appendChat(s, { role: 'user', kind: 'text', text: msg }))
+      if (refining) await refinePlan(msg)
+      else await sendChat(msg, pic)
+      update(s => appendChat(s, { role: 'user', kind: 'text', text: msg, ...(pic ? { photo: true } : {}) }))
       setText('')
+      setPhoto(null)
       refresh()
     } catch (e) {
       toast(e.message || t('Could not ask the Coach'))
@@ -253,6 +278,11 @@ export default function CoachChat() {
     </div>
 
     <div className="composer">
+      {photo && photosOn && <div className="attach-preview">
+        <img src={photo.url} alt="" />
+        <span className="grow">{tco('Photo')} · {Math.max(1, Math.round(photo.bytes / 1024))} KB</span>
+        <button className="iconbtn" onClick={() => setPhoto(null)} aria-label={tco('Remove the photo')}><Icon name="xmark" /></button>
+      </div>}
       {idle && !busy && <div className="chips-row">
         <button className="qchip" onClick={askReview}><Icon name="sparkles" />{t('Review my training')}</button>
         {!!lastWorkout && <button className="qchip" onClick={askDebrief}><Icon name="checkCircle" />{t('Last workout')}</button>}
@@ -260,18 +290,27 @@ export default function CoachChat() {
         {community && <button className="qchip" onClick={showCohort}><Icon name="person" />{t('Compare')}</button>}
       </div>}
       <div className="composer-in">
+        {photosOn && <>
+          <input ref={fileRef} type="file" accept="image/*" hidden onChange={pickPhoto} />
+          <button className="attach" onClick={() => fileRef.current?.click()} disabled={busy || preparing || !!job}
+            aria-label={tco('Attach a photo')}><Icon name="camera" /></button>
+        </>}
         <textarea rows={1} value={text} maxLength={maxMessageLen || 1000} placeholder={listening ? tco('Listening…') : placeholder} disabled={!!job}
           readOnly={listening}
           onChange={e => setText(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }} />
         {canDictate() && <button className={'mic' + (listening ? ' on' : '')} onClick={toggleDictation} disabled={busy || !!job}
           aria-pressed={listening} aria-label={listening ? tco('Stop dictation') : tco('Dictate')}><Icon name="mic" /></button>}
-        <button className="send" onClick={send} disabled={!text.trim() || busy || !!job} aria-label={t('Send')}><Icon name="arrowUp" /></button>
+        <button className="send" onClick={send} disabled={(!text.trim() && !(photo && photosOn)) || busy || preparing || !!job} aria-label={t('Send')}><Icon name="arrowUp" /></button>
       </div>
       {cap?.limit > 0 && <div className="composer-cap">{t('{0} of {1} Coach runs used today', cap.used, cap.limit)}</div>}
     </div>
   </div>
 }
+
+// The providers a phone with its own key can show a photo to: the core adapters with `vision`
+// (api/coach/core/adapters/anthropic.js). Named here so the chat need not load the core to know.
+const LOCAL_VISION = new Set(['anthropic'])
 
 // What went wrong with dictation, in the app's voice. Silence, or the recognizer stopping on its
 // own, is not an error and says nothing.
@@ -312,7 +351,9 @@ function Message({ m, S, profile, openSheet, update, nav }) {
     </div>
   }
   if (m.kind === 'reverted' || m.kind === 'nochange' || m.kind === 'error' || m.kind === 'text') {
-    return <Bubble role={m.role} kind={m.kind} at={m.at}>{m.role === 'coach' ? <Linked text={m.text} /> : m.text}</Bubble>
+    // A photo that went with a message is not kept, so the thread marks where one was.
+    return <Bubble role={m.role} kind={m.kind} at={m.at}>{m.role === 'coach' ? <Linked text={m.text} />
+      : <>{m.photo && <Icon name="camera" className="msg-photo" />}{m.text || (m.photo ? tco('Photo') : '')}</>}</Bubble>
   }
   return null
 }

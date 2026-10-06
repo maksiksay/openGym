@@ -346,6 +346,12 @@ export function isConnected() {
 export const WEB_PROVIDERS = new Set(['claude', 'anthropic']);
 export const webCapable = (cfg = load()) => WEB_PROVIDERS.has(cfg && cfg.provider);
 
+/** The providers that can see a photo sent with a chat message (docs/dev/COACH_VOICE_PHOTO.md):
+ *  Claude through the Agent SDK, Anthropic through an image block, and the fixture, which reads
+ *  only the payload's `photo: true` so the whole path can be walked without an account. */
+export const VISION_PROVIDERS = new Set(['claude', 'anthropic', 'fixture']);
+export const visionCapable = (cfg = load()) => VISION_PROVIDERS.has(cfg && cfg.provider);
+
 /** What /api/config tells every client. Absent ⇒ no Coach UI exists anywhere (FR-55/56). */
 export function publicConfig() {
   if (!isEnabled() || !isConnected()) return null;
@@ -353,7 +359,9 @@ export function publicConfig() {
   return {
     enabled: true, provider: cfg.provider, providerLabel: providerMeta(cfg).label, authMode: cfg.authMode, community: !!cfg.community,
     // So the consent screen can say the Coach may search (docs/dev/COACH_WEB.md).
-    web: cfg.webSearch === true && webCapable(cfg)
+    web: cfg.webSearch === true && webCapable(cfg),
+    // So the chat offers a camera only where the provider can see the photo.
+    vision: visionCapable(cfg)
   };
 }
 

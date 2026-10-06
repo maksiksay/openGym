@@ -4,6 +4,11 @@ export default {
   // screen and cards
   'Health': 'Здоровье',
   'Health & food': 'Здоровье и питание',
+  // The consent screens translate every category through th(), the photos one included
+  // (lib/coach.js CATEGORY_TEXT, docs/dev/COACH_VOICE_PHOTO.md).
+  'Photos you attach': 'Фото, которые вы прикрепляете',
+  'A photo you attach to a message in the chat, for that message only. It is not kept — not in the chat, not on the server.':
+    'Фото, прикреплённое к сообщению в чате, — только для этого сообщения. Оно не хранится: ни в чате, ни на сервере.',
   'Sleep, wellbeing and food': 'Сон, самочувствие и питание',
   'Wellbeing': 'Самочувствие',
   'Food': 'Еда',

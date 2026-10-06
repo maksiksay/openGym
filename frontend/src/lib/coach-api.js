@@ -66,7 +66,11 @@ export const requestReview = (...a) => _requestReview(...a).then(track)
 // A message typed in the chat: the Coach decides whether it answers, proposes plan changes or
 // asks what was meant (docs/dev/COACH_CHAT.md). The demo has no model to answer with, so a
 // message there still gets the canned review it always did.
-const _sendChat = async message => DEMO ? (await demo()).demoReview(S()) : LOCAL() ? (await local()).localChat(S(), message) : api('/api/coach/chat', { method: 'POST', body: JSON.stringify({ message, lang: getLang() }) })
+// A photo may go with it (docs/dev/COACH_VOICE_PHOTO.md): `{ type, data }`, already drawn again on
+// the device by lib/coach-photo.js.
+const _sendChat = async (message, photo) => DEMO ? (await demo()).demoReview(S())
+  : LOCAL() ? (await local()).localChat(S(), message, photo)
+    : api('/api/coach/chat', { method: 'POST', body: JSON.stringify({ message, lang: getLang(), ...(photo ? { photo: { type: photo.type, data: photo.data } } : {}) }) })
 export const sendChat = (...a) => _sendChat(...a).then(track)
 const _requestPlan = async intake => DEMO ? (await demo()).demoPlan(S(), intake) : LOCAL() ? (await local()).localPlan(S(), intake) : api('/api/coach/plan', { method: 'POST', body: JSON.stringify({ intake, lang: getLang() }) })
 export const requestPlan = (...a) => _requestPlan(...a).then(track)

@@ -150,7 +150,7 @@ describe('CoachIntake — the consent screen', () => {
   it('lists the built-in categories first, then whatever the server says actually goes', async () => {
     vi.mocked(disclosure).mockResolvedValue({ categories: ['plan', 'prefs'], providerLabel: 'Anthropic', payer: 'you', host: 'api.anthropic.com' })
     mount()
-    expect(all('.ob-consent-row')).toHaveLength(6)                       // CATEGORY_TEXT, before the call lands
+    expect(all('.ob-consent-row')).toHaveLength(7)                       // CATEGORY_TEXT, before the call lands
     await settle()
     expect(all('.ob-consent-row')).toHaveLength(2)
     expect(host.textContent).toContain('Sent straight to api.anthropic.com with your own API key')
@@ -185,7 +185,7 @@ describe('CoachIntake — the consent screen', () => {
     mocks.config = { coach: { enabled: true, providerLabel: 'Claude Agent SDK' } }
     mount(); await settle()
     expect(host.textContent).toContain('Sent to Claude Agent SDK, running on this server')
-    expect(all('.ob-consent-row')).toHaveLength(6)      // and the built-in list stands in
+    expect(all('.ob-consent-row')).toHaveLength(7)      // and the built-in list stands in
 
     act(() => root.unmount())
     mocks.config = { coach: { enabled: true } }
@@ -198,6 +198,19 @@ describe('CoachIntake — the consent screen', () => {
     vi.mocked(disclosure).mockResolvedValue({ categories: ['plan', 'sleep'], providerLabel: 'x', payer: 'instance' })
     mount(); await settle()
     expect(all('.ob-consent-row').map(r => r.querySelector('b').textContent)).toEqual(['Your plan', 'sleep'])
+  })
+
+  // docs/dev/COACH_VOICE_PHOTO.md: version 3 added photos, and everyone is asked again once.
+  it('asks a returning profile again after the consent changed, and sends it back to its chat', () => {
+    const profile = { goal: 'muscle', experience: 'some', daysPerWeek: 3, preferredDays: [1, 3, 5], sessionMin: 60, equipment: [] }
+    mocks.S.coach = { consent: { agreedAt: '2026-09-01T00:00:00Z', version: CONSENT_VERSION - 1 }, profile, chat: [] }
+    mount()
+    expect(eyebrow()).toBe('Before we start')
+    expect(host.textContent).toContain('Photos you attach')
+    tap('button', 'I understand')
+    expect(mocks.S.coach.consent.version).toBe(CONSENT_VERSION)
+    expect(mocks.S.coach.profile).toEqual(profile)
+    expect(mocks.nav).toHaveBeenCalledWith('/coach', { replace: true })
   })
 
   it('is skipped entirely once consent is on file', () => {

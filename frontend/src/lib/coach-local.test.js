@@ -113,6 +113,33 @@ describe('the Coach on a phone with its own key', () => {
     expect(s.last.meal.items).toEqual([{ name: 'Oats', g: 60, kcal: 370, p: 13, f: 7, c: 60, confidence: 'typical' }])
   })
 
+  it('a photo goes to Anthropic as an image block before the text, and the payload only says there is one', async () => {
+    device.data = { mode: 'byok', provider: 'anthropic', model: 'claude-t', baseUrl: null }
+    secret.key = 'sk-ant-test'
+    const answer = { coach_contract: 1, reply: 'meal', text: 'Read off the photo.', items: [{ name: 'Oats', g: 60, kcal: 370, p: 13, f: 7, c: 60, confidence: 'estimate' }] }
+    wire.answer = { status: 200, body: { content: [{ type: 'text', text: JSON.stringify(answer) }], stop_reason: 'end_turn' } }
+    const S = { ...state(), coach: { ...state().coach, consent: { agreedAt: '2026-08-01T00:00:00Z', version: 3 } } }
+    await local.localChat(S, '', { type: 'image/jpeg', data: 'QUJD' })
+    const s = await settle()
+    expect(s.last).toMatchObject({ kind: 'chat', outcome: 'meal' })
+    const sent = wire.calls[0]
+    expect(sent.url).toBe('https://api.anthropic.com/v1/messages')
+    const [image, text] = sent.body.messages[0].content
+    expect(image).toEqual({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: 'QUJD' } })
+    expect(text.type).toBe('text')
+    expect(text.text).toContain('"photo":true')
+    expect(text.text).not.toContain('QUJD')
+  })
+
+  it('a photo is refused by a provider that cannot see it, and before the consent that names photos', async () => {
+    const v3 = { ...state(), coach: { ...state().coach, consent: { agreedAt: '2026-08-01T00:00:00Z', version: 3 } } }
+    await expect(local.localChat(v3, 'Look', { type: 'image/jpeg', data: 'QUJD' })).rejects.toMatchObject({ code: 'novision' })
+    device.data = { mode: 'byok', provider: 'anthropic', model: 'claude-t', baseUrl: null }
+    _resetCoachDevice()
+    await expect(local.localChat(state(), 'Look', { type: 'image/jpeg', data: 'QUJD' })).rejects.toMatchObject({ code: 'photoconsent' })
+    expect(wire.calls).toHaveLength(0)
+  })
+
   it('a chat message that asks for a change gets a review\'s proposal, which the apply engine accepts', async () => {
     const S = state()
     wire.answer = chat(JSON.stringify({ ...review, reply: 'changes' }))
@@ -234,7 +261,7 @@ describe('the Coach on a phone with its own key', () => {
     const d = await local.localDisclosure()
     expect(d.payer).toBe('you')
     expect(d.host).toBe('api.openai.com')
-    expect(d.categories).toEqual(['plan', 'training', 'bodyweight', 'profile', 'health', 'prefs'])
+    expect(d.categories).toEqual(['plan', 'training', 'bodyweight', 'profile', 'health', 'prefs', 'photos'])
   })
 })
 

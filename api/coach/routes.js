@@ -11,6 +11,7 @@ import { computeCohort } from './cohort.js';
 import { adapterFor } from './adapters/index.js';
 import { canDropPrivileges } from './adapters/spawn.js';
 import { DATA_CATEGORIES } from './core/payload.js';
+import { cleanPhoto } from './photo.js';
 import { validateBaseUrl, baseUrlFor } from './core/providers.js';
 
 // Job failures the user sees, in the app's own voice. The raw provider detail never reaches
@@ -23,9 +24,11 @@ const USER_ERROR = {
   // Verbatim, because it tells the user the one thing that resolves it and names who resolves
   // it. A vaguer message here turns into a support question for the person running the box.
   shared: cfgStore.SHARED_ACCOUNT_REFUSAL,
-  unprivileged: 'the Coach is switched off on this instance for safety reasons'
+  unprivileged: 'the Coach is switched off on this instance for safety reasons',
+  novision: 'the Coach on this instance cannot see photos',
+  photoconsent: 'the Coach needs your go-ahead for photos first'
 };
-const HTTP_FOR = { off: 503, busy: 409, cap: 429, consent: 403, shared: 409, unprivileged: 503 };
+const HTTP_FOR = { off: 503, busy: 409, cap: 429, consent: 403, shared: 409, unprivileged: 503, novision: 409, photoconsent: 403 };
 
 export function coachRoutes({ json, readBody, readSession, requireAdmin }) {
   /** Every user route starts the same way: signed in, feature on, feature reachable. */
@@ -101,9 +104,16 @@ export function coachRoutes({ json, readBody, readSession, requireAdmin }) {
       const user = guard(req, res); if (!user) return;
       const body = await readBody(req);
       const message = typeof body.message === 'string' ? body.message.trim().slice(0, cfgStore.MAX_MESSAGE_LEN_CEILING) : '';
-      if (!message) return json(res, 400, { error: 'message is required' });
+      // A photo may come with it, or stand for it (docs/dev/COACH_VOICE_PHOTO.md).
+      let photo = null;
+      if (body.photo != null) {
+        const p = cleanPhoto(body.photo);
+        if (!p.ok) return json(res, 400, { error: p.error });
+        photo = p.photo;
+      }
+      if (!message && !photo) return json(res, 400, { error: 'message is required' });
       try {
-        const job = jobs.enqueue(user.id, { kind: 'chat', lang: body.lang, message });
+        const job = jobs.enqueue(user.id, { kind: 'chat', lang: body.lang, message, photo });
         json(res, 202, { job });
       } catch (e) { failEnqueue(res, e); }
     },
