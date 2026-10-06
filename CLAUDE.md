@@ -28,7 +28,8 @@ docs/      guides indexed in docs/README.md (FAQ, SELF_HOSTING*, MOBILE, AI_COAC
            SCOREBOARD: wins, goal line, monthly quota; AB_PLAN: Nordic/Copenhagen built-ins, the
            2×40 A/B starter plan, the next session without a weekly schedule; COACH_WEB: web search
            for the Coach's plans, reviews and chat, search only; COACH_CHAT: one chat job that answers,
-           proposes plan changes or asks back).
+           proposes plan changes or asks back; COACH_VOICE_PHOTO: dictation in the chat, a meal
+           card from a message or a photo, photos for Claude/Anthropic only).
 ```
 
 ## Commands

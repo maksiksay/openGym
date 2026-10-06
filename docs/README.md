@@ -52,6 +52,7 @@ Design notes for specific features, kept next to the code they describe:
 | [A/B plan](dev/AB_PLAN.md) | Nordic curl and Copenhagen built-ins, the 2×40 starter plan, the next session without a schedule |
 | [Coach web search](dev/COACH_WEB.md) | Letting the Coach search the web in plans, reviews and chat, search only |
 | [Coach chat](dev/COACH_CHAT.md) | The Coach decides whether a message is a question, a plan change or unclear |
+| [Coach voice, meals and photos](dev/COACH_VOICE_PHOTO.md) | Dictation in the chat, a meal logged from a message or a photo, and the fix that keeps a waiting proposal |
 
 ## Still stuck?
 
