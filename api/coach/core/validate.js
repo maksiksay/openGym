@@ -625,3 +625,48 @@ export function validateDebrief(data) {
   if (errors.length) return fail(errors);
   return { ok: true, proposal: { summary: clampStr(data.summary.trim(), 600), score, ...lists } };
 }
+
+/* ================================= chat messages ================================= */
+
+const CHAT_REPLIES = ['answer', 'clarify', 'changes'];
+const CHAT_TEXT_MAX = 3000;
+const CHAT_SOURCES_MAX = 5;
+const SOURCE_TITLE_MAX = 80;
+const SOURCE_URL_MAX = 300;
+/** The longest a chat reading gets: the text and its source lines. jobs.js keeps it whole. */
+export const CHAT_READING_MAX = 5000;
+
+/** A source the person can open: an http(s) URL that parses, with a title cut short. */
+function sourceLine(s) {
+  if (!s || typeof s !== 'object' || !isStr(s.url)) return null;
+  const url = s.url.trim();
+  if (url.length > SOURCE_URL_MAX || !/^https?:\/\/\S+$/i.test(url)) return null;
+  try { new URL(url); } catch { return null; }
+  const title = isStr(s.title) ? s.title.trim().replace(/\s+/g, ' ').slice(0, SOURCE_TITLE_MAX) : url;
+  return `${title} — ${url}`;
+}
+
+/**
+ * Validate an answer to a message typed into the chat (docs/dev/COACH_CHAT.md). The model picks
+ * the reply: `answer` and `clarify` are text for the chat, and take the path a review that changes
+ * nothing takes (`nochange` with a `reading`); `changes` is a review's change set and is judged by
+ * validateReview, against the same plan, into the same proposal.
+ * Returns { ok, nochange, reading } | { ok, proposal } | { ok:false, errors }.
+ */
+export function validateChat(data, plan, ctx = {}) {
+  if (!data || typeof data !== 'object') return fail(['the answer was not an object']);
+  if (!CHAT_REPLIES.includes(data.reply)) return fail([`reply must be one of: ${CHAT_REPLIES.join(', ')}`]);
+  if (data.reply === 'changes') {
+    if (!Array.isArray(data.changes) || !data.changes.length) {
+      return fail(['reply "changes" needs at least one change in "changes" — to say something without changing the plan, reply "answer"']);
+    }
+    return validateReview({ summary: data.summary, evidence: data.evidence, changes: data.changes, notes: data.notes }, plan, ctx);
+  }
+  if (!isStr(data.text)) return fail([`reply "${data.reply}" needs its "text"`]);
+  let reading = clampStr(data.text.trim(), CHAT_TEXT_MAX);
+  if (data.reply === 'answer' && Array.isArray(data.sources)) {
+    const lines = [...new Set(data.sources.map(sourceLine).filter(Boolean))].slice(0, CHAT_SOURCES_MAX);
+    if (lines.length) reading += '\n\n' + lines.join('\n');
+  }
+  return { ok: true, nochange: true, reading: clampStr(reading, CHAT_READING_MAX) };
+}

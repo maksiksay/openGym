@@ -13,7 +13,7 @@ const { coachRoutes } = await import('../coach/routes.js');
 const on = provider => ({ webSearch: true, provider });
 
 test('consultations search only with the switch on and a provider that can', () => {
-  for (const kind of ['create', 'review']) {
+  for (const kind of ['create', 'review', 'chat']) {
     assert.deepEqual(jobs.webOptionsFor(on('claude'), kind), { web: { note: jobs.CONSULT_WEB_NOTE } }, kind);
     const a = jobs.webOptionsFor(on('anthropic'), kind);
     assert.equal(a.webNote, jobs.CONSULT_WEB_NOTE);

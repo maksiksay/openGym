@@ -89,6 +89,7 @@ export async function localStatus() {
 }
 
 export const localReview = (S, note) => start(S, 'review', { note: note ? String(note).slice(0, 1000) : null })
+export const localChat = (S, message) => start(S, 'chat', { message: String(message || '').slice(0, 1000) })
 export const localPlan = (S, intake) => start(S, 'create', { intake: intake || null })
 export const localRefine = async (S, text) => {
   const d = await loadCoachDevice()
@@ -142,7 +143,7 @@ async function start(S, kind, opts) {
 async function run(S, kind, opts, d, adapter) {
   const key = await getApiKey()
   const payload = payloadLib.build(S, {
-    handle: await handle(), kind, intake: opts.intake, note: opts.note, refine: opts.refine, previous: opts.previous, workoutId: opts.workoutId,
+    handle: await handle(), kind, intake: opts.intake, note: opts.note, refine: opts.refine, message: opts.message, previous: opts.previous, workoutId: opts.workoutId,
     lang: getLang()   // what the app shows, which a profile that never picked a language does not store (#303)
   })
   const attempt = await runPipeline({
@@ -163,11 +164,12 @@ async function run(S, kind, opts, d, adapter) {
   }
   if (attempt.nochange) {
     last = { id: job.id, kind, outcome: 'nochange', errorClass: null, at: Date.now(), reading: attempt.reading }
-    if (notify) notify({ kind: 'nochange', reading: attempt.reading })
+    if (notify) notify({ kind: 'nochange', reading: attempt.reading, job: kind })
     return
   }
   const pending = {
-    id: job.id, kind, createdAt: Date.now(), expiresAt: Date.now() + PENDING_DAYS * 86400000,
+    // A chat that asked for a plan change gets a review's change set, shown and kept as one.
+    id: job.id, kind: kind === 'chat' ? 'review' : kind, createdAt: Date.now(), expiresAt: Date.now() + PENDING_DAYS * 86400000,
     planHash: planHash(S), iteration: opts.iteration || 1,
     ...(kind === 'debrief' ? { workout: workoutMetaOf(S, opts.workoutId) } : {}),
     ...attempt.result

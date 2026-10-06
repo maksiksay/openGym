@@ -40,7 +40,8 @@ const local = async () => {
     localMod.setNotifier(ev => {
       const toast = useUI.getState().toast
       if (ev.kind === 'failed') toast(jobErrorText(ev.errorClass, ev.detail))
-      else if (ev.kind === 'nochange') toast(t('Nothing to change right now: {0}', String(ev.reading || '').slice(0, 140)))
+      // A chat's answer is the Coach's message in the thread, not a verdict on the plan.
+      else if (ev.kind === 'nochange' && ev.job !== 'chat') toast(t('Nothing to change right now: {0}', String(ev.reading || '').slice(0, 140)))
     })
   }
   return localMod
@@ -62,6 +63,11 @@ export const settleAwaited = id => { if (!id || awaited === id) awaited = null }
 export const coachStatus = async () => DEMO ? (await demo()).demoStatus() : LOCAL() ? (await local()).localStatus() : api('/api/coach/status')
 const _requestReview = async note => DEMO ? (await demo()).demoReview(S()) : LOCAL() ? (await local()).localReview(S(), note) : api('/api/coach/review', { method: 'POST', body: JSON.stringify({ note: note || '', lang: getLang() }) })
 export const requestReview = (...a) => _requestReview(...a).then(track)
+// A message typed in the chat: the Coach decides whether it answers, proposes plan changes or
+// asks what was meant (docs/dev/COACH_CHAT.md). The demo has no model to answer with, so a
+// message there still gets the canned review it always did.
+const _sendChat = async message => DEMO ? (await demo()).demoReview(S()) : LOCAL() ? (await local()).localChat(S(), message) : api('/api/coach/chat', { method: 'POST', body: JSON.stringify({ message, lang: getLang() }) })
+export const sendChat = (...a) => _sendChat(...a).then(track)
 const _requestPlan = async intake => DEMO ? (await demo()).demoPlan(S(), intake) : LOCAL() ? (await local()).localPlan(S(), intake) : api('/api/coach/plan', { method: 'POST', body: JSON.stringify({ intake, lang: getLang() }) })
 export const requestPlan = (...a) => _requestPlan(...a).then(track)
 const _refinePlan = async text => DEMO ? (await demo()).demoRefine(S()) : LOCAL() ? (await local()).localRefine(S(), text) : api('/api/coach/plan', { method: 'POST', body: JSON.stringify({ refine: text, lang: getLang() }) })

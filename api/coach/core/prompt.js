@@ -4,7 +4,16 @@
 import { PROMPTS } from './prompts.js';
 
 export const taskOf = (kind, payload) =>
-  kind === 'review' ? 'review' : kind === 'debrief' ? 'debrief' : payload && payload.refine ? 'refine' : 'create';
+  kind === 'review' || kind === 'debrief' || kind === 'chat' ? kind : payload && payload.refine ? 'refine' : 'create';
+
+// A chat message that asks for a plan change is answered with a review's change set, so the chat
+// task is given the review's own rules for one — review.md from its table of change types on —
+// rather than a copy of them that could drift from what validateReview accepts.
+const CHANGE_RULES_AT = '### Allowed change types';
+export const CHANGE_RULES = PROMPTS.review.includes(CHANGE_RULES_AT)
+  ? PROMPTS.review.slice(PROMPTS.review.indexOf(CHANGE_RULES_AT))
+  : '';
+const taskPrompt = task => (task === 'chat' ? PROMPTS.chat + '\n\n' + CHANGE_RULES : PROMPTS[task]);
 
 /**
  * The prompt in two parts: `system` is the rules — byte-identical for every job of the same
@@ -16,7 +25,7 @@ export const taskOf = (kind, payload) =>
  */
 export function buildPromptParts(kind, payload, repair) {
   const task = taskOf(kind, payload);
-  const system = PROMPTS.common + '\n\n---\n\n' + PROMPTS[task];
+  const system = PROMPTS.common + '\n\n---\n\n' + taskPrompt(task);
   // Compact JSON, not pretty-printed: the indentation was ~30% of the payload's tokens and
   // a model reads either just as well.
   let user = '## Payload\n\n```json\n' + JSON.stringify(payload) + '\n```\n';

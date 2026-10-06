@@ -501,7 +501,7 @@ export function workoutMeta(S, workoutId) {
  * Build a job payload.
  *
  * @param {object} S      the profile's synced state
- * @param {object} opts   { handle, kind, intake?, note?, refine?, previous?, workoutId?, cohort?, lang? }
+ * @param {object} opts   { handle, kind, intake?, note?, refine?, message?, previous?, workoutId?, cohort?, lang? }
  *
  * `handle` is the opaque per-profile pseudonym the payload carries instead of a uid. It is
  * supplied rather than derived because the two runtimes mint it differently: the server keys
@@ -514,7 +514,7 @@ export function build(S, opts = {}) {
   const profile = opts.intake || coach.profile || null;
   const p = {
     coach_contract: CONTRACT,
-    task: opts.kind === 'review' ? 'review' : opts.kind === 'debrief' ? 'debrief' : 'create',
+    task: opts.kind === 'review' || opts.kind === 'debrief' || opts.kind === 'chat' ? opts.kind : 'create',
     meta: {
       profile: opts.handle,
       // Both are short codes in any real state; cut anyway, since the state is the client's.
@@ -570,8 +570,12 @@ export function build(S, opts = {}) {
       p.previous = [];
     }
     if (opts.cohort) p.cohort = cleanCohort(opts.cohort);
-  } else if (opts.kind === 'review') {
-    const workouts = reviewWindow(S, coach.lastReview?.at ? String(coach.lastReview.at).slice(0, 10) : null);
+  } else if (opts.kind === 'review' || opts.kind === 'chat') {
+    // A chat message reads what a review reads (docs/dev/COACH_CHAT.md), over the whole twelve
+    // weeks: a question is about the training as it stands, not about what changed since the
+    // last review.
+    const since = opts.kind === 'review' && coach.lastReview?.at ? String(coach.lastReview.at).slice(0, 10) : null;
+    const workouts = reviewWindow(S, since);
     const detailFrom = Math.max(0, workouts.length - FULL_DETAIL_SESSIONS);
     p.window = {
       from: day(workouts[0]?.d),
@@ -582,6 +586,7 @@ export function build(S, opts = {}) {
     p.bodyweight = { goal: num(S.targetW) ?? null, series: weighIns(S, p.window.from, null) };
     { const h = healthSlice(S, p.window.from, null); if (h) p.health = h; }
     if (opts.note) p.userNote = String(opts.note).slice(0, MAX_NOTE_CHARS);
+    if (opts.kind === 'chat' && opts.message) p.message = String(opts.message).slice(0, MAX_NOTE_CHARS);
     if (opts.cohort) p.cohort = cleanCohort(opts.cohort);
     // A review names mostly what is already trained; 60 candidates is plenty for a swap.
     p.library = librarySlice(S, p.coachProfile?.equipment, { keep: trainedIds(S, workouts), max: 60 });
@@ -610,7 +615,7 @@ export function build(S, opts = {}) {
     }
   }
   if (opts.kind !== 'debrief') {
-    const said = conversation(coach, [opts.note, opts.refine]);
+    const said = conversation(coach, [opts.note, opts.refine, opts.message], opts.kind === 'chat' ? CHAT_CONVERSATION : null);
     if (said.length) p.conversation = said;
   }
   return p;
@@ -620,15 +625,19 @@ export function build(S, opts = {}) {
 // The user's own lines (data, never instruction — common.md rule 3) and the Coach's earlier
 // verdicts; never proposals, errors or the intake card, which travel in their own fields or
 // are noise. Six lines, cut short: enough to resolve a reference, not a transcript to argue
-// with. The message being sent right now rides in userNote/refine, so it is left out here.
+// with. The message being sent right now rides in userNote/refine/message, so it is left out
+// here. A chat job reads more of it: there the conversation is the context, and an answer to
+// the Coach's own clarifying question has to reach back to the question (docs/dev/COACH_CHAT.md).
 export const CONVERSATION_LINES = 6;
 export const CONVERSATION_CHARS = 240;
-function conversation(coach, current) {
+export const CHAT_CONVERSATION = Object.freeze({ lines: 8, chars: 500 });
+function conversation(coach, current, size) {
+  const { lines, chars } = size || { lines: CONVERSATION_LINES, chars: CONVERSATION_CHARS };
   const now = new Set((current || []).filter(Boolean).map(x => String(x).trim()));
   return (coach.chat || [])
     .filter(m => m && typeof m.text === 'string' && m.text.trim()
       && ((m.role === 'user' && m.kind === 'text') || (m.role === 'coach' && (m.kind === 'nochange' || m.kind === 'text'))))
     .filter(m => !(m.role === 'user' && now.has(m.text.trim())))
-    .slice(-CONVERSATION_LINES)
-    .map(m => ({ who: m.role === 'user' ? 'user' : 'coach', text: m.text.trim().slice(0, CONVERSATION_CHARS) }));
+    .slice(-lines)
+    .map(m => ({ who: m.role === 'user' ? 'user' : 'coach', text: m.text.trim().slice(0, chars) }));
 }

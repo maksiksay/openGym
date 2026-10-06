@@ -36,16 +36,19 @@ For each message, the model picks one of three replies:
 
 ### Memory of the conversation
 
-The payload carries the last eight chat turns (`conversation`): role and text, each clipped to
-500 characters. A clarifying question can then be answered in the next message, and "the second
-one" means something.
+The payload already carried the last six lines of the chat (`conversation`: `who` and `text`,
+240 characters each) for a review or a plan. A `chat` job reads more of it: the last eight
+lines, 500 characters each. A clarifying question can then be answered in the next message, and
+"the second one" means something. The message being sent is not among them; it rides in
+`message`.
 
 ### What the model reads
 
 What a review reads, with the message on top:
 
 - the plan;
-- the training window with its aggregates;
+- the training window with its aggregates, over the whole twelve weeks rather than since the
+  last review: a question is about the training as it stands;
 - body weight;
 - daily check-ins and food totals against the goals;
 - the intake answers;
@@ -78,24 +81,39 @@ agreed to, so the consent does not change.
   - At most five sources are kept, and only `http(s)` URLs. They are written under the text as
     `title — url` lines.
 - **`changes`** goes to `validateReview` against the plan and comes out as the same proposal a
-  review makes.
+  review makes. A `changes` reply with no changes in it fails.
 - **Anything else** fails, and gets the pipeline's one repair round like any unusable answer.
+
+The proposal waits as `pending` with kind `review`: the app shows, applies, logs and reverts it
+exactly as a review's. The job itself is `chat` in the history.
 
 ## Where it lives
 
 - `api/coach/prompts/chat.md`, then `node scripts/build-coach-assets.mjs` (`prompts.js`).
-- `api/coach/core/prompt.js`: kind `chat` → task `chat`.
+- `api/coach/core/prompt.js`: kind `chat` → task `chat`. The system prompt is `common.md`,
+  `chat.md`, and then `review.md` from its table of change types on (`CHANGE_RULES`), so the
+  rules for a change set exist once.
 - `api/coach/core/payload.js`: kind `chat` builds the review slice plus `message` and
   `conversation`.
 - `api/coach/core/pipeline.js`: kind `chat` → `validateChat`.
 - `api/coach/core/schemas.js`: no strict schema for `chat`. The three reply shapes do not fit one
   schema, so the HTTP providers use their plain JSON mode for it.
-- `api/coach/jobs.js`: `enqueue` takes `kind: 'chat'` with `message`; `WEB_KINDS` gains `chat`.
-- `api/coach/routes.js`: `POST /api/coach/chat` with `{ message, lang }`. The message is clipped to
-  the admin's message length, like a review note.
-- `frontend/src/lib/coach-api.js`: `sendChat(message)`, server or phone-local, as the other
-  requests are.
+- `api/coach/jobs.js`: `enqueue` takes `kind: 'chat'` with `message`; `WEB_KINDS` gains `chat`;
+  a proposal is stored with kind `review`; the history keeps a reading of up to 5000 characters,
+  an answer with its sources.
+- The web search note (`CONSULT_WEB_NOTE`) says sources go into `sources` where a reply has
+  that field.
+- `api/coach/warmup.js`: for a local model, the `chat` prefix is warmed last, so the one live
+  slot holds the kind every typed message uses.
+- `api/coach/routes.js`: `POST /api/coach/chat` with `{ message, lang }`. A blank message is a
+  400. The message is clipped to the admin's message length, like a review note. In
+  `api/openapi.yaml`.
+- `frontend/src/lib/coach-api.js`: `sendChat(message)`, server or phone-local
+  (`coach-local.js` `localChat`), as the other requests are. The demo build has no model to
+  answer with, so a message there still gets its canned review.
 - `frontend/src/views/CoachChat.jsx`: `send()` uses it whenever the refine path does not apply.
+  The typing bubble says "Reading your message…". URLs in the Coach's messages are links
+  (`lib/links.js`, http(s) only), opened outside the app.
 
 ## Tests
 
@@ -115,7 +133,9 @@ agreed to, so the consent does not change.
 - **Route:** `POST /api/coach/chat` enqueues a `chat` job with the message.
 - **Web:** `webOptionsFor(cfg, 'chat')` searches when the switch is on.
 - **Client:** with a plan and nothing pending, a typed message goes to `chat`; with a pending
-  new plan, it still refines.
-- **Prompts:** `build-coach-assets.mjs --check`.
+  new plan, it still refines; on a phone with its own key, `localChat` runs the same core. URLs
+  in the Coach's messages are links, `javascript:` never.
+- **Prompts:** `build-coach-assets.mjs --check`; the chat prompt ends with the review's change
+  rules.
 - **For real on the instance:** a question about protein gets an answer, a "swap the bench for
   dumbbells" gets a proposal, and "change it" with nothing to go on gets a clarifying question.

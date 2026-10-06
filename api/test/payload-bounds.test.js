@@ -48,7 +48,7 @@ test('an intake posted with megabytes of text is cut to what the intake screen a
 test('a profile synced into the state is cut the same way, for a review and a debrief too', () => {
   const S = sampleState();
   S.coach.profile = hugeProfile();
-  for (const kind of ['create', 'review', 'debrief']) {
+  for (const kind of ['create', 'review', 'debrief', 'chat']) {
     const p = payload.build(S, { handle: 'h'.repeat(16), kind });
     assertBounded(p.coachProfile);
     assert.ok(JSON.stringify(p).length < 100_000, kind + ' payload stays small');
@@ -95,7 +95,7 @@ test('names, the declined log and the meta codes are bounded too, since the stat
   S.workouts[0].rating = 'great' + HUGE;
   S.customEx = [{ id: 'cx1', n: 'Sandbag' + HUGE, bp: 'back' + HUGE }];
   S.coach.log = [{ decisions: [{ status: 'rejected', type: 'sets' + HUGE, why: 'no' + HUGE }] }];
-  for (const kind of ['create', 'review', 'debrief']) {
+  for (const kind of ['create', 'review', 'debrief', 'chat']) {
     const p = payload.build(S, { handle: 'h'.repeat(16), kind });
     assert.ok(JSON.stringify(p).length < 100_000, kind + ' payload stays small');
     assert.equal(p.plan.routines[0].name.length, payload.NAME_MAX);
@@ -152,7 +152,7 @@ test('every plan, log and id field is bounded too, for a create, a review and a 
   for (const [field, set] of Object.entries(planAndLogFields)) {
     const S = sampleState();
     set(S);
-    for (const kind of ['create', 'review', 'debrief']) {
+    for (const kind of ['create', 'review', 'debrief', 'chat']) {
       const json = JSON.stringify(payload.build(S, { handle: 'h'.repeat(16), kind }));
       assert.ok(json.length < 100_000, `${field}: the ${kind} payload stays small (${json.length})`);
       assert.ok(!json.includes(INJECT.slice(0, payload.ID_MAX + 1)), `${field}: no more of it than an id's length reaches a ${kind}`);

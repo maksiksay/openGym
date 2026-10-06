@@ -25,9 +25,10 @@ test('warmup pings the compatible endpoint once per chat kind, with the real rul
 
   const r = await warmOnce({ log: quiet, fetch: fakeFetch });
   assert.equal(r.ok, true);
-  assert.equal(seen.length, 2);
-  const reviewPrefix = buildPromptParts('review', {}).system;
-  assert.ok(seen[1].messages[0].content.endsWith(reviewPrefix), 'review is warmed LAST, so the single live slot ends up holding it');
+  assert.equal(seen.length, 3);
+  const chatPrefix = buildPromptParts('chat', {}).system;
+  assert.ok(seen[2].messages[0].content.endsWith(chatPrefix), 'chat is warmed LAST, so the single live slot ends up holding it');
+  assert.ok(seen[1].messages[0].content.endsWith(buildPromptParts('review', {}).system));
   assert.ok(seen[0].messages[0].content.endsWith(buildPromptParts('debrief', {}).system));
   assert.equal(seen[0].model, 'm1');
 

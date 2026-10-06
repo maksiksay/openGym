@@ -93,8 +93,11 @@ length, equipment, limitations. From then on the Coach is a chat. The answers ar
 message; while a job runs a typing bubble shows the elapsed time; the proposal arrives as a
 card with a tab per routine and a reason under every change; free text below it asks for a
 refinement, a button applies it. Coming back later, asking for a review of what was logged
-since, or changing an answer all happen in the same conversation. Users cannot switch the
-Coach off themselves — only the admin can, from the card above.
+since, or changing an answer all happen in the same conversation. A message typed into the chat
+is the Coach's to place: a question (training, food and macros, sleep, recovery) gets an
+answer, a request to change the plan gets a proposal like a review's, and a message it cannot
+place gets one short question back ([`docs/dev/COACH_CHAT.md`](dev/COACH_CHAT.md)). Users cannot
+switch the Coach off themselves — only the admin can, from the card above.
 
 A key, a model and the account binding described below belong to the provider they were
 entered for. Switching chips does not clear them: the Anthropic key is still there when you

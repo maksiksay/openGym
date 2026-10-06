@@ -95,6 +95,19 @@ export function coachRoutes({ json, readBody, readSession, requireAdmin }) {
       } catch (e) { failEnqueue(res, e); }
     },
 
+    // A message typed in the chat (docs/dev/COACH_CHAT.md). The Coach decides what it is: a
+    // question it answers, a plan change it proposes, or something it asks about first.
+    'POST /api/coach/chat': async (req, res) => {
+      const user = guard(req, res); if (!user) return;
+      const body = await readBody(req);
+      const message = typeof body.message === 'string' ? body.message.trim().slice(0, cfgStore.MAX_MESSAGE_LEN_CEILING) : '';
+      if (!message) return json(res, 400, { error: 'message is required' });
+      try {
+        const job = jobs.enqueue(user.id, { kind: 'chat', lang: body.lang, message });
+        json(res, 202, { job });
+      } catch (e) { failEnqueue(res, e); }
+    },
+
     // One workout, read closely. Nothing to apply — the card is kept in the user's log.
     'POST /api/coach/debrief': async (req, res) => {
       const user = guard(req, res); if (!user) return;

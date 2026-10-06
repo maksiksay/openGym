@@ -2465,6 +2465,53 @@ paths:
         '429': { $ref: '#/components/responses/CoachRefused' }
         '503': { $ref: '#/components/responses/CoachOff' }
 
+  /api/coach/chat:
+    post:
+      tags: [coach]
+      operationId: postCoachChat
+      summary: Send a message to the Coach
+      description: |
+        Queues a `chat` job for a message typed in the Coach chat. The Coach decides what the
+        message is: a question it answers, a request it turns into a change-set to accept or
+        reject, or something it asks about first. An answer or a question comes back as the
+        last outcome's `reading`, a change-set as the pending proposal (kind `review`), both
+        through `GET /api/coach/status`. The job reads what a review reads, plus the last few
+        lines of the chat.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message]
+              properties:
+                message:
+                  type: string
+                  minLength: 1
+                  maxLength: 4000
+                  description: |
+                    What the profile typed. Cut to the instance's `maxMessageLen` (1000 unless
+                    the admin changed it; 200–4000).
+                lang:
+                  type: string
+                  pattern: '^[A-Za-z]{2,3}([-_][A-Za-z0-9]{2,8})?$'
+                  description: |
+                    The language the app is showing. The Coach answers in the language of the
+                    message, and falls back to this one.
+      responses:
+        '202': { $ref: '#/components/responses/CoachJobQueued' }
+        '400':
+          description: '`message` missing or blank.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: "message is required" }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/CoachRefused' }
+        '409': { $ref: '#/components/responses/CoachRefused' }
+        '429': { $ref: '#/components/responses/CoachRefused' }
+        '503': { $ref: '#/components/responses/CoachOff' }
+
   /api/coach/debrief:
     post:
       tags: [coach]

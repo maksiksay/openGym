@@ -28,7 +28,9 @@ import {
   changeTitle, changeValues, exName, canRevert, revertLast
 } from '../lib/coach.js'
 import { insightsFor, sessionInsights } from '../lib/coach-insights.js'
-import { useCoachStatus, requestReview, requestDebrief, requestPlan, refinePlan, resolvePending, cohortStats, setCohortShare, jobErrorText, awaitedJob, settleAwaited } from '../lib/coach-api.js'
+import { useCoachStatus, requestReview, requestDebrief, requestPlan, refinePlan, sendChat, resolvePending, cohortStats, setCohortShare, jobErrorText, awaitedJob, settleAwaited } from '../lib/coach-api.js'
+import { tco } from '../lib/coach-i18n.js'
+import { splitLinks } from '../lib/links.js'
 import { confirmSheet } from '../sheets.jsx'
 import Icon from '../components/Icon.jsx'
 import { glyphOf } from '../lib/glyphs.js'
@@ -106,9 +108,11 @@ export default function CoachChat() {
     try {
       // A message about a proposed plan refines it. With no plan at all — the first attempt
       // failed, or nothing was ever built — the message asks for one; a review would only
-      // answer that there is no workout to look at, which is how people got stuck.
+      // answer that there is no workout to look at, which is how people got stuck. Anything
+      // else goes to the Coach as it is, and the Coach decides whether to answer it, propose a
+      // change or ask what was meant (docs/dev/COACH_CHAT.md).
       if (pending?.kind === 'create' || !(S.routines || []).length) await refinePlan(msg)
-      else await requestReview(msg)
+      else await sendChat(msg)
       update(s => appendChat(s, { role: 'user', kind: 'text', text: msg }))
       setText('')
       refresh()
@@ -254,9 +258,16 @@ function Message({ m, S, profile, openSheet }) {
     </div>
   }
   if (m.kind === 'reverted' || m.kind === 'nochange' || m.kind === 'error' || m.kind === 'text') {
-    return <Bubble role={m.role} kind={m.kind} at={m.at}>{m.text}</Bubble>
+    return <Bubble role={m.role} kind={m.kind} at={m.at}>{m.role === 'coach' ? <Linked text={m.text} /> : m.text}</Bubble>
   }
   return null
+}
+
+/** The Coach's text with the sources it names as links, opened outside the app. */
+function Linked({ text }) {
+  return splitLinks(text).map((p, i) => p.url
+    ? <a key={i} href={p.url} target="_blank" rel="noopener noreferrer">{p.url}</a>
+    : p.text)
 }
 
 const stamp = at => {
@@ -280,7 +291,8 @@ function Typing({ S, kind, coachLocal, config }) {
     // local model rather than something wrong; the next line already warns it takes longer.
     eta = local ? '' : t('This usually takes a minute or two.')
   }
-  const doing = kind === 'create' ? t('Building your plan…') : kind === 'debrief' ? t('Looking at that session…') : t('Reading your training…')
+  const doing = kind === 'create' ? t('Building your plan…') : kind === 'debrief' ? t('Looking at that session…')
+    : kind === 'chat' ? tco('Reading your message…') : t('Reading your training…')
   return <div className="msg coach">
     <div className="bub typing"><i /><i /><i /></div>
     <div className="typing-eta">

@@ -14,7 +14,7 @@ import { CONTRACT } from './payload.js';
 import { buildPrompt, buildPromptParts } from './prompt.js';
 import { SCHEMAS } from './schemas.js';
 import { extractJSON, contractOK } from './parse.js';
-import { validatePlan, validateReview, validateDebrief } from './validate.js';
+import { validatePlan, validateReview, validateDebrief, validateChat } from './validate.js';
 
 /**
  * One attempt: prompt → provider → parse → validate.
@@ -61,6 +61,8 @@ export async function attemptOnce({ adapter, cfg, kind, payload, model, timeoutM
   const customIds = (payload.library || []).filter(e => e && e.custom).map(e => e.id);
   const checked = kind === 'review'
     ? validateReview(parsed.value, payload.plan, { customIds })
+    : kind === 'chat'
+      ? validateChat(parsed.value, payload.plan, { customIds })
     : kind === 'debrief'
       ? validateDebrief(parsed.value)
       : validatePlan(parsed.value, {

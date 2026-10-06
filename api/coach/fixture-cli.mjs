@@ -119,6 +119,31 @@ if (kind === 'debrief') {
   });
 }
 
+// chat: the three replies, picked by the message the way a model would, and an answer that
+// carries one source the validator must drop and the conversation it was given, so a test can see
+// both arrive (docs/dev/COACH_CHAT.md).
+if (kind === 'chat') {
+  const msg = String(P.message || '');
+  if (/^\s*(change it|\?)\s*$/i.test(msg)) out({ coach_contract: 1, reply: 'clarify', text: 'Change what: a routine, or one exercise?' });
+  const r = (P.plan?.routines || [])[0];
+  const e = r?.ex?.[0];
+  if (/\b(swap|add a set|more sets|replace)\b/i.test(msg) && r && e) {
+    out({
+      coach_contract: 1, reply: 'changes', summary: 'One more set, as you asked.',
+      changes: [{ id: 'c1', type: 'sets', target: { routineId: r.id, exId: e.id }, before: e.sets, after: (e.sets || 3) + 1, why: 'You asked for it, and every set hit its target last time.' }],
+      notes: []
+    });
+  }
+  out({
+    coach_contract: 1, reply: 'answer',
+    text: `You asked (${msg.length} characters): "${msg.slice(0, 200)}". I can see ${(P.conversation || []).length} earlier lines and ${(P.window?.workouts || []).length} sessions.`,
+    sources: [
+      { title: 'A source on protein', url: 'https://example.org/protein' },
+      { title: 'Not a page', url: 'javascript:alert(1)' }
+    ]
+  });
+}
+
 // review
 const routine = (P.plan?.routines || [])[0];
 const first = routine?.ex?.[0];

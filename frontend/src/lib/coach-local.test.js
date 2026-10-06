@@ -81,6 +81,27 @@ describe('the Coach on a phone with its own key', () => {
     expect(S.coach.snapshots).toHaveLength(1)
   })
 
+  it('answers a chat message with the same core: the message rides in the payload, the answer comes back as text', async () => {
+    wire.answer = chat(JSON.stringify({ coach_contract: 1, reply: 'answer', text: 'About 1.6 g per kg.', sources: [{ title: 'A review', url: 'https://example.org/p' }] }))
+    await local.localChat(state(), 'How much protein?')
+    const s = await settle()
+    expect(s.pending).toBeNull()
+    expect(s.last).toMatchObject({ kind: 'chat', outcome: 'nochange' })
+    expect(s.last.reading).toBe('About 1.6 g per kg.\n\nA review — https://example.org/p')
+    expect(wire.calls[0].body.messages[1].content).toContain('"message":"How much protein?"')
+    expect(wire.calls[0].body.messages[0].content).toContain('# Task: answer a message in the chat')
+  })
+
+  it('a chat message that asks for a change gets a review\'s proposal, which the apply engine accepts', async () => {
+    const S = state()
+    wire.answer = chat(JSON.stringify({ ...review, reply: 'changes' }))
+    await local.localChat(S, 'one more set on the first one')
+    const s = await settle()
+    expect(s.pending.kind).toBe('review')
+    applyChangeSet(S, markStale(s.pending, S), ['c1'])
+    expect(S.routines[0].ex[0].sets).toBe(4)
+  })
+
   it('spends the single repair round when the first answer is unusable, then gives up', async () => {
     wire.answer = n => n === 1 ? chat('{"coach_contract":1,"changes":[{"id":"x","type":"teleport"}]}') : chat(JSON.stringify(review))
     await local.localReview(state())
