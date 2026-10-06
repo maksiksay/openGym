@@ -21,3 +21,5 @@ node_modules
 junit.xml
 coverage/
 frontend/bundle-size.json
+# A CLI provider's sign-in cache (Codex auth.json), kept outside ./data on purpose: never committed.
+coach-auth/
