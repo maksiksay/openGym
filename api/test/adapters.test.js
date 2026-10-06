@@ -10,7 +10,8 @@ import { tempData } from './helpers.mjs';
 
 tempData();
 const { adapterFor, default: ADAPTERS } = await import('../coach/adapters/index.js');
-const { LOCKDOWN } = await import('../coach/adapters/claude.js');
+const { LOCKDOWN, WEB_LOCKDOWN, sdkOptions } = await import('../coach/adapters/claude.js');
+const { SYSTEM_PROMPT } = await import('../coach/core/system-prompt.js');
 const { argvFor } = await import('../coach/adapters/codex.js');
 const cfg = await import('../coach/config.js');
 
@@ -30,6 +31,37 @@ test('the Claude adapter is locked out of every tool the SDK could give it', () 
   assert.equal(LOCKDOWN.strictMcpConfig, true, 'no MCP server may arrive from ambient config');
   assert.equal(LOCKDOWN.persistSession, false, 'no session history is written anywhere');
   assert.equal(LOCKDOWN.maxTurns, 1, 'one turn: a job is a question, not a conversation');
+});
+
+// Coach web search (docs/dev/COACH_WEB.md): the one widening of LOCKDOWN, a second frozen set
+// asserted by value like the first, so adding anything past web search is a red build too.
+test('the web lockdown adds web search and nothing else', () => {
+  assert.ok(Object.isFrozen(WEB_LOCKDOWN));
+  assert.deepEqual(WEB_LOCKDOWN.tools, ['WebSearch'], 'search is the only built-in tool');
+  assert.deepEqual(WEB_LOCKDOWN.allowedTools, ['WebSearch'], 'and the only one allowed to run');
+  for (const k of ['settingSources', 'skills', 'strictMcpConfig', 'persistSession', 'permissionMode']) {
+    assert.deepEqual(WEB_LOCKDOWN[k], LOCKDOWN[k], `${k} is the lockdown's`);
+  }
+  assert.equal(WEB_LOCKDOWN.maxTurns, 8, 'a search takes turns; one ends at the tool call');
+  assert.deepEqual(Object.keys(WEB_LOCKDOWN).sort(), [...Object.keys(LOCKDOWN), 'allowedTools'].sort());
+  for (const forbidden of ['WebFetch', 'Bash', 'Read', 'Write', 'Edit', 'Glob', 'Grep']) {
+    assert.ok(!WEB_LOCKDOWN.tools.includes(forbidden) && !WEB_LOCKDOWN.allowedTools.includes(forbidden), forbidden);
+  }
+});
+
+test('a job gets the web lockdown only when asked, with the note after the system prompt', () => {
+  const plain = sdkOptions({});
+  assert.deepEqual(plain.tools, []);
+  assert.equal(plain.maxTurns, 1);
+  assert.equal(plain.allowedTools, undefined);
+  assert.equal(plain.systemPrompt, SYSTEM_PROMPT);
+  const web = sdkOptions({ web: { note: 'SEARCH NOTE' } });
+  assert.deepEqual(web.tools, ['WebSearch']);
+  assert.equal(web.maxTurns, 8);
+  assert.ok(web.systemPrompt.startsWith(SYSTEM_PROMPT));
+  assert.ok(web.systemPrompt.endsWith('SEARCH NOTE'));
+  // asking for web without a note still gets the lockdown, never a wider set
+  assert.deepEqual(sdkOptions({ web: {} }).tools, ['WebSearch']);
 });
 
 test('an image built without the AI runtime reports it rather than crashing', async () => {

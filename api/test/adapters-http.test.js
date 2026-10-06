@@ -305,3 +305,19 @@ test('models(): OpenAI’s list is cut to what Chat Completions can use; a compa
   const co = fakeFetch([ok({ data: [{ id: 'qwen2.5:3b' }, { id: 'llama3.2' }] })]);
   assert.deepEqual((await compatible.models({ providerOptions: { compatible: { baseUrl: 'http://ollama:11434' } } }, {}, { fetch: co })).models, ['llama3.2', 'qwen2.5:3b']);
 });
+
+// Coach web search (docs/dev/COACH_WEB.md): a consultation hands its own note; the food lookup's
+// stays the default.
+test('Anthropic: a web search note of its own replaces the food note', async () => {
+  const tools = [{ type: 'web_search_20250305', name: 'web_search', max_uses: 3 }];
+  let f = fakeFetch([ok({ content: [{ type: 'text', text: '{}' }], stop_reason: 'end_turn' })]);
+  await anthropic.invoke({ cfg: {}, prompt: 'P', system: 'RULES', tools, webNote: ' CONSULT NOTE', env, fetch: f });
+  let text = f.calls[0].body.system[0].text;
+  assert.ok(text.includes(' CONSULT NOTE'));
+  assert.ok(!text.includes('look up the food'));
+  assert.deepEqual(f.calls[0].body.tools, tools);
+  f = fakeFetch([ok({ content: [{ type: 'text', text: '{}' }], stop_reason: 'end_turn' })]);
+  await anthropic.invoke({ cfg: {}, prompt: 'P', system: 'RULES', tools, env, fetch: f });
+  text = f.calls[0].body.system[0].text;
+  assert.ok(text.includes('look up the food'), 'the food lookup keeps its note');
+});

@@ -89,6 +89,9 @@ const DEFAULTS = {
   providerOptions: {},                               // { [provider]: { baseUrl } }
   boundUid: {},                                      // instance mode: { [provider]: the profile its credential bound to }
   caps: { perProfileDaily: 10, instanceDaily: 0 },   // 0 = unlimited
+  // Consultations (plans, reviews, chat questions) may search the web, when the provider can
+  // (webCapable). Off until the owner switches it on. docs/dev/COACH_WEB.md
+  webSearch: false,
   daily: null,                                       // { date, count }: jobs enqueued today across every profile
   // Anonymous medians across profiles that opt in ("compare with others"). Off by default: it
   // is the one feature where one person's numbers feed into what another person sees.
@@ -338,11 +341,20 @@ export function isConnected() {
   return !!decrypt(rec.data);
 }
 
+/** The providers that can search the web: Claude through the Agent SDK, Anthropic through its
+ *  server tool. */
+export const WEB_PROVIDERS = new Set(['claude', 'anthropic']);
+export const webCapable = (cfg = load()) => WEB_PROVIDERS.has(cfg && cfg.provider);
+
 /** What /api/config tells every client. Absent ⇒ no Coach UI exists anywhere (FR-55/56). */
 export function publicConfig() {
   if (!isEnabled() || !isConnected()) return null;
   const cfg = load();
-  return { enabled: true, provider: cfg.provider, providerLabel: providerMeta(cfg).label, authMode: cfg.authMode, community: !!cfg.community };
+  return {
+    enabled: true, provider: cfg.provider, providerLabel: providerMeta(cfg).label, authMode: cfg.authMode, community: !!cfg.community,
+    // So the consent screen can say the Coach may search (docs/dev/COACH_WEB.md).
+    web: cfg.webSearch === true && webCapable(cfg)
+  };
 }
 
 /**

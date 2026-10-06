@@ -286,6 +286,15 @@ export default function AdminCoach() {
             <Switch checked={!!d.community} disabled={busy} onChange={v => patch({ community: v })} />
           </div>
 
+          {/* docs/dev/COACH_WEB.md: search only, for the consultations, never a debrief. */}
+          <div className="adm-group-t" style={{ marginTop: 14 }}>Web search</div>
+          {d.webCapable ? <div className="row between" style={{ gap: 12, alignItems: 'flex-start' }}>
+            <div className="adm-hint" style={{ margin: 0 }}>
+              <b>Let the Coach search the web.</b> Plans, reviews and chat questions may search; a debrief after a workout never does. Search only: no page is opened from this server, the model keeps people's data out of the queries and names its sources.
+            </div>
+            <Switch checked={!!d.webSearch} disabled={busy} aria-label="Web search" onChange={v => patch({ webSearch: v })} />
+          </div> : <div className="adm-hint">{meta.label || d.provider} has no web search here. Claude and the Anthropic API can search.</div>}
+
           <div className="adm-group-t" style={{ marginTop: 14 }}>Whose account pays</div>
           <div className="adm-hint">{d.authMode === 'profile'
             ? 'Each profile signs in with their own account.'

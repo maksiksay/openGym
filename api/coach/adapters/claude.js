@@ -17,6 +17,10 @@
  * They are exported as LOCKDOWN and asserted by value in adapters.test.js, so re-enabling one
  * is a red build rather than a quiet capability grant.
  *
+ * WEB_LOCKDOWN is the one widening (docs/dev/COACH_WEB.md): the same set with web search and
+ * nothing else, given only to the consultation jobs and the food lookup when the owner allows it.
+ * A search runs at Anthropic, so the container still opens no page. Asserted by value too.
+ *
  * The import is lazy on purpose. The default image ships without the SDK (see api/Dockerfile),
  * and an absent runtime has to be an ordinary reportable state — check() says so, isConnected()
  * goes false, and no Coach UI is mounted — rather than a boot crash for every instance that
@@ -49,6 +53,22 @@ export const LOCKDOWN = Object.freeze({
   permissionMode: 'dontAsk',
   maxTurns: 1
 });
+
+/** LOCKDOWN with web search: the only built-in tool, and the only one allowed to run. A search
+ *  takes turns (one ends at the tool call), hence more than one. */
+export const WEB_LOCKDOWN = Object.freeze({
+  ...LOCKDOWN,
+  tools: ['WebSearch'],
+  allowedTools: ['WebSearch'],
+  maxTurns: 8
+});
+
+/** The SDK options a call gets: LOCKDOWN, or WEB_LOCKDOWN with the job's note after the system
+ *  prompt when it was asked for web search. Exported so a test can assert the choice. */
+export function sdkOptions({ web } = {}) {
+  if (!web) return { ...LOCKDOWN, systemPrompt: SYSTEM_PROMPT };
+  return { ...WEB_LOCKDOWN, systemPrompt: web.note ? SYSTEM_PROMPT + '\n\n' + web.note : SYSTEM_PROMPT };
+}
 
 let cached;
 /** Resolve the SDK, or null when this image was built without it. Never throws. */
@@ -92,7 +112,7 @@ export default {
     return { ok: true, version: v ? `Claude Agent SDK ${v}` : 'Claude Agent SDK' };
   },
 
-  async invoke({ prompt, jobDir, env, model, timeoutMs }) {
+  async invoke({ prompt, jobDir, env, model, timeoutMs, web }) {
     const m = await sdk();
     if (!m) return { code: -1, text: '', stderr: `${PKG} is not installed`, timedOut: false, spawnError: true };
 
@@ -104,7 +124,7 @@ export default {
       for await (const message of m.query({
         prompt,
         options: {
-          ...LOCKDOWN,
+          ...sdkOptions({ web }),
           abortController,
           cwd: jobDir,
           // `env` REPLACES the child environment rather than extending it — which is exactly the
@@ -112,7 +132,6 @@ export default {
           // and the VAPID keys cannot reach the model process by inheritance.
           env: { ...env, CLAUDE_AGENT_SDK_CLIENT_APP: CLIENT_APP },
           model: model || undefined,
-          systemPrompt: SYSTEM_PROMPT,
           stderr: data => { if (stderr.length < OUTPUT_CAP) stderr += data; },
           spawnClaudeCodeProcess: spawnAsCoach
         }

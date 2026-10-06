@@ -183,6 +183,8 @@ export function coachRoutes({ json, readBody, readSession, requireAdmin }) {
         caps: cfg.caps,
         maxMessageLen: cfg.maxMessageLen,
         community: !!cfg.community,
+        webSearch: cfg.webSearch === true,
+        webCapable: cfgStore.webCapable(cfg),
         runtime: { ok: !!check.ok, version: check.version || null, error: check.error || null, needsKey: !!check.needsKey },
         authMode: cfg.authMode,
         boundUid: cfgStore.boundUidFor(cfg),
@@ -244,6 +246,8 @@ export function coachRoutes({ json, readBody, readSession, requireAdmin }) {
         patch.providerOptions = { ...current.providerOptions, [target]: { ...(current.providerOptions[target] || {}), baseUrl: v.value } };
       }
       if (body.community !== undefined) patch.community = !!body.community;
+      // Only a boolean switches web search (docs/dev/COACH_WEB.md).
+      if (typeof body.webSearch === 'boolean') patch.webSearch = body.webSearch;
       if (body.caps) {
         patch.caps = {
           perProfileDaily: Math.max(0, Math.min(200, +body.caps.perProfileDaily || 0)),

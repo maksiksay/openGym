@@ -16,6 +16,7 @@ import { t } from '../lib/i18n.js'
 import { DAYN } from '../lib/format.js'
 import { EXDB } from '../lib/exercises.js'
 import { emptyCoach, coachAvailable, hasConsent, CONSENT_VERSION, CATEGORY_TEXT, appendChat } from '../lib/coach.js'
+import { tco } from '../lib/coach-i18n.js'
 import { th } from '../lib/health-i18n.js'
 import { requestPlan, disclosure } from '../lib/coach-api.js'
 import { DEMO } from '../lib/demo.js'
@@ -255,6 +256,8 @@ function Consent({ onAgree, onDecline }) {
     <div className="ob-fine">
       <div>{who}</div>
       <div>{t('Your name, your sign-in details and everything else about your account stay here. Other people’s data is never included.')}</div>
+      {/* Not a data category: nothing of the person's leaves through a search (docs/dev/COACH_WEB.md). */}
+      {config?.coach?.web && <div>{tco('The Coach may search the web for general information. Your data never goes into a search.')}</div>}
       <div style={{ color: 'var(--yellow)' }}>{t('The Coach is not a doctor or a physiotherapist. If something hurts, ask a professional.')}</div>
     </div>
     <div className="ob-foot" style={{ flexDirection: 'column' }}>

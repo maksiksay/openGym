@@ -3,8 +3,9 @@ import { httpAdapter } from './http.js';
 import { SYSTEM_PROMPT } from '../system-prompt.js';
 
 export const ANTHROPIC_VERSION = '2023-06-01';
-// The one exception to "no tools": a food lookup may be given Anthropic's own web search.
-const WEB_NOTE = ' For this task only, a web search tool is available: use it solely to look up the food named in the payload.';
+// The one exception to "no tools": a food lookup may be given Anthropic's own web search, and
+// so may a consultation when the owner allows it (docs/dev/COACH_WEB.md), with a note of its own.
+export const FOOD_WEB_NOTE = ' For this task only, a web search tool is available: use it solely to look up the food named in the payload.';
 
 export const anthropicSpec = {
   id: 'anthropic',
@@ -19,11 +20,11 @@ export const anthropicSpec = {
   }),
   // The rules block is marked cacheable: identical for every job of a task, so subsequent
   // jobs read it from Anthropic's prompt cache at a tenth of the input price.
-  body: ({ model, prompt, system, tools, maxTokens }) => ({
+  body: ({ model, prompt, system, tools, webNote, maxTokens }) => ({
     model,
     max_tokens: maxTokens,
     system: system
-      ? [{ type: 'text', text: SYSTEM_PROMPT + (Array.isArray(tools) && tools.length ? WEB_NOTE : '') + '\n\n' + system, cache_control: { type: 'ephemeral' } }]
+      ? [{ type: 'text', text: SYSTEM_PROMPT + (Array.isArray(tools) && tools.length ? (webNote ? ' ' + String(webNote).trim() : FOOD_WEB_NOTE) : '') + '\n\n' + system, cache_control: { type: 'ephemeral' } }]
       : SYSTEM_PROMPT,
     messages: [{ role: 'user', content: prompt }],
     // Server tools only (web search, run by Anthropic): the model gets no tool of ours to call.

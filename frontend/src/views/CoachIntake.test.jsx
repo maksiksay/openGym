@@ -156,6 +156,18 @@ describe('CoachIntake — the consent screen', () => {
     expect(host.textContent).toContain('Sent straight to api.anthropic.com with your own API key')
   })
 
+  // docs/dev/COACH_WEB.md: said only when the server lets the Coach search.
+  it('says the Coach may search the web only when the server lets it', async () => {
+    const line = 'The Coach may search the web for general information. Your data never goes into a search.'
+    mount(); await settle()
+    expect(host.querySelector('.ob-fine').textContent).not.toContain(line)
+    act(() => root.unmount()); host.remove()
+    host = document.createElement('div'); document.body.appendChild(host); root = createRoot(host)
+    mocks.config = { coach: { enabled: true, web: true } }
+    mount(); await settle()
+    expect(host.querySelector('.ob-fine').textContent).toContain(line)
+  })
+
   it('names the instance owner as the payer when the server is the one calling', async () => {
     vi.mocked(disclosure).mockResolvedValue({ categories: ['plan'], providerLabel: 'Anthropic', payer: 'instance' })
     mount(); await settle()
