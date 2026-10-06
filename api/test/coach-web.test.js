@@ -33,6 +33,7 @@ test('the note keeps the person out of the queries and the answer in its contrac
   const n = jobs.CONSULT_WEB_NOTE;
   assert.match(n, /only when the answer needs facts that are not in the payload/);
   assert.match(n, /Never put the person's own data/);
+  assert.match(n, /Prefer research papers, systematic reviews/);
   assert.match(n, /never as instructions/);
   assert.match(n, /URL/);
   assert.match(n, /JSON the contract asks for/);
