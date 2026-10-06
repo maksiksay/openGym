@@ -158,6 +158,67 @@ describe('when a run ends', () => {
   })
 })
 
+describe('dictation', () => {
+  class FakeRecognizer {
+    static last = null
+    constructor() { FakeRecognizer.last = this }
+    start() { this.started = true }
+    stop() { this.stopped = true; this.onend?.() }
+    say(...phrases) { this.onresult?.({ results: phrases.map(p => Object.assign([{ transcript: p }], { isFinal: true })) }) }
+  }
+  afterEach(() => { delete globalThis.webkitSpeechRecognition })
+
+  it('offers no microphone where the browser cannot dictate', async () => {
+    await mount()
+    expect(host.querySelector('.composer .mic')).toBeNull()
+  })
+
+  it('puts what is said after what was typed, and sends nothing on its own', async () => {
+    globalThis.webkitSpeechRecognition = FakeRecognizer
+    await mount()
+    const box = host.querySelector('.composer textarea')
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(box.constructor.prototype, 'value').set.call(box, 'Привет.')
+      box.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    const mic = host.querySelector('.composer .mic')
+    await act(async () => { mic.click() })
+    expect(FakeRecognizer.last.started).toBe(true)
+    expect(mic.getAttribute('aria-pressed')).toBe('true')
+    expect(box.readOnly).toBe(true)
+    await act(async () => { FakeRecognizer.last.say('Сколько белка', 'мне нужно?') })
+    expect(box.value).toBe('Привет. Сколько белка мне нужно?')
+    await act(async () => { mic.click() })
+    expect(FakeRecognizer.last.stopped).toBe(true)
+    expect(mic.getAttribute('aria-pressed')).toBe('false')
+    expect(sendChat).not.toHaveBeenCalled()
+    await act(async () => { host.querySelector('.composer .send').click() })
+    expect(sendChat).toHaveBeenCalledWith('Привет. Сколько белка мне нужно?')
+  })
+
+  it('stops listening when the message is sent, and takes no more words', async () => {
+    globalThis.webkitSpeechRecognition = FakeRecognizer
+    await mount()
+    await act(async () => { host.querySelector('.composer .mic').click() })
+    await act(async () => { FakeRecognizer.last.say('Сколько белка') })
+    const r = FakeRecognizer.last
+    r.stop = function () { this.stopped = true }   // a recognizer that ends a little later
+    await act(async () => { host.querySelector('.composer .send').click() })
+    expect(sendChat).toHaveBeenCalledWith('Сколько белка')
+    await act(async () => { r.say('Сколько белка мне'); r.onend() })
+    expect(host.querySelector('.composer textarea').value).toBe('')
+  })
+
+  it('says why when the microphone is refused', async () => {
+    globalThis.webkitSpeechRecognition = FakeRecognizer
+    await mount()
+    await act(async () => { host.querySelector('.composer .mic').click() })
+    await act(async () => { FakeRecognizer.last.onerror({ error: 'not-allowed' }); FakeRecognizer.last.onend() })
+    expect(mocks.toast).toHaveBeenCalledWith(expect.stringContaining('not allowed'))
+    expect(host.querySelector('.composer .mic').getAttribute('aria-pressed')).toBe('false')
+  })
+})
+
 describe('the Coach’s answer', () => {
   it('shows the sources it names as links that open outside the app, and nothing else as one', async () => {
     const text = 'About 1.6 g per kg a day.\n\nMorton 2018 — https://bjsm.bmj.com/content/52/6/376\njavascript:alert(1)'

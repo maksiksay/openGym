@@ -16,7 +16,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../store/useStore.js'
 import { useUI } from '../store/useUI.js'
-import { t } from '../lib/i18n.js'
+import { t, getLang } from '../lib/i18n.js'
 import { fmtDate, fmtNum, DAYS, weekOrder, weekStartOf } from '../lib/format.js'
 import { exLine } from '../lib/history.js'
 import { speedUnitOf } from '../lib/speed.js'
@@ -31,6 +31,7 @@ import { insightsFor, sessionInsights } from '../lib/coach-insights.js'
 import { useCoachStatus, requestReview, requestDebrief, requestPlan, refinePlan, sendChat, resolvePending, cohortStats, setCohortShare, jobErrorText, awaitedJob, settleAwaited } from '../lib/coach-api.js'
 import { tco } from '../lib/coach-i18n.js'
 import { splitLinks } from '../lib/links.js'
+import { canDictate, dictate, speechLang } from '../lib/speech.js'
 import { confirmSheet } from '../sheets.jsx'
 import Icon from '../components/Icon.jsx'
 import { glyphOf } from '../lib/glyphs.js'
@@ -51,8 +52,11 @@ export default function CoachChat() {
   const { job, pending, cap, loading, lastError, last, refresh, maxMessageLen } = useCoachStatus(true)
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
+  const [listening, setListening] = useState(false)
+  const dictation = useRef(null)   // { stop, mute } while listening
   const endRef = useRef(null)
   const prevJob = useRef(null)
+  useEffect(() => () => dictation.current?.mute(), [])
   const coachMode = coachLocal?.mode
 
   const ok = coachAvailable(config, user, { demo: DEMO, mobile: MOBILE, coachMode })
@@ -107,7 +111,30 @@ export default function CoachChat() {
   const coach = S.coach || emptyCoach()
   const community = !!config?.coach?.community && !DEMO && !(MOBILE && coachMode === 'byok')
 
+  // Dictation (docs/dev/COACH_VOICE_PHOTO.md): what is said lands in the box after whatever was
+  // typed there, and waits to be read and sent like anything typed. A second tap stops it and
+  // still takes the last words; sending stops it and takes nothing more.
+  const toggleDictation = () => {
+    if (dictation.current) { dictation.current.stop(); return }
+    const before = text.trim() ? text.trim() + ' ' : ''
+    let live = true
+    const stop = dictate({
+      lang: speechLang(getLang()),
+      onText: said => { if (live) setText(before + said) },
+      onEnd: err => {
+        live = false
+        dictation.current = null
+        setListening(false)
+        if (err && err !== 'unsupported') toast(tco(DICTATION_ERRORS[err] || DICTATION_ERRORS.other))
+      }
+    })
+    if (!live) return
+    dictation.current = { stop, mute: () => { live = false; stop() } }
+    setListening(true)
+  }
+
   const send = async () => {
+    dictation.current?.mute()
     const msg = text.trim()
     if (!msg || busy) return
     setBusy(true)
@@ -227,14 +254,28 @@ export default function CoachChat() {
         {community && <button className="qchip" onClick={showCohort}><Icon name="person" />{t('Compare')}</button>}
       </div>}
       <div className="composer-in">
-        <textarea rows={1} value={text} maxLength={maxMessageLen || 1000} placeholder={placeholder} disabled={!!job}
+        <textarea rows={1} value={text} maxLength={maxMessageLen || 1000} placeholder={listening ? tco('Listening…') : placeholder} disabled={!!job}
+          readOnly={listening}
           onChange={e => setText(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }} />
+        {canDictate() && <button className={'mic' + (listening ? ' on' : '')} onClick={toggleDictation} disabled={busy || !!job}
+          aria-pressed={listening} aria-label={listening ? tco('Stop dictation') : tco('Dictate')}><Icon name="mic" /></button>}
         <button className="send" onClick={send} disabled={!text.trim() || busy || !!job} aria-label={t('Send')}><Icon name="arrowUp" /></button>
       </div>
       {cap?.limit > 0 && <div className="composer-cap">{t('{0} of {1} Coach runs used today', cap.used, cap.limit)}</div>}
     </div>
   </div>
+}
+
+// What went wrong with dictation, in the app's voice. Silence, or the recognizer stopping on its
+// own, is not an error and says nothing.
+const DICTATION_ERRORS = {
+  'not-allowed': 'The microphone or speech recognition is not allowed. Allow both for this site, and check that dictation is on in your phone’s settings.',
+  'service-not-allowed': 'The microphone or speech recognition is not allowed. Allow both for this site, and check that dictation is on in your phone’s settings.',
+  'audio-capture': 'No microphone was found.',
+  network: 'Dictation needs a connection.',
+  'language-not-supported': 'Dictation is not available in this language.',
+  other: 'Dictation did not work. Try again, or use the keyboard’s microphone.',
 }
 
 /* ---------------------------------- bubbles ---------------------------------- */
