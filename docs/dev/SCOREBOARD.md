@@ -127,13 +127,14 @@ In time mode it is the longer hold, marked `+Δ s`.
   for an id-less legacy record) to `[{ id, beat?, records }]`. `records` holds any of
   `weight: { v, prev }`, `reps: { w, r, prev }`, `e1rm: { v, prev }`, `volume: { v, prev, unit:
   'load' | 'reps' }` and `hold: { v, prev }`. Only exercises with a win are listed.
-- **Caching.** The store clones the whole state on every update, so the array's identity changes
-  on every tap. The timeline is therefore memoized on a signature of the history instead: each
-  workout's key, `start` and edit stamp `_ts`, plus the profile's unit. Editing, moving or
-  deleting a saved workout, or a sync that brings one in, changes the signature. The unit is in
-  it because a kg ↔ lb switch converts every logged weight without stamping the workouts, and
-  the record values would otherwise read in the old unit. So the call is
-  `winsTimeline(workouts, unit)`.
+- **Caching.** `winsTimeline(workouts)` is memoized in a `WeakMap` keyed by the history array
+  itself. The store never edits that array in place (every update clones the state), so a new
+  array is the only way the history changes, and the same array always has the same answer. A
+  signature of keys, starts and edit stamps was tried first and dropped: any path that changes a
+  set without stamping the workout, and a kg ↔ lb switch, which converts every logged weight
+  without stamping, would have been served a stale answer. The cost is one pass over the history
+  per state change on the screens that show wins (Home, History, Stats, the finish sheet), never
+  per tap in a workout, where the card scores only its own exercise.
 - **`liveWins(history, entry)`** gives the same answer for a session in progress, read against
   the history before it (`sessionHistory`). The card chip uses it.
 - **`setMark(prevItem, item, exId, mode)`** gives the per-set mark.
