@@ -19,7 +19,7 @@ import { validatePlan, validateReview, validateDebrief, validateChat } from './v
 /**
  * One attempt: prompt → provider → parse → validate.
  *
- * @returns {{ ok:true, nochange?:boolean, reading?:string, result?:object }
+ * @returns {{ ok:true, nochange?:boolean, reading?:string, result?:object, meal?:object }
  *        | { ok:false, errorClass:string, detail?:string, repairable?:boolean, errors?:string[], raw?:string }}
  */
 export async function attemptOnce({ adapter, cfg, kind, payload, model, timeoutMs, invokeOpts = {} }, repair) {
@@ -72,6 +72,7 @@ export async function attemptOnce({ adapter, cfg, kind, payload, model, timeoutM
     });
 
   if (!checked.ok) return { ok: false, repairable: !repair, errors: checked.errors, raw: r.text, errorClass: 'unusable' };
+  if (checked.meal) return { ok: true, meal: checked.meal };
   if (checked.nochange) return { ok: true, nochange: true, reading: checked.reading };
   return { ok: true, result: checked.proposal || { bundle: checked.bundle, summary: checked.bundle.summary } };
 }

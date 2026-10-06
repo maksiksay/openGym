@@ -163,6 +163,11 @@ async function run(S, kind, opts, d, adapter) {
     if (notify) notify({ kind: 'failed', errorClass: attempt.errorClass, detail })
     return
   }
+  if (attempt.meal) {
+    // What someone ate: a card in the chat, never the proposal slot (docs/dev/COACH_VOICE_PHOTO.md).
+    last = { id: job.id, kind, outcome: 'meal', errorClass: null, at: Date.now(), reading: attempt.meal.text || null, meal: attempt.meal }
+    return
+  }
   if (attempt.nochange) {
     last = { id: job.id, kind, outcome: 'nochange', errorClass: null, at: Date.now(), reading: attempt.reading }
     if (notify) notify({ kind: 'nochange', reading: attempt.reading, job: kind })

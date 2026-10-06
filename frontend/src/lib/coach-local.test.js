@@ -104,6 +104,15 @@ describe('the Coach on a phone with its own key', () => {
     expect(wire.calls.at(-1).body.messages[1].content).toContain('"waiting":{"kind":"review"')
   })
 
+  it('a meal read from a chat message comes back as the last outcome, not as a proposal', async () => {
+    wire.answer = chat(JSON.stringify({ coach_contract: 1, reply: 'meal', text: 'Counted.', items: [{ name: 'Oats', g: 60, kcal: 370, p: 13, f: 7, c: 60, confidence: 'typical' }] }))
+    await local.localChat(state(), 'I ate 60 g of oats')
+    const s = await settle()
+    expect(s.pending).toBeNull()
+    expect(s.last).toMatchObject({ kind: 'chat', outcome: 'meal', reading: 'Counted.' })
+    expect(s.last.meal.items).toEqual([{ name: 'Oats', g: 60, kcal: 370, p: 13, f: 7, c: 60, confidence: 'typical' }])
+  })
+
   it('a chat message that asks for a change gets a review\'s proposal, which the apply engine accepts', async () => {
     const S = state()
     wire.answer = chat(JSON.stringify({ ...review, reply: 'changes' }))

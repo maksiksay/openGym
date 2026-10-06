@@ -13,4 +13,17 @@ export default {
   'Dictation needs a connection.': 'Для диктовки нужен интернет.',
   'Dictation is not available in this language.': 'Диктовка недоступна на этом языке.',
   'Dictation did not work. Try again, or use the keyboard’s microphone.': 'Диктовка не сработала. Попробуйте ещё раз или используйте микрофон на клавиатуре.',
+  'Food · an estimate': 'Питание · оценка',
+  'an estimate': 'оценка',
+  'Grams of {0}': 'Граммы: {0}',
+  'Yesterday': 'Вчера',
+  'Add to the food log': 'Добавить в питание',
+  'Not now': 'Не надо',
+  'Added to {0}, {1}: {2} kcal': 'Добавлено в {0}, {1}: {2} ккал',
+  'today': 'сегодня',
+  'yesterday': 'вчера',
+  'Not added to the food log': 'Не добавлено в питание',
+  'Open': 'Открыть',
+  'Food tracking is off or paused. Switch it on in Settings → Health & food to add meals from the chat.':
+    'Учёт питания выключен или на паузе. Включите его в Настройки → Здоровье и питание, чтобы добавлять еду из чата.',
 }

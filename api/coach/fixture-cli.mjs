@@ -125,6 +125,17 @@ if (kind === 'debrief') {
 if (kind === 'chat') {
   const msg = String(P.message || '');
   if (/^\s*(change it|\?)\s*$/i.test(msg)) out({ coach_contract: 1, reply: 'clarify', text: 'Change what: a routine, or one exercise?' });
+  if (/\bate\b|съел/i.test(msg) || P.photo) {
+    out({
+      coach_contract: 1, reply: 'meal', slot: 'l',
+      text: P.photo ? 'Read off the photo; the portions are my guess.' : 'Counted as you said; the oil is my guess.',
+      items: [
+        { name: 'Buckwheat, boiled', g: 200, kcal: 110, p: 4.2, f: 1.1, c: 21.3, confidence: 'typical' },
+        { name: 'Chicken breast, cooked', g: 150, kcal: 165, p: 31, f: 3.6, c: 0, confidence: 'typical' },
+        { name: 'Sunflower oil', g: 10, kcal: 899, p: 0, f: 99.9, c: 0, confidence: 'estimate' }
+      ]
+    });
+  }
   const r = (P.plan?.routines || [])[0];
   const e = r?.ex?.[0];
   if (/\b(swap|add a set|more sets|replace)\b/i.test(msg) && r && e) {

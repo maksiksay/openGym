@@ -158,7 +158,7 @@ export function status(uid) {
 }
 function lastOutcome(rec) {
   const h = (rec.history || []).at(-1);
-  return h ? { id: h.id, kind: h.kind, outcome: h.outcome, errorClass: h.errorClass || null, at: h.at, ...(h.reading ? { reading: h.reading } : {}) } : null;
+  return h ? { id: h.id, kind: h.kind, outcome: h.outcome, errorClass: h.errorClass || null, at: h.at, ...(h.reading ? { reading: h.reading } : {}), ...(h.meal ? { meal: h.meal } : {}) } : null;
 }
 function archive(uid, rec, outcome) {
   const history = [...(rec.history || []), {
@@ -288,7 +288,10 @@ function finish(job, result) {
     // the profile's own file — deliberately not in `detail`, which goes to the instance log
     // the admin card renders, and which carries counts and outcomes only (FR-12/42).
     // A chat answer is longer than a review's verdict and carries its sources (validate.js caps it).
-    ...(result.reading ? { reading: String(result.reading).slice(0, CHAT_READING_MAX) } : {})
+    ...(result.reading ? { reading: String(result.reading).slice(0, CHAT_READING_MAX) } : {}),
+    // A meal read from the chat, as validated (core/food.js bounds it): the card the client
+    // turns into rows for the food log once the person adds it.
+    ...(result.meal ? { meal: result.meal } : {})
   }].slice(-HISTORY_MAX);
   writeUser(job.uid, {
     ...rec,
@@ -373,6 +376,11 @@ async function execute(job) {
       // Cancelled by a forget, not failed by the provider: the log must not blame the job budget.
       const errorClass = ctl.signal.aborted ? 'forgotten' : attempt.errorClass;
       return finish(job, { outcome: 'failed', errorClass, detail: attempt.detail });
+    }
+    if (attempt.meal) {
+      // What someone ate, for a card in the chat: not a proposal, so it never takes the place of
+      // one that is waiting (docs/dev/COACH_VOICE_PHOTO.md).
+      return finish(job, { outcome: 'meal', pending: undefined, detail: null, reading: attempt.meal.text || null, meal: attempt.meal });
     }
     if (attempt.nochange) {
       // A review that finds nothing to change supersedes the proposal waiting; a chat that

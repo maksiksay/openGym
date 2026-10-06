@@ -56,6 +56,14 @@ vi.mock('../lib/api.js', () => ({
 vi.mock('../coach.css', () => ({}))
 
 const routine = { id: 'r1', name: 'Strength A', emoji: '💪', ex: [{ id: '0001', sets: 3, reps: 10, mode: 'reps' }] }
+const MEAL = {
+  text: 'Counted as you said; the oil is my guess.', slot: 'l', day: 'today',
+  items: [
+    { name: 'Гречка отварная', g: 200, kcal: 110, p: 4.2, f: 1.1, c: 21.3, confidence: 'typical' },
+    { name: 'Куриная грудка', g: 150, kcal: 165, p: 31, f: 3.6, c: 0, confidence: 'typical' },
+    { name: 'Масло подсолнечное', g: 10, kcal: 899, p: 0, f: 99.9, c: 0, confidence: 'estimate' },
+  ],
+}
 const state = ({ routines = [routine], chat = [] } = {}) => ({
   unit: 'kg', lang: 'en', customEx: [], workouts: [], bodyweight: [], exWeights: {},
   dayPlan: {}, routines, week: {},
@@ -151,6 +159,12 @@ describe('when a run ends', () => {
     expect(mocks.S.coach.chat).toHaveLength(before)
   })
 
+  it('brings a meal as a card for the food log, and leaves a waiting review alone', async () => {
+    await mount({ pending: review, job: running })
+    await end({ id: 'j1', kind: 'chat', outcome: 'meal', reading: MEAL.text, meal: MEAL })
+    expect(mocks.S.coach.chat.at(-1)).toMatchObject({ role: 'coach', kind: 'meal', status: 'open', text: MEAL.text, meal: MEAL })
+  })
+
   it('says it failed, with a review waiting too', async () => {
     await mount({ pending: review, job: running })
     await end({ id: 'j1', kind: 'chat', outcome: 'failed', errorClass: 'timeout' })
@@ -216,6 +230,65 @@ describe('dictation', () => {
     await act(async () => { FakeRecognizer.last.onerror({ error: 'not-allowed' }); FakeRecognizer.last.onend() })
     expect(mocks.toast).toHaveBeenCalledWith(expect.stringContaining('not allowed'))
     expect(host.querySelector('.composer .mic').getAttribute('aria-pressed')).toBe('false')
+  })
+})
+
+describe('a meal card', () => {
+  const line = (over = {}) => ({ id: 'meal1', at: Date.now(), role: 'coach', kind: 'meal', text: MEAL.text, meal: MEAL, status: 'open', ...over })
+  const type = async (el, value) => {
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(el.constructor.prototype, 'value').set.call(el, value)
+      el.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+  }
+  const rerender = () => act(async () => { root.render(React.createElement(CoachChat)) })
+
+  it('shows what the Coach counted, and adds it at the grams the person settled on', async () => {
+    await mount({ S: state({ chat: [line()] }) })
+    const card = host.querySelector('.pcard.meal')
+    expect(card.querySelector('.pcard-h').textContent).toContain('558')
+    expect(card.textContent).toContain('Counted as you said; the oil is my guess.')
+    const inputs = card.querySelectorAll('.meal-g input')
+    expect([...inputs].map(i => i.value)).toEqual(['200', '150', '10'])
+    await type(inputs[1], '100')
+    await type(inputs[2], '0')
+    expect(card.querySelector('.pcard-h').textContent).toContain('385')
+    await act(async () => { [...card.querySelectorAll('button')].find(b => /Add to the food log/.test(b.textContent)).click() })
+    expect(mocks.S.meals.map(r => [r.name, r.g, r.kcal, r.slot, r.src])).toEqual([
+      ['Гречка отварная', 200, 220, 'l', 'ai'],
+      ['Куриная грудка', 100, 165, 'l', 'ai'],
+    ])
+    const saved = mocks.S.coach.chat.find(m => m.id === 'meal1')
+    expect(saved).toMatchObject({ status: 'added', added: { slot: 'l', day: 'today', n: 2, kcal: 385 } })
+    await rerender()
+    expect(host.querySelector('.pcard.meal')).toBeNull()
+    expect(host.querySelector('.meal-done').textContent).toContain('Added to lunch, today: 385 kcal')
+  })
+
+  it('logs into yesterday\'s dinner when the person says so on the card', async () => {
+    await mount({ S: state({ chat: [line()] }) })
+    const press = label => act(async () => { [...host.querySelectorAll('.meal-when button')].find(b => b.textContent === label).click() })
+    await press('Dinner')
+    await press('Yesterday')
+    await act(async () => { [...host.querySelectorAll('.pcard.meal button')].find(b => /Add to the food log/.test(b.textContent)).click() })
+    const d = new Date(); d.setDate(d.getDate() - 1)
+    const yesterday = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
+    expect(mocks.S.meals.every(r => r.slot === 'd' && r.d === yesterday)).toBe(true)
+  })
+
+  it('turned down, it logs nothing and folds', async () => {
+    await mount({ S: state({ chat: [line()] }) })
+    await act(async () => { [...host.querySelectorAll('.pcard.meal button')].find(b => /Not now/.test(b.textContent)).click() })
+    expect(mocks.S.meals).toBeUndefined()
+    expect(mocks.S.coach.chat.find(m => m.id === 'meal1').status).toBe('dismissed')
+  })
+
+  it('with food tracking off, shows the numbers and says where to switch it on, with no Add', async () => {
+    await mount({ S: { ...state({ chat: [line()] }), nutri: { on: false } } })
+    const card = host.querySelector('.pcard.meal')
+    expect(card.querySelector('.pcard-h').textContent).toContain('558')
+    expect(card.textContent).toContain('Settings → Health & food')
+    expect([...card.querySelectorAll('button')].some(b => /Add to the food log/.test(b.textContent))).toBe(false)
   })
 })
 

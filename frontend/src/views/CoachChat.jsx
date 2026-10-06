@@ -16,7 +16,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../store/useStore.js'
 import { useUI } from '../store/useUI.js'
-import { t, getLang } from '../lib/i18n.js'
+import { t, getLang, dateLocale } from '../lib/i18n.js'
 import { fmtDate, fmtNum, DAYS, weekOrder, weekStartOf } from '../lib/format.js'
 import { exLine } from '../lib/history.js'
 import { speedUnitOf } from '../lib/speed.js'
@@ -32,11 +32,14 @@ import { useCoachStatus, requestReview, requestDebrief, requestPlan, refinePlan,
 import { tco } from '../lib/coach-i18n.js'
 import { splitLinks } from '../lib/links.js'
 import { canDictate, dictate, speechLang } from '../lib/speech.js'
+import { cardMeals, cardPortions, cardStart } from '../lib/coach-meal.js'
+import { th } from '../lib/health-i18n.js'
+import { SLOTS, SLOT_NAMES } from '../lib/nutrition.js'
 import { confirmSheet } from '../sheets.jsx'
 import Icon from '../components/Icon.jsx'
 import { glyphOf } from '../lib/glyphs.js'
 import LineChart from '../components/LineChart.jsx'
-import { Button, Check, Switch, Section, Row, SelectRow } from '../components/ui.jsx'
+import { Button, Check, Switch, Section, Row, SelectRow, Segmented } from '../components/ui.jsx'
 import '../coach.css'
 
 export default function CoachChat() {
@@ -94,7 +97,10 @@ export default function CoachChat() {
     update(s => {
       // A run that ended unseen has no duration worth learning from.
       if (was) recordTiming(s, ms)
-      if (!proposed) {
+      // What someone ate comes back as a card for the food log (docs/dev/COACH_VOICE_PHOTO.md).
+      if (ended?.outcome === 'meal' && ended.meal) {
+        appendChat(s, { role: 'coach', kind: 'meal', text: ended.reading || '', meal: ended.meal, status: 'open' })
+      } else if (!proposed) {
         const cls = lastError?.errorClass || (last?.outcome === 'failed' ? (last.errorClass || 'internal') : null)
         appendChat(s, cls
           ? { role: 'coach', kind: 'error', text: jobErrorText(cls, lastError?.detail) }
@@ -233,7 +239,7 @@ export default function CoachChat() {
     <div className="msgs">
       <Bubble role="coach">{t('Hi — I’m your Coach. I build your plan from your answers and adjust it from what you actually log. Nothing changes until you say so.')}</Bubble>
 
-      {(coach.chat || []).map(m => <Message key={m.id} m={m} S={S} profile={coach.profile} openSheet={openSheet} />)}
+      {(coach.chat || []).map(m => <Message key={m.id} m={m} S={S} profile={coach.profile} openSheet={openSheet} update={update} nav={nav} />)}
 
       {job && <Typing S={S} kind={job.kind} coachLocal={coachLocal} config={config} />}
 
@@ -288,7 +294,8 @@ function Bubble({ role, kind, at, children }) {
   </div>
 }
 
-function Message({ m, S, profile, openSheet }) {
+function Message({ m, S, profile, openSheet, update, nav }) {
+  if (m.kind === 'meal') return <MealCard m={m} S={S} update={update} nav={nav} />
   if (m.kind === 'intake') {
     const lines = profileLines(profile)
     return <Bubble role="user" at={m.at}>
@@ -633,6 +640,82 @@ function DebriefCard({ p, S, update, toast, refresh }) {
       </div>
     </div>
     <div className="msg-t">{t('Want changes to the plan from this? Ask for a review below.')}</div>
+  </div>
+}
+
+/* ---------------------------------- a meal ---------------------------------- */
+
+const fmtG = n => (Math.round((Number(n) || 0) * 10) / 10).toLocaleString(dateLocale(), { maximumFractionDigits: 1 })
+
+/**
+ * What someone ate, read from a message or a photo (docs/dev/COACH_VOICE_PHOTO.md). Nothing reaches
+ * the food log until Add, and the grams, the meal and the day are the person's to correct first.
+ * Once added or turned down it folds into one line, kept in the thread.
+ */
+function MealCard({ m, S, update, nav }) {
+  const meal = m.meal && Array.isArray(m.meal.items) ? m.meal : { items: [] }
+  const start = useMemo(() => cardStart(meal, new Date(m.at || Date.now())), [m.id])
+  const [grams, setGrams] = useState(() => meal.items.map(it => String(it.g)))
+  const [slot, setSlot] = useState(start.slot)
+  const [day, setDay] = useState(start.day)
+  const { rows, total } = cardPortions(meal, grams)
+  const tracking = S.healthOn !== false && S.nutri?.on !== false && !S.nutri?.paused
+
+  const settle = status => update(s => {
+    const line = (s.coach?.chat || []).find(x => x.id === m.id)
+    if (!line || line.status !== 'open') return
+    if (status === 'added') {
+      const meals = cardMeals(meal, { grams, day, slot, now: new Date() })
+      s.meals = [...(s.meals || []), ...meals]
+      line.added = { slot, day, n: meals.length, kcal: Math.round(meals.reduce((a, r) => a + (r.kcal || 0), 0)) }
+    }
+    line.status = status
+  })
+
+  if (m.status === 'added' || m.status === 'dismissed') {
+    const a = m.added
+    return <div className="msg coach">
+      <div className="bub meal-done">
+        <Icon name={m.status === 'added' ? 'checkCircle' : 'xmark'} />
+        <span>{m.status === 'added' && a
+          ? tco('Added to {0}, {1}: {2} kcal', th(SLOT_NAMES[a.slot] || 'Snack').toLowerCase(), a.day === 'yesterday' ? tco('yesterday') : tco('today'), a.kcal)
+          : tco('Not added to the food log')}</span>
+        {m.status === 'added' && S.healthOn !== false && <button className="meal-open" onClick={() => nav('/health')}>{tco('Open')}</button>}
+      </div>
+      {m.at && <div className="msg-t">{stamp(m.at)}</div>}
+    </div>
+  }
+
+  return <div className="msg coach" style={{ maxWidth: '100%', width: '100%' }}>
+    <div className="pcard meal">
+      <div className="pcard-hd">
+        <div className="pcard-eyebrow">{tco('Food · an estimate')}</div>
+        <h2 className="pcard-h">{total.kcal} {th('kcal')}</h2>
+        <p className="pcard-sum meal-macros">{th('P')} {fmtG(total.p)} · {th('F')} {fmtG(total.f)} · {th('C')} {fmtG(total.c)}</p>
+        {!!m.text && <p className="pcard-sum">{m.text}</p>}
+      </div>
+      {rows.map((r, i) => <div key={i} className={'meal-item' + (r.g > 0 ? '' : ' out')}>
+        <div className="meal-name">{r.name}{r.confidence === 'estimate' && <span className="meal-est" title={tco('an estimate')}> ≈</span>}</div>
+        <label className="meal-g">
+          <input type="number" inputMode="decimal" min="0" max="5000" value={grams[i]} disabled={!tracking}
+            aria-label={tco('Grams of {0}', r.name)}
+            onChange={e => { const v = e.target.value; setGrams(g => g.map((x, j) => (j === i ? v : x))) }} />
+          <span>{th('g')}</span>
+        </label>
+        <div className="meal-kcal">{r.kcal}</div>
+      </div>)}
+      {tracking ? <>
+        <div className="meal-when">
+          <Segmented options={SLOTS.map(v => ({ value: v, label: th(SLOT_NAMES[v]) }))} value={slot} onChange={setSlot} />
+          <Segmented options={[{ value: 'today', label: th('Today') }, { value: 'yesterday', label: tco('Yesterday') }]} value={day} onChange={setDay} />
+        </div>
+        <div className="pcard-ft">
+          <Button variant="primary" icon="plus" disabled={!total.n} onClick={() => settle('added')}>{tco('Add to the food log')}</Button>
+          <Button onClick={() => settle('dismissed')}>{tco('Not now')}</Button>
+        </div>
+      </> : <p className="pcard-sum meal-off">{tco('Food tracking is off or paused. Switch it on in Settings → Health & food to add meals from the chat.')}</p>}
+    </div>
+    {m.at && <div className="msg-t">{stamp(m.at)}</div>}
   </div>
 }
 
