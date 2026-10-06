@@ -24,6 +24,8 @@ import { progressionGuidance } from '../lib/progression-copy.js'
 import { buildPlannedEntry, plannedConfigOf, builtOutOfProgression } from '../lib/session-start.js'
 import { sessionNoProg, setSessionNoProg, setEntryNoProg, joinSessionNoProg } from '../lib/session-noprog.js'
 import { glyphOf } from '../lib/glyphs.js'
+import { nextUp } from '../lib/rotation.js'
+import { tp } from '../lib/plan-i18n.js'
 import { markAllSetsDone, sessionHistory } from '../lib/backfill.js'
 import { bestSetFor } from '../lib/exercise-history.js'
 import { scoreExercise, rowMarks } from '../lib/scoreboard.js'
@@ -46,10 +48,12 @@ function StartChooser() {
   const todayRoutines = effectiveRoutines(S, todayISO())
   const todayName = todayRoutines.map(r => r.name).join(' + ')
   const todayOvr = S.dayPlan[todayISO()] !== undefined
-  const idSet = new Set(todayIds)
+  // With no weekly plan at all, the routine whose turn it is (lib/rotation.js) leads the screen.
+  const up = !todayRoutines.length ? nextUp(S, todayISO()) : null
+  const idSet = new Set([...todayIds, ...(up ? [up.id] : [])])
   const others = S.routines.filter(r => !idSet.has(r.id))
   return <div className="narrow">
-    <div className="hdr"><div><h1>{t('Start workout')}</h1><div className="sub">{t(DAYN[new Date().getDay()])} — {todayRoutines.length ? t('today is {0}', todayName) : t('rest day, but no one’s stopping you')}</div></div></div>
+    <div className="hdr"><div><h1>{t('Start workout')}</h1><div className="sub">{t(DAYN[new Date().getDay()])} — {todayRoutines.length ? t('today is {0}', todayName) : up ? tp('next up is {0}', up.name) : t('rest day, but no one’s stopping you')}</div></div></div>
     {todayRoutines.length > 0 && <div className="card" style={{ borderColor: 'var(--acc)' }}>
       <h2 className="accent">{t("Today's plan")}{todayOvr ? ' · ' + t('rescheduled') : ''}</h2>
       <div className="row between" style={{ marginBottom: 12 }}>
@@ -57,6 +61,14 @@ function StartChooser() {
         <span className="lrow-i" style={{ width: 38, height: 38, borderRadius: 9, fontSize: 22 }}><Icon name={glyphOf(todayRoutines[0].emoji)} /></span>
       </div>
       <Button variant="primary" icon="play" onClick={() => startFlow(todayIds)}>{t('Start {0}', todayName)}</Button>
+    </div>}
+    {up && <div className="card" style={{ borderColor: 'var(--acc)' }}>
+      <h2 className="accent">{tp('Next up')}</h2>
+      <div className="row between" style={{ marginBottom: 12 }}>
+        <div><div className="big">{up.name}</div><div className="muted small">{exCount(up.ex.length)}</div></div>
+        <span className="lrow-i" style={{ width: 38, height: 38, borderRadius: 9, fontSize: 22 }}><Icon name={glyphOf(up.emoji)} /></span>
+      </div>
+      <Button variant="primary" icon="play" onClick={() => startFlow([up.id])}>{t('Start {0}', up.name)}</Button>
     </div>}
     {others.length > 0 && <><h4 className="sec">{t('Other routines')}</h4>
       <div className="list">{others.map(r => <div key={r.id} className="item" onClick={() => startFlow([r.id])}>

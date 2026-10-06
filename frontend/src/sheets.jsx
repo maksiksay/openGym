@@ -33,6 +33,7 @@ import { estimate1RM, best1RM, REP_CAP } from './lib/onerm.js'
 import { winsOf } from './lib/scoreboard.js'
 import { monthQuota, monthGoalOf, autoMonthGoal, MAX_MONTH_GOAL } from './lib/quota.js'
 import { ts, nWins, winChips, monthLabel } from './lib/score-i18n.js'
+import { tp } from './lib/plan-i18n.js'
 import { exerciseHistory } from './lib/exercise-history.js'
 import { policyFor, defaultIncrement, POLICIES_FOR, POLICY_NAME, POLICY_DESC, MAX_BW_SETS, weightIncrement } from './lib/progression.js'
 import { normalizeRepRange } from './lib/rep-range.js'
@@ -134,6 +135,7 @@ export function confirmSheet(opts) {
 // string literals written inside a t() call, so copy parked in the catalog and passed in as a
 // variable is invisible to it — it would quietly stay English in every language.
 const PLAN_COPY = {
+  'ab-2x40': () => ({ name: tp('Strength 2×40 (A/B)'), about: tp('The four anchor lifts — squat, Romanian deadlift, bench press and pull-ups — in two 40-minute sessions, each finished with Nordic curls and Copenhagen adductions.') }),
   ppl: () => ({ name: t('Push / Pull / Legs'), about: t('Push, pull and legs each get their own day.') }),
   'upper-lower': () => ({ name: t('Upper / Lower'), about: t('Upper body twice, lower body twice.') }),
   'full-body': () => ({ name: t('Full Body'), about: t('Three sessions, the whole body each time.') }),
@@ -145,7 +147,8 @@ const PLAN_COPY = {
 // nothing at all. planId is deliberately required — a default invites `onClick={loadStarterPlan}`,
 // which hands the click event in as the plan and silently loads nothing.
 export function loadStarterPlan(planId) {
-  const plan = buildStarterPlan(planId)
+  // A plan that wants its routines in the interface language gets them named here (starter.js).
+  const plan = buildStarterPlan(planId, { nameOf: tp })
   if (!plan) return false
   update(st => {
     st.routines.push(...plan.routines)
@@ -178,11 +181,11 @@ function StarterPlanChooser({ close }) {
   return <>
     <h3>{t('Choose starter plan')}</h3>
     <div className="list">
-      {starterPlanOptions().map(({ id, days }) => {
+      {starterPlanOptions().map(({ id, days, perWeek }) => {
         const { name, about } = PLAN_COPY[id]()
         return <div key={id} className="item" {...tappable(() => choose(id, name))}>
           <span className="lrow-i" style={{ background: 'var(--surface-3)' }}><Icon name="sparkles" /></span>
-          <div className="grow"><div className="tt">{name}</div><div className="ss">{t('{0} days per week', days)} · {about}</div></div>
+          <div className="grow"><div className="tt">{name}</div><div className="ss">{days ? t('{0} days per week', days) : tp('{0}× a week, on any days', perWeek)} · {about}</div></div>
           <Icon name="chevronRight" className="chev" />
         </div>
       })}

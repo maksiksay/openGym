@@ -2106,3 +2106,27 @@ describe('mark all sets done while logging a past workout', () => {
     expect(labels(await openMenu())).not.toContain('Mark all sets done')
   })
 })
+
+// With no weekly plan at all, the start screen leads with the routine whose turn it is
+// (docs/dev/AB_PLAN.md).
+describe('the start screen without a weekly plan', () => {
+  it('leads with the routine whose turn it is, and starts it', async () => {
+    const { startFlow } = await import('../sheets.jsx')
+    const routines = [
+      { id: 'A', name: 'Strength A', emoji: 'barbell', ex: [{ id: '0043', sets: 3, reps: 5 }] },
+      { id: 'B', name: 'Strength B', emoji: 'pullup', ex: [{ id: '0085', sets: 3, reps: 8 }] },
+    ]
+    mocks.S = { ...workout([]), active: null, routines, week: {}, dayPlan: {},
+      workouts: [{ id: 'w1', d: '2020-01-01', start: Date.parse('2020-01-01T18:00:00'), routineIds: ['A'], entries: [] }] }
+    installDom()
+    await act(async () => { root.render(React.createElement(Workout)) })
+    expect(container.textContent).toContain('next up is Strength B')
+    const card = [...container.querySelectorAll('.card')].find(c => c.textContent.includes('Next up'))
+    expect(card.textContent).toContain('Strength B')
+    // the other routine is still there, under Other routines
+    expect(container.textContent).toContain('Other routines')
+    const start = [...card.querySelectorAll('button')].find(b => b.textContent.trim() === 'Start Strength B')
+    await act(async () => { start.dispatchEvent(new dom.Event('click', { bubbles: true })) })
+    expect(startFlow).toHaveBeenCalledWith(['B'])
+  })
+})

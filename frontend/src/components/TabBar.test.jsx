@@ -60,3 +60,32 @@ describe('the tab bar across a store write', () => {
     expect(tabs()[0].className).toBe('on')
   })
 })
+
+// With no weekly plan at all, Start starts the routine whose turn it is (docs/dev/AB_PLAN.md).
+describe('Start without a weekly plan', () => {
+  const routines = [
+    { id: 'A', name: 'Strength A', ex: [{ id: '0043', sets: 3, reps: 5 }] },
+    { id: 'B', name: 'Strength B', ex: [{ id: '0085', sets: 3, reps: 8 }] },
+  ]
+  const lastA = { id: 'w1', d: '2020-01-01', start: Date.parse('2020-01-01T18:00:00'), routineIds: ['A'], entries: [] }
+
+  it('starts the routine after the one trained last', () => {
+    const onStart = vi.fn()
+    useStore.setState(s => ({ S: { ...s.S, routines, week: {}, dayPlan: {}, workouts: [lastA] } }))
+    act(() => { root.render(<TabBar onStart={onStart} />) })
+    act(() => { tabs()[2].click() })
+    expect(onStart).toHaveBeenCalledWith(['B'])
+  })
+
+  it('starts nothing by itself while the weekly plan is in use', () => {
+    const onStart = vi.fn()
+    // a plan on some weekday, but every weekday but one is free: today may be a rest day
+    const week = Object.fromEntries([0, 1, 2, 3, 4, 5, 6].map(d => [d, []]))
+    const today = new Date().getDay()
+    week[(today + 1) % 7] = ['A']
+    useStore.setState(s => ({ S: { ...s.S, routines, week, dayPlan: {}, workouts: [lastA] } }))
+    act(() => { root.render(<TabBar onStart={onStart} />) })
+    act(() => { tabs()[2].click() })
+    expect(onStart).not.toHaveBeenCalled()
+  })
+})

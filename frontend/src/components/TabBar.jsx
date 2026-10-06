@@ -2,6 +2,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { useStore } from '../store/useStore.js'
 import { effectiveRoutineIds, effectiveRoutines } from '../lib/history.js'
 import { todayISO } from '../lib/format.js'
+import { nextUp } from '../lib/rotation.js'
 import { t } from '../lib/i18n.js'
 import Icon from './Icon.jsx'
 
@@ -32,6 +33,10 @@ export default function TabBar({ onStart }) {
       // A weekday can hold several routines; start the combined session if any of them has
       // exercises, otherwise fall through to the picker.
       if (effectiveRoutines(S, todayISO()).some(r => r.ex.length)) { onStart(effectiveRoutineIds(S, todayISO())); return }
+      // No weekly plan at all: the routine whose turn it is (lib/rotation.js), the way a planned
+      // day starts its own.
+      const up = nextUp(S, todayISO())
+      if (up) { onStart([up.id]); return }
     }
     nav('/workout')
   }

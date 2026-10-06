@@ -53,8 +53,20 @@ describe('starter plan chooser', () => {
     starterPlanSheet()
     const host = renderTop()
     expect([...host.querySelectorAll('.item .tt')].map(el => el.textContent))
-      .toEqual(['Push / Pull / Legs', 'Upper / Lower', 'Full Body', '5×5'])
+      .toEqual(['Strength 2×40 (A/B)', 'Push / Pull / Legs', 'Upper / Lower', 'Full Body', '5×5'])
     expect(rowFor(host, 'Upper / Lower').querySelector('.ss').textContent).toContain('4 days per week')
+    // a plan with no weekdays says how often instead (docs/dev/AB_PLAN.md)
+    expect(rowFor(host, 'Strength 2×40 (A/B)').querySelector('.ss').textContent).toContain('2× a week, on any days')
+  })
+
+  it('loads the A/B plan without touching the weekly plan or asking', () => {
+    useStore.setState(s => ({ S: { ...s.S, week: { 1: ['mine'] } } }))
+    const before = useStore.getState().S.routines.length
+    choose('Strength 2×40 (A/B)')
+    expect(useUI.getState().sheets).toHaveLength(0)
+    const S = useStore.getState().S
+    expect(S.week).toEqual({ 1: ['mine'] })
+    expect(S.routines.slice(before).map(r => r.name)).toEqual(['Strength A', 'Strength B'])
   })
 
   it('loads straight away when the plan’s weekdays are free, without asking', () => {

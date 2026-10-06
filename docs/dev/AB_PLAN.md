@@ -56,11 +56,12 @@ and had to be told every time which routine came next.
   | hu | nordic combhajlítás | koppenhágai adduktorgyakorlat |
 
   German gets none: body-weight rows stay out of `de.json` by its own rule.
-- **Instructions** have five steps in English (`st`), in Russian (`instr/ru.js`, by hand) and
-  in Portuguese (Brazil) (`scripts/instruction-sources/pt-BR.json`, then the builder).
-  `scripts/build-instructions.mjs` regenerates `instr/ru.js` from the upstream dataset and would
-  drop the Russian entries, so that file carries a comment saying so. Every other language falls
-  back to the English steps, as it does for any gap.
+- **Instructions** have five steps in English (`st`), in Portuguese (Brazil)
+  (`scripts/instruction-sources/pt-BR.json`, then the builder) and in Russian. The Russian steps
+  sit in `EXTRA_STEPS` in `lib/exercises-extra.js` and are merged into the Russian pack as it
+  loads (`lib/i18n.js`). `instr/ru.js` is generated from the upstream dataset by
+  `scripts/build-instructions.mjs`, so anything added to it by hand would be lost the next time it
+  runs. Every other language falls back to the English steps, as it does for any gap.
 
 ### Around them
 

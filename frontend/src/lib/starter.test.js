@@ -31,8 +31,9 @@ const APPROVED = {
 const shape = r => r.ex.map(e => [e.id, e.sets, e.reps])
 
 describe('starter plan catalog', () => {
-  it('offers exactly the four plans, with the day count read off the schedule', () => {
+  it('offers exactly the five plans, with the day count read off the schedule', () => {
     expect(starterPlanOptions()).toEqual([
+      { id: 'ab-2x40', days: 0, perWeek: 2 },
       { id: 'ppl', days: 3 }, { id: 'upper-lower', days: 4 },
       { id: 'full-body', days: 3 }, { id: '5x5', days: 3 },
     ])
@@ -100,5 +101,50 @@ describe('starterRoutines (the demo build entry point)', () => {
     const first = starterRoutines().map(r => r.id)
     const second = starterRoutines().map(r => r.id)
     expect(new Set([...first, ...second]).size).toBe(6)
+  })
+})
+
+// Two sessions on any days (docs/dev/AB_PLAN.md): [id, sets, reps, repsMin, prog, side].
+describe('ab-2x40', () => {
+  const row = e => [e.id, e.sets, e.reps, e.repsMin ?? null, e.prog ?? null, e.side ?? false]
+  const FINISH = [['9001', 2, 5, null, 'off', false], ['9002', 2, 12, null, 'off', true]]
+
+  it('builds the two approved routines with their ranges, policies and per-side work', () => {
+    const { routines } = buildStarterPlan('ab-2x40')
+    expect(routines.map(r => [r.name, r.emoji])).toEqual([['Strength A', 'barbell'], ['Strength B', 'pullup']])
+    expect(routines[0].ex.map(row)).toEqual([
+      ['0043', 3, 5, null, null, false],
+      ['0025', 3, 8, 6, 'double', false],
+      ['0027', 3, 10, 8, 'double', false],
+      ['0410', 2, 20, 16, 'double', true],
+      ...FINISH,
+    ])
+    expect(routines[1].ex.map(row)).toEqual([
+      ['0085', 3, 8, 6, 'double', false],
+      ['0652', 3, 6, null, null, false],
+      ['0426', 3, 8, 6, 'double', false],
+      ['0251', 3, 6, null, null, false],
+      ...FINISH,
+    ])
+    for (const r of routines) for (const e of r.ex) { expect(EXIDX[e.id], e.id).toBeTruthy(); expect(e.weight).toBe(0) }
+  })
+
+  it('claims no weekday', () => {
+    expect(buildStarterPlan('ab-2x40').schedule).toEqual([])
+    expect(starterPlanDays('ab-2x40')).toEqual([])
+  })
+
+  it('names its routines with the translator it is handed, and only it', () => {
+    const nameOf = name => name.replace('Strength', 'Сила')
+    expect(buildStarterPlan('ab-2x40', { nameOf }).routines.map(r => r.name)).toEqual(['Сила A', 'Сила B'])
+    // the plans that keep canonical English names ignore it
+    expect(buildStarterPlan('ppl', { nameOf: () => 'x' }).routines[0].name).toBe('Push Day')
+  })
+
+  it('hands every build its own copies of the shared finishers', () => {
+    const [a, b] = buildStarterPlan('ab-2x40').routines
+    expect(a.ex.at(-1)).not.toBe(b.ex.at(-1))
+    a.ex.at(-1).reps = 99
+    expect(buildStarterPlan('ab-2x40').routines[1].ex.at(-1).reps).toBe(12)
   })
 })
