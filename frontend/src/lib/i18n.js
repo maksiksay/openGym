@@ -9,6 +9,7 @@ import {
   getLang, dateLocale, t, instrFor, exerciseNameFor, exerciseNameSearchText, getVersion,
   baseLang, derivePack, _setLangState, exerciseNameClass
 } from './i18n-core.js'
+import { EXTRA_STEPS } from './exercises-extra.js'
 
 export {
   LANGS, INSTR_LANGS, EXERCISE_NAME_LANGS, DATE_LOCALES, DERIVED_LOCALES, RTL_LANGS,
@@ -43,6 +44,8 @@ export async function setLang(l, showEn, enOnly) {
   let dict = {}, instr = null, exerciseNames = null
   try { dict = base === 'en' ? {} : (await localePacks['../locales/' + base + '.js']()).default } catch (e) { dict = {} }
   try { instr = base === 'en' || !INSTR_LANGS.includes(base) ? null : (await instrPacks['../instr/' + base + '.js']()).default } catch (e) { instr = null }
+  // The fork's own exercises (lib/exercises-extra.js) are not in packs generated from the dataset.
+  if (instr && EXTRA_STEPS[base]) instr = { ...instr, ...EXTRA_STEPS[base] }
   try {
     exerciseNames = base === 'en' || !EXERCISE_NAME_LANGS.includes(base)
       ? null

@@ -169,6 +169,8 @@ const ALIAS_EX = {
   'close grip bench press': '0030', 'close-grip bench press': '0030',
   squat: '0043', 'back squat': '0043', 'barbell squat': '0043', 'front squat': '0042',
   deadlift: '0032', 'romanian deadlift': '0085', rdl: '0085', 'sumo deadlift': '0117',
+  'nordic curl': '9001', 'nordic hamstring curl': '9001', 'nordic ham curl': '9001', nordics: '9001',
+  copenhagen: '9002', 'copenhagen plank': '9002', 'copenhagen adduction': '9002', 'copenhagen adductor': '9002',
   'lat pulldown': '2330', 'lat pull down': '2330', pulldown: '2330',
   shrug: '0095', shrugs: '0095',
   'overhead press': '0091', 'military press': '0091', 'shoulder press': '0091', ohp: '0091',

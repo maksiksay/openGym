@@ -562,8 +562,15 @@ describe('stored overrides', () => {
 
     expect(nordic({ [key]: { id: '0599', _ts: 3 } })).toMatchObject({ isOverridden: true, mappedExerciseId: '0599' })
     const cleared = nordic({ [key]: { id: null, _ts: 9 } })
-    expect(cleared).toMatchObject({ isOverridden: false, configuredExerciseId: '3193', mappedExerciseId: '3193' })
+    // the default is the Nordic curl itself; the glute-ham raise logged here still counts as its fallback
+    expect(cleared).toMatchObject({ isOverridden: false, configuredExerciseId: '9001', mappedExerciseId: '3193' })
     expect(nordic({ [key]: '0599' })).toMatchObject({ isOverridden: true, mappedExerciseId: '0599' })
+  })
+
+  it('reads the Nordic curl itself once it is logged', () => {
+    const S = { unit: 'kg', workouts: [workoutAt('9001', NOW, [setDone(0, 3)])] }
+    expect(computeBalance(S, template).find(r => r.roleId === 'nordicCurl'))
+      .toMatchObject({ configuredExerciseId: '9001', mappedExerciseId: '9001', status: BALANCE_STATUSES.BALANCED })
   })
 })
 

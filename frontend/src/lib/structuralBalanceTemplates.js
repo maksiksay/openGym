@@ -191,12 +191,11 @@ export const TEMPLATES = {
         id: 'nordicCurl',
         label: 'Nordic curl (1 rep)',
         evaluationMode: EVALUATION_MODES.REP_COUNT,
-        // No exercise literally named "Nordic curl" exists in EXDB. Glute-ham raise is the
-        // closest mechanical relative (eccentric knee flexion, foot anchored) — an
-        // approximation, not the same exercise. The 1-rep target is the Nordic curl's own,
-        // not recalibrated for the substitute. Users can override this via the exercise
-        // picker (see structuralBalance.js's exerciseIdsFor) if they'd rather map it elsewhere.
-        exerciseIds: ['3193'], // glute-ham raise
+        // The Nordic hamstring curl itself (9001, lib/exercises-extra.js). Glute-ham raise, the
+        // closest mechanical relative (eccentric knee flexion, foot anchored), stood in before it
+        // existed and stays as the fallback. Users can override this via the exercise picker
+        // (see structuralBalance.js's exerciseIdsFor) if they'd rather map it elsewhere.
+        exerciseIds: ['9001', '3193'], // nordic hamstring curl, glute-ham raise
         repsTarget: 1,
       },
       {
