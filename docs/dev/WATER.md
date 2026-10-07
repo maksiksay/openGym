@@ -97,7 +97,8 @@ only, never the food log.
 - **`frontend/src/views/Home.jsx`:** the water row on the health card.
 - **`frontend/src/views/Health.jsx`:** the Water card, the chart, `hasWellbeing`.
 - **`frontend/src/views/Settings.jsx`:** the water goal.
-- **`frontend/src/views/CoachChat.jsx`:** ml on a meal card's drink.
+- **`frontend/src/lib/coach-meal.js`, `frontend/src/views/CoachChat.jsx`:** a meal card's drink
+  keeps its flag and reads in ml.
 - **`frontend/src/components/Icon.jsx`:** `drop`.
 - **`frontend/src/store/useStore.js`:** `waterGoal: null`.
 - **`frontend/src/lib/health-i18n.ru.js`:** the strings.
