@@ -35,7 +35,9 @@ docs/      guides indexed in docs/README.md (FAQ, SELF_HOSTING*, MOBILE, AI_COAC
            HEALTH_IMPORT: steps and sleep from Apple Health via Shortcuts and an import key, steps goal;
            WATER: a daily water counter, drinks from the food log counted in, a water goal;
            SUGAR_FIBRE: sugars and fibre per food and meal row, a fibre goal, no sugar limit;
-           RIR_STEP: the last set's reps in reserve sets the next step, a short night's miss does not count).
+           RIR_STEP: the last set's reps in reserve sets the next step, a short night's miss does not count;
+           COACH_ASSISTANT: the chat logs weight, check-in, water and goals through a card, knows the
+           app's screens and links to them; consent 4 adds water, sugar and fibre).
 ```
 
 ## Commands
