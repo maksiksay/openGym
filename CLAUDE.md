@@ -33,7 +33,8 @@ docs/      guides indexed in docs/README.md (FAQ, SELF_HOSTING*, MOBILE, AI_COAC
            anchor lifts, a max-reps test in the last week, program changes at the boundary;
            STRENGTH_LEVELS: Beginner–Elite per lift relative to body weight, a fitted model;
            HEALTH_IMPORT: steps and sleep from Apple Health via Shortcuts and an import key, steps goal;
-           WATER: a daily water counter, drinks from the food log counted in, a water goal).
+           WATER: a daily water counter, drinks from the food log counted in, a water goal;
+           SUGAR_FIBRE: sugars and fibre per food and meal row, a fibre goal, no sugar limit).
 ```
 
 ## Commands
