@@ -33,6 +33,14 @@ export const litresNum = ml => (Math.round((Number(ml) || 0) / 10) / 100).toLoca
 /** "250 ml". */
 export const nMl = ml => `${Math.round(Number(ml) || 0).toLocaleString(dateLocale())} ${th('ml')}`
 
+/** "5 of 7 entries" — how many of a day's rows had sugar or fibre (docs/dev/SUGAR_FIBRE.md). In
+ *  Russian the noun after «из N» is genitive: «из 1 записи», «из 7 записей», «из 21 записи». */
+export function ofEntries(k, n) {
+  const lang = baseLang(getLang())
+  if (lang === 'ru') return `${k} из ${n} ${n % 10 === 1 && n % 100 !== 11 ? 'записи' : 'записей'}`
+  return `${k} of ${n} ${n === 1 ? 'entry' : 'entries'}`
+}
+
 export function plural(n, forms) {
   const lang = baseLang(getLang())
   if (lang !== 'ru' && lang !== 'uk') return Math.abs(n) === 1 ? forms[0] : forms[forms.length - 1]

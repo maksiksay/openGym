@@ -278,4 +278,14 @@ export default {
   'Water, tea, coffee, juice, milk: their millilitres go into the day\'s water. Not alcohol.': 'Вода, чай, кофе, сок, молоко: их миллилитры идут в воду за день. Алкоголь — нет.',
   'Per 100 ml, from the label': 'На 100 мл, с этикетки',
   'Usual portion, ml (optional)': 'Обычная порция, мл (необязательно)',
+
+  // Sugar and fibre (docs/dev/SUGAR_FIBRE.md)
+  'Sugar': 'Сахар',
+  'Fibre': 'Клетчатка',
+  'Sugar, g': 'Сахар, г',
+  'Fibre, g': 'Клетчатка, г',
+  'sugar {0} g': 'сахар {0} г',
+  'fibre {0} g': 'клетчатка {0} г',
+  'Sugar is part of the carbs, so it cannot be more than them.': 'Сахар входит в углеводы, поэтому его не может быть больше, чем их.',
+  'Fibre {0} g a day · sugar {1} g a day': 'Клетчатка {0} г в день · сахар {1} г в день',
 }

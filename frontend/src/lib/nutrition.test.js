@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   portion, kcalOf, mealsOn, totals, dayTotals, dailySeries, weeklyNutrition, suggestGoals, progressOf,
   fold, matchScore, searchFoods, recentFoods, mealRow, repeatRow, quickRow, validFood, slotForHour,
+  FIBRE_GOAL_DEFAULT, fibreGoalOf,
 } from './nutrition.js'
 import { BASE_FOODS, BASE_BY_ID, baseName, baseAsFood } from './foods-base.js'
 
@@ -31,8 +32,8 @@ describe('day totals', () => {
     expect(mealsOn(meals, '2026-10-05').map(m => m.id)).toEqual(['b', 'a'])
   })
   it('sums and rounds', () => {
-    expect(dayTotals(meals, '2026-10-05')).toEqual({ kcal: 800, p: 60, f: 30, c: 60, n: 2 })
-    expect(totals([])).toEqual({ kcal: 0, p: 0, f: 0, c: 0, n: 0 })
+    expect(dayTotals(meals, '2026-10-05')).toEqual({ kcal: 800, p: 60, f: 30, c: 60, n: 2, sug: 0, fib: 0, sugN: 0, fibN: 0 })
+    expect(totals([])).toEqual({ kcal: 0, p: 0, f: 0, c: 0, n: 0, sug: 0, fib: 0, sugN: 0, fibN: 0 })
   })
   it('lists only days that have entries, oldest first, within bounds', () => {
     expect(dailySeries(meals).map(x => x.d)).toEqual(['2026-10-04', '2026-10-05'])
@@ -197,5 +198,52 @@ describe('drinks', () => {
     for (const id of ['beer', 'wine-dry', 'yogurt-plain', 'whey', 'cream-10']) expect(drink(id), id).toBe(false)
     expect(baseAsFood(BASE_BY_ID.get('water'), 'ru')).toMatchObject({ name: 'Вода', kcal: 0, srv: 250, drink: true })
     expect(baseAsFood(BASE_BY_ID.get('beer'), 'en').drink).toBeUndefined()
+  })
+})
+
+// docs/dev/SUGAR_FIBRE.md: sugars and fibre ride along when known, and unknown is not zero.
+describe('sugar and fibre', () => {
+  const oats = { name: 'Oats', kcal: 366, p: 12.3, f: 6.2, c: 61.8, sug: 1, fib: 10.1 }
+
+  it('scale with the portion onto the row, and back for a repeat', () => {
+    expect(portion(oats, 50)).toEqual({ kcal: 183, p: 6.2, f: 3.1, c: 30.9, sug: 0.5, fib: 5.1 })
+    expect(portion(chicken, 100)).toEqual({ kcal: 165, p: 31, f: 3.6, c: 0 })
+    const r = mealRow({ food: oats, g: 80, d: '2026-10-05', slot: 'b', id: 'o1', t: 1 })
+    expect(r).toMatchObject({ sug: 0.8, fib: 8.1 })
+    expect(repeatRow(r, { g: 40, d: '2026-10-06', slot: 'b', id: 'o2', t: 2 })).toMatchObject({ g: 40, sug: 0.4, fib: 4.1 })
+    expect('fib' in mealRow({ food: chicken, g: 100, d: '2026-10-05', slot: 'l', id: 'c1', t: 1 })).toBe(false)
+  })
+
+  it('sum over the rows that have them, and count those rows', () => {
+    const rows = [
+      { kcal: 300, p: 10, f: 5, c: 50, sug: 2, fib: 8 },
+      { kcal: 200, p: 30, f: 5, c: 0, sug: 0, fib: 0 },
+      { kcal: 700, p: 30, f: 30, c: 70 },                 // a quick entry: unknown, not zero
+    ]
+    expect(totals(rows)).toMatchObject({ n: 3, sug: 2, fib: 8, sugN: 2, fibN: 2 })
+  })
+
+  it('cannot have more sugar than carbohydrate, while fibre may stand apart', () => {
+    expect(validFood({ name: 'x', kcal: 100, c: 10, sug: 10.4 })).toBe(true)
+    expect(validFood({ name: 'x', kcal: 100, c: 10, sug: 12 })).toBe(false)
+    expect(validFood({ name: 'Bran', kcal: 200, p: 15, f: 4, c: 20, fib: 40 })).toBe(true)
+    expect(validFood({ name: 'x', kcal: 100, c: 10, fib: -1 })).toBe(false)
+    expect(validFood({ name: 'x', kcal: 100, c: 10, fib: 101 })).toBe(false)
+  })
+
+  it('are known for every built-in food, within bounds, sugar never above carbohydrate', () => {
+    for (const f of BASE_FOODS) {
+      expect(Number.isFinite(f.sug) && Number.isFinite(f.fib), f.id).toBe(true)
+      expect(f.sug >= 0 && f.sug <= f.c + 0.5 && f.fib >= 0 && f.fib <= 100, f.id).toBe(true)
+    }
+    expect(baseAsFood(BASE_BY_ID.get('banana'), 'en')).toMatchObject({ sug: 12.2, fib: 2.6 })
+  })
+
+  it('have a fibre goal of the profile\'s own, or 30', () => {
+    expect(fibreGoalOf({})).toBe(FIBRE_GOAL_DEFAULT)
+    expect(FIBRE_GOAL_DEFAULT).toBe(30)
+    expect(fibreGoalOf({ nutri: { fibGoal: 35 } })).toBe(35)
+    expect(fibreGoalOf({ nutri: { fibGoal: 2 } })).toBe(30)
+    expect(fibreGoalOf({ nutri: { fibGoal: null } })).toBe(30)
   })
 })

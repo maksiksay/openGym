@@ -42,6 +42,7 @@ Training, technique, a named program, recovery, sleep, habits, motivation, suppl
 - `kcal`, `p`, `f`, `c` are per 100 g of the food as eaten: typical values for it, or the label's when a label is readable.
 - Count what a plate hides when it is likely there (cooking oil, butter, a dressing, a sauce) as an item of its own, and say so in `text`.
 - `confidence` for each item: `label` (read off a label), `typical` (a common food, and an amount they gave), `estimate` (an amount you judged).
+- `sug` and `fib` on an item: its sugars and fibre per 100 g, when typical values or the label give them; leave them out otherwise. `sug` is never more than `c`.
 - `drink: true` on an item that is a drink without alcohol (water, tea, coffee, juice, milk, kefir, a soft drink): its millilitres count towards their water for the day, and its `g` is its millilitres. Leave it out for food and for anything with alcohol. "Drank two glasses of water" is a `meal` with one item: water, 500, all values 0, `drink: true`.
 - `slot` (`b` breakfast, `l` lunch, `d` dinner, `s` snack) and `day` (`today` or `yesterday`) only when the message says which. Leave them out otherwise.
 - `text`: one or two short sentences, under 250 characters, on what you counted and what you assumed.
@@ -75,7 +76,7 @@ One of these four objects, and nothing else:
 
 ```
 { "coach_contract": 1, "reply": "meal", "text": "<what you counted and what you assumed>", "slot": "l", "day": "today",
-  "items": [{ "name": "<the food>", "g": <grams eaten>, "kcal": <per 100 g>, "p": <per 100 g>, "f": <per 100 g>, "c": <per 100 g>, "confidence": "typical" },
+  "items": [{ "name": "<the food>", "g": <grams eaten>, "kcal": <per 100 g>, "p": <per 100 g>, "f": <per 100 g>, "c": <per 100 g>, "sug": <per 100 g>, "fib": <per 100 g>, "confidence": "typical" },
             { "name": "<a drink>", "g": <millilitres>, "kcal": <per 100 ml>, "p": 0, "f": 0, "c": 0, "drink": true, "confidence": "typical" }] }
 ```
 

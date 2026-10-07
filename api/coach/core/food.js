@@ -25,6 +25,8 @@ export const FOOD_SCHEMA = {
     f: { type: 'number' },
     c: { type: 'number' },
     srv: { type: 'number' },
+    sug: { type: 'number' },
+    fib: { type: 'number' },
     drink: { type: 'boolean' },
     confidence: { type: 'string', enum: CONFIDENCE },
     note: { type: 'string' }
@@ -72,6 +74,19 @@ function per100(v, where = '') {
 }
 
 /**
+ * Sugars and fibre per 100 g, when the model gave sensible ones (docs/dev/SUGAR_FIBRE.md): each
+ * 0–100, and sugars no more than the carbohydrate they are part of. Both are optional, so a bad
+ * figure is left out rather than sending a whole good answer back for repair.
+ */
+function extras(v, c) {
+  const out = {};
+  const sug = num(v.sug), fib = num(v.fib);
+  if (sug != null && sug >= 0 && sug <= 100 && sug <= c + 0.5) out.sug = r1(sug);
+  if (fib != null && fib >= 0 && fib <= 100) out.fib = r1(fib);
+  return out;
+}
+
+/**
  * The model's answer, checked. Returns { ok: true, food } | { ok: true, found: false, note }
  * | { ok: false, errors }. Bounds are those of a real label; an energy figure far from what the
  * macros imply is refused rather than shown, because a number the person is asked to trust has
@@ -96,7 +111,7 @@ export function validateFood(v) {
     ok: true,
     food: {
       name, ...(brand ? { brand } : {}),
-      kcal: Math.round(kcal), p: r1(p), f: r1(f), c: r1(c),
+      kcal: Math.round(kcal), p: r1(p), f: r1(f), c: r1(c), ...extras(v, c),
       ...(srv && srv > 0 && srv <= 2000 ? { srv: Math.round(srv) } : {}),
       // A drink without alcohol: its millilitres count as water in the app (docs/dev/WATER.md).
       // Only a literal true: a model's "yes" or 1 is no answer to a yes-or-no field.
@@ -131,7 +146,7 @@ export function validateMeal(v) {
     if (g == null || g < 1 || g > 3000) errors.push(`${where}\`g\` must be the grams eaten, 1 to 3000`);
     const { errors: valueErrors, kcal, p, f, c } = per100(it, where);
     errors.push(...valueErrors);
-    return { name, g: Math.round(g), kcal: Math.round(kcal), p: r1(p), f: r1(f), c: r1(c), ...(it.drink === true ? { drink: true } : {}), confidence: CONFIDENCE.includes(it.confidence) ? it.confidence : 'estimate' };
+    return { name, g: Math.round(g), kcal: Math.round(kcal), p: r1(p), f: r1(f), c: r1(c), ...(c != null ? extras(it, c) : {}), ...(it.drink === true ? { drink: true } : {}), confidence: CONFIDENCE.includes(it.confidence) ? it.confidence : 'estimate' };
   });
   if (errors.length) return { ok: false, errors };
   return {

@@ -3,9 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import { useStore } from '../store/useStore.js'
 import { todayISO, isoOf, fmtDate } from '../lib/format.js'
 import { dateLocale } from '../lib/i18n.js'
-import { th, litresNum, nMl } from '../lib/health-i18n.js'
+import { th, litresNum, nMl, ofEntries } from '../lib/health-i18n.js'
 import { healthOn, hasWellbeing, healthSeries, recentAverages, sleepVsTraining, stepsGoalOf, waterSummary, waterSeries, waterGoalOf, addWater } from '../lib/health.js'
-import { SLOTS, SLOT_NAMES, mealsOn, totals, dailySeries, progressOf } from '../lib/nutrition.js'
+import { SLOTS, SLOT_NAMES, mealsOn, totals, dailySeries, progressOf, fibreGoalOf } from '../lib/nutrition.js'
 import { checkInSheet, addFoodSheet, mealRowSheet, goalsSheet, foodFormSheet, waterSheet, fmtInt, fmt1, macroLine, unitOf } from '../sheets-health.jsx'
 import LineChart from '../components/LineChart.jsx'
 import Icon from '../components/Icon.jsx'
@@ -96,6 +96,11 @@ function NutritionDay({ S, d }) {
     <MacroBar label={th('Protein')} value={tot.p} goal={goals?.p} unit="g" color="var(--acc)" />
     <MacroBar label={th('Fat')} value={tot.f} goal={goals?.f} unit="g" color="var(--yellow)" />
     <MacroBar label={th('Carbs')} value={tot.c} goal={goals?.c} unit="g" color="var(--blue)" />
+    {/* docs/dev/SUGAR_FIBRE.md: fibre against its goal, sugar as a number with no limit. A row
+        without them adds nothing, and the label says how many of the day's rows had them. */}
+    <MacroBar label={th('Fibre') + (tot.n && tot.fibN < tot.n ? ' · ' + ofEntries(tot.fibN, tot.n) : '')} value={tot.fib} goal={fibreGoalOf(S)} unit="g" color="var(--green)" />
+    <div className="row between small hsugar"><span>{th('Sugar')}{tot.n && tot.sugN < tot.n ? <span className="dim"> · {ofEntries(tot.sugN, tot.n)}</span> : null}</span>
+      <span className="muted">{fmt1(tot.sug)} {th('g')}</span></div>
 
     {SLOTS.map(slot => {
       const xs = rows.filter(m => m.slot === slot)
@@ -123,6 +128,9 @@ function WeekCard({ S, d }) {
   const n = days.length
   const mean = f => (n ? days.reduce((s, x) => s + x[f], 0) / n : null)
   const kcal = mean('kcal'), prot = mean('p')
+  // Sugar and fibre over the days that have them at all (docs/dev/SUGAR_FIBRE.md).
+  const meanKnown = x => { const ds = days.filter(dd => dd[x + 'N'] > 0); return ds.length ? ds.reduce((s, dd) => s + dd[x], 0) / ds.length : null }
+  const fib = meanKnown('fib'), sug = meanKnown('sug')
   const avg = recentAverages(S.health, d, 7)
   const goals = S.nutri?.goals || null
   const pct = (v, g) => (g && v != null ? ' · ' + Math.round(v / g * 100) + '%' : '')
@@ -134,6 +142,9 @@ function WeekCard({ S, d }) {
       <div><b>{avg.sleep != null ? fmt1(avg.sleep) : '—'}</b><span>{th('sleep, h')}</span></div>
       <div><b>{avg.energy != null ? fmt1(avg.energy) : '—'}</b><span>{th('energy, 1–5')}</span></div>
     </div>
+    {(fib != null || sug != null) && <div className="small" style={{ marginTop: 8 }}>
+      {th('Fibre {0} g a day · sugar {1} g a day', fib != null ? fmt1(fib) : '—', sug != null ? fmt1(sug) : '—')}
+    </div>}
     <div className="dim small" style={{ marginTop: 8 }}>
       {n ? th('Food: average of {0} logged days before today. Days without entries are left out, not counted as zero.', n) : th('No food logged in the last seven days.')}
     </div>

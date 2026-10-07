@@ -18,7 +18,7 @@ import { loadOfWorkouts, rankOf, levelsOf } from '../../frontend/src/lib/muscles
 import { policyFor } from '../../frontend/src/lib/progression.js'
 import { buildSessionEntries, startsFromLast } from '../../frontend/src/lib/session-start.js'
 import { healthBetween, meanOf, hasWellbeing, waterOn, waterSeries, waterGoalOf } from '../../frontend/src/lib/health.js'
-import { dailySeries, mealsOn, SLOT_NAMES } from '../../frontend/src/lib/nutrition.js'
+import { dailySeries, mealsOn, SLOT_NAMES, fibreGoalOf } from '../../frontend/src/lib/nutrition.js'
 
 /* ---------- helpers ---------- */
 
@@ -334,7 +334,7 @@ export const getBodyweight = {
 /** get_health_log — the Health module: daily check-ins, food per day, goals. */
 export const getHealthLog = {
   name: 'get_health_log',
-  description: 'Get the health & food log: per-day sleep (hours, the night before that date), sleep quality / energy / stress (1–5; stress higher = more), steps, waist (cm) and notes; per-day water in ml (the water buttons plus drinks logged as food, with the part from food) against the water goal; per-day food totals (kcal, protein, fat, carbs in g) against the daily goals; and averages over the range. With detail=true each day also lists what was eaten (name, grams, slot). A day missing from the food list was not logged — unknown, not zero. Useful for "does my sleep affect my lifting?", "how is my protein this month?" or "what did I eat before my best sessions?".',
+  description: 'Get the health & food log: per-day sleep (hours, the night before that date), sleep quality / energy / stress (1–5; stress higher = more), steps, waist (cm) and notes; per-day water in ml (the water buttons plus drinks logged as food, with the part from food) against the water goal; per-day food totals (kcal, protein, fat, carbs in g, and sugar and fibre over the rows that have them, with how many did) against the daily goals and the fibre goal; and averages over the range. With detail=true each day also lists what was eaten (name, grams, slot). A day missing from the food list was not logged — unknown, not zero. Useful for "does my sleep affect my lifting?", "how is my protein this month?" or "what did I eat before my best sessions?".',
   schema: {
     from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe('Inclusive start date YYYY-MM-DD. Defaults to 28 days before `to`.'),
     to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe('Inclusive end date YYYY-MM-DD. Defaults to today.'),
@@ -354,7 +354,11 @@ export const getHealthLog = {
     })
     const food = dailySeries(S.meals, start, end).map(x => {
       const o = { date: x.d, kcal: x.kcal, protein_g: x.p, fat_g: x.f, carbs_g: x.c, items: x.n }
-      if (detail) o.meals = mealsOn(S.meals, x.d).map(m => ({ slot: SLOT_NAMES[m.slot] || m.slot, name: m.name, grams: m.g || null, kcal: m.kcal, protein_g: m.p }))
+      // docs/dev/SUGAR_FIBRE.md: summed over the rows that have them — unknown is not zero.
+      if (x.sugN) { o.sugar_g = x.sug; o.sugar_items = x.sugN }
+      if (x.fibN) { o.fibre_g = x.fib; o.fibre_items = x.fibN }
+      if (detail) o.meals = mealsOn(S.meals, x.d).map(m => ({ slot: SLOT_NAMES[m.slot] || m.slot, name: m.name, grams: m.g || null, kcal: m.kcal, protein_g: m.p,
+        ...(m.sug != null ? { sugar_g: m.sug } : {}), ...(m.fib != null ? { fibre_g: m.fib } : {}) }))
       return o
     })
     // docs/dev/WATER.md: the counter and the drinks of the food log, for the days that have any.
@@ -367,10 +371,12 @@ export const getHealthLog = {
       food_tracking: S.nutri?.on === false ? 'off' : S.nutri?.paused ? 'paused' : 'on',
       goals: goals ? { kcal: goals.kcal ?? null, protein_g: goals.p ?? null, fat_g: goals.f ?? null, carbs_g: goals.c ?? null } : null,
       water_goal_ml: waterGoalOf(S),
+      fibre_goal_g: fibreGoalOf(S),
       averages: {
         sleep_h: avg(days, 'sleep'), sleep_quality: avg(days, 'sleep_quality'), energy: avg(days, 'energy'), stress: avg(days, 'stress'), steps: avg(days, 'steps'),
         kcal_per_logged_day: avg(food, 'kcal'), protein_g_per_logged_day: avg(food, 'protein_g'), days_with_food: food.length, days_with_checkin: days.length,
-        water_ml_per_day: avg(water, 'total_ml'), days_with_water: water.length
+        water_ml_per_day: avg(water, 'total_ml'), days_with_water: water.length,
+        fibre_g_per_day: avg(food.filter(x => x.fibre_items), 'fibre_g'), sugar_g_per_day: avg(food.filter(x => x.sugar_items), 'sugar_g')
       },
       days,
       water,

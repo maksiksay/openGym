@@ -460,6 +460,19 @@ describe('get_health_log', () => {
     expect(r.averages).toMatchObject({ water_ml_per_day: 1375, days_with_water: 2, days_with_checkin: 2 })
     delete S.waterGoal
   })
+  test('sugar and fibre are summed over the rows that have them, with how many did', () => {
+    seed()
+    S.meals[0].sug = 0.8; S.meals[0].fib = 8.1
+    S.nutri.fibGoal = 35
+    _seedStateForTests(S)
+    const r = call('get_health_log', { detail: true })
+    expect(r.food[0]).toMatchObject({ sugar_g: 0.8, sugar_items: 1, fibre_g: 8.1, fibre_items: 1, items: 2 })
+    expect(r.food[0].meals[0]).toMatchObject({ name: 'Oats', sugar_g: 0.8, fibre_g: 8.1 })
+    expect('fibre_g' in r.food[0].meals[1]).toBe(false)
+    expect(r.fibre_goal_g).toBe(35)
+    expect(r.averages).toMatchObject({ fibre_g_per_day: 8.1, sugar_g_per_day: 0.8 })
+    delete S.nutri.fibGoal
+  })
   test('an empty log is empty, not an error', () => {
     const r = call('get_health_log', { from: '2026-07-01', to: '2026-07-02' })
     expect(r.days).toEqual([])

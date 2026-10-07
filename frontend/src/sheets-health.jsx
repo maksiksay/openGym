@@ -11,7 +11,7 @@ import { th, nMl } from './lib/health-i18n.js'
 import { healthOn, setHealth, hasWellbeing, WELLBEING_FIELDS, waterOn, WATER_MAX } from './lib/health.js'
 import {
   SLOTS, SLOT_NAMES, portion, mealRow, repeatRow, quickRow, recentFoods, searchFoods, validFood,
-  suggestGoals, kcalOf, ACTIVITY, slotForHour,
+  suggestGoals, kcalOf, ACTIVITY, slotForHour, FIBRE_GOAL_DEFAULT,
 } from './lib/nutrition.js'
 import { BASE_FOODS, BASE_BY_ID, baseName, baseAsFood } from './lib/foods-base.js'
 import { lookupBarcode, searchProducts, cleanCode, productUrl } from './lib/off.js'
@@ -34,6 +34,8 @@ export const fmtInt = n => Math.round(Number(n) || 0).toLocaleString(dateLocale(
 export const fmt1 = n => (Math.round((Number(n) || 0) * 10) / 10).toLocaleString(dateLocale(), { maximumFractionDigits: 1 })
 /** "Б 31 · Ж 3,6 · У 0" — the macros in one line. */
 export const macroLine = x => `${th('P')} ${fmt1(x.p)} · ${th('F')} ${fmt1(x.f)} · ${th('C')} ${fmt1(x.c)}`
+/** "sugar 12 g · fibre 3 g" — what is known of the two (docs/dev/SUGAR_FIBRE.md). */
+export const sugarFibreLine = x => [x?.sug != null ? th('sugar {0} g', fmt1(x.sug)) : null, x?.fib != null ? th('fibre {0} g', fmt1(x.fib)) : null].filter(Boolean).join(' · ')
 /** A food's or a row's amount unit: millilitres for a drink (docs/dev/WATER.md), grams otherwise. */
 export const unitOf = x => th(x?.drink === true ? 'ml' : 'g')
 
@@ -177,7 +179,8 @@ function AddFoodSheet({ d, slot: slot0, close }) {
       toast(th('Added: {0}', m.name)); close(); return
     }
     const k = 100 / m.g
-    portionSheet({ food: { name: m.name, kcal: m.kcal * k, p: m.p * k, f: m.f * k, c: m.c * k, ...(m.drink === true ? { drink: true } : {}) }, fid: m.fid, src: m.src, d, slot, g: m.g, onDone: after })
+    portionSheet({ food: { name: m.name, kcal: m.kcal * k, p: m.p * k, f: m.f * k, c: m.c * k, ...(m.drink === true ? { drink: true } : {}),
+      ...(m.sug != null ? { sug: m.sug * k } : {}), ...(m.fib != null ? { fib: m.fib * k } : {}) }, fid: m.fid, src: m.src, d, slot, g: m.g, onDone: after })
   }
   const searchOnline = async () => {
     setOnline({ state: 'busy', items: [] })
@@ -285,7 +288,8 @@ function keepOffFood(s, f) {
     : s.foods.find(x => x.src === 'off' && !x.code && x.name === f.name && (x.brand || '') === (f.brand || ''))
   if (have) return have
   const food = { id: uid(), t: Date.now(), name: f.name, ...(f.brand ? { brand: f.brand } : {}), ...(f.code ? { code: f.code } : {}),
-    kcal: f.kcal, p: f.p, f: f.f, c: f.c, ...(f.srv ? { srv: f.srv } : {}), ...(f.drink === true ? { drink: true } : {}), src: 'off' }
+    kcal: f.kcal, p: f.p, f: f.f, c: f.c, ...(f.sug != null ? { sug: f.sug } : {}), ...(f.fib != null ? { fib: f.fib } : {}),
+    ...(f.srv ? { srv: f.srv } : {}), ...(f.drink === true ? { drink: true } : {}), src: 'off' }
   s.foods.push(food)
   return food
 }
@@ -318,6 +322,7 @@ function PortionSheet({ food, unit, fid, src, d, slot, g: g0, fromOff, onDone, c
       </button>)}
     </div>
     {drink && <div className="dim small" style={{ marginBottom: 10 }}>{th('Counts towards your water for the day.')}</div>}
+    {(now.sug != null || now.fib != null) && <div className="muted small" style={{ marginBottom: 10 }}>{sugarFibreLine(now)}</div>}
     <div className="hsum">
       <div><b>{fmtInt(now.kcal)}</b><span>{th('kcal')}</span></div>
       <div><b>{fmt1(now.p)}</b><span>{th('Protein')}</span></div>
@@ -335,12 +340,14 @@ export const portionSheet = opts => ui().openSheet(close => <PortionSheet {...op
 function FoodFormSheet({ initial = {}, note, onSaved, close }) {
   const [f, setF] = useState(() => ({ name: initial.name || '', brand: initial.brand || '', code: initial.code || '',
     kcal: initial.kcal ?? null, p: initial.p ?? null, f: initial.f ?? null, c: initial.c ?? null, srv: initial.srv ?? null,
-    drink: initial.drink === true }))
+    sug: initial.sug ?? null, fib: initial.fib ?? null, drink: initial.drink === true }))
   const set = (k, v) => setF(o => ({ ...o, [k]: v }))
   const implied = kcalOf(f)
   const save = () => {
     const kcal = f.kcal == null || f.kcal === 0 ? implied : f.kcal
-    const food = { name: f.name.trim().slice(0, 120), kcal, p: f.p || 0, f: f.f || 0, c: f.c || 0, ...(f.drink ? { drink: true } : {}) }
+    const food = { name: f.name.trim().slice(0, 120), kcal, p: f.p || 0, f: f.f || 0, c: f.c || 0, ...(f.drink ? { drink: true } : {}),
+      ...(f.sug != null ? { sug: Math.round(f.sug * 10) / 10 } : {}), ...(f.fib != null ? { fib: Math.round(f.fib * 10) / 10 } : {}) }
+    if (food.sug != null && food.sug > food.c + 0.5) { toast(th('Sugar is part of the carbs, so it cannot be more than them.')); return }
     if (!validFood(food)) { toast(th('Give it a name and the values per 100 g')); return }
     let saved = null
     update(s => {
@@ -351,6 +358,8 @@ function FoodFormSheet({ initial = {}, note, onSaved, close }) {
       const code = cleanCode(f.code); if (code) row.code = code; else delete row.code
       if (f.srv > 0) row.srv = Math.round(f.srv); else delete row.srv
       if (!f.drink) delete row.drink
+      // Cleared in the form, gone from the food: unknown again, not zero.
+      for (const x of ['sug', 'fib']) if (food[x] == null) delete row[x]
       // Replaced, not merged into: a brand or barcode cleared in the form has to be gone.
       if (existing) s.foods = s.foods.map(x => (x === existing ? row : x)); else s.foods.push(row)
       saved = { ...row }
@@ -378,6 +387,8 @@ function FoodFormSheet({ initial = {}, note, onSaved, close }) {
       <label className="hfield"><span>{th('Protein, g')}</span><NumberField className="field" value={f.p} nullable onChange={v => set('p', v)} /></label>
       <label className="hfield"><span>{th('Fat, g')}</span><NumberField className="field" value={f.f} nullable onChange={v => set('f', v)} /></label>
       <label className="hfield"><span>{th('Carbs, g')}</span><NumberField className="field" value={f.c} nullable onChange={v => set('c', v)} /></label>
+      <label className="hfield"><span>{th('Sugar, g')}</span><NumberField className="field" value={f.sug} nullable onChange={v => set('sug', v)} /></label>
+      <label className="hfield"><span>{th('Fibre, g')}</span><NumberField className="field" value={f.fib} nullable onChange={v => set('fib', v)} /></label>
     </div>
     <label className="hfield" style={{ marginTop: 10 }}><span>{th(f.drink ? 'Usual portion, ml (optional)' : 'Usual portion, g (optional)')}</span><NumberField className="field" value={f.srv} nullable decimal={false} onChange={v => set('srv', v)} /></label>
     <div className="dim small" style={{ marginTop: 6 }}>{th('Leave kcal empty to work it out from the macros.')}</div>
@@ -429,6 +440,7 @@ function MealRowSheet({ row, close }) {
       if (row.g > 0 && g > 0 && g !== row.g) {
         const k = g / row.g
         m.kcal = Math.round(m.kcal * k); m.p = Math.round(m.p * k * 10) / 10; m.f = Math.round(m.f * k * 10) / 10; m.c = Math.round(m.c * k * 10) / 10
+        for (const x of ['sug', 'fib']) if (m[x] != null) m[x] = Math.round(m[x] * k * 10) / 10
         m.g = Math.round(g)
       }
       m.slot = slot
@@ -553,7 +565,7 @@ function GoalsSheet({ close }) {
   const st = useStore(s => s.S)
   const nutri = st.nutri || {}
   const g0 = nutri.goals || {}
-  const [g, setG] = useState({ kcal: g0.kcal ?? null, p: g0.p ?? null, f: g0.f ?? null, c: g0.c ?? null })
+  const [g, setG] = useState({ kcal: g0.kcal ?? null, p: g0.p ?? null, f: g0.f ?? null, c: g0.c ?? null, fib: nutri.fibGoal ?? null })
   const bw = lastBW(st)
   const bwKg = bw ? Math.round(convertBodyWeight(bw.w, st.unit, 'kg') * 10) / 10 : null
   const b0 = nutri.body || {}
@@ -565,7 +577,9 @@ function GoalsSheet({ close }) {
   const setBody = (k, v) => setB(o => ({ ...o, [k]: v }))
   const save = () => {
     const goals = Object.fromEntries(['kcal', 'p', 'f', 'c'].map(k => [k, g[k] > 0 ? Math.round(g[k]) : null]))
-    update(s => { s.nutri = { ...(s.nutri || {}), goals: Object.values(goals).some(Boolean) ? goals : null, body: b } })
+    // Fibre has a goal of its own, 30 g unless set (docs/dev/SUGAR_FIBRE.md); empty goes back to that.
+    const fibGoal = g.fib >= 5 && g.fib <= 100 ? Math.round(g.fib) : null
+    update(s => { s.nutri = { ...(s.nutri || {}), goals: Object.values(goals).some(Boolean) ? goals : null, fibGoal, body: b } })
     close(); toast(th('Goals saved'))
   }
   return <>
@@ -576,6 +590,7 @@ function GoalsSheet({ close }) {
       <label className="hfield"><span>{th('Protein, g')}</span><NumberField className="field" value={g.p} nullable decimal={false} onChange={v => set('p', v)} /></label>
       <label className="hfield"><span>{th('Fat, g')}</span><NumberField className="field" value={g.f} nullable decimal={false} onChange={v => set('f', v)} /></label>
       <label className="hfield"><span>{th('Carbs, g')}</span><NumberField className="field" value={g.c} nullable decimal={false} onChange={v => set('c', v)} /></label>
+      <label className="hfield"><span>{th('Fibre, g')}</span><NumberField className="field" value={g.fib} nullable decimal={false} onChange={v => set('fib', v)} placeholder={String(FIBRE_GOAL_DEFAULT)} /></label>
     </div>
     {!calc
       ? <Button size="sm" variant="ghost" icon="sparkles" style={{ marginTop: 8 }} onClick={() => setCalc(true)}>{th('Work them out for me')}</Button>
@@ -602,7 +617,7 @@ function GoalsSheet({ close }) {
                 </div>
                 <div className="dim small" style={{ marginTop: 6 }}>{th('Mifflin–St Jeor, protein 1.8 g per kg. A starting point: adjust after 2–3 weeks by how your weekly average weight moves.')}</div>
                 <div style={{ height: 8 }} />
-                <Button size="sm" onClick={() => setG({ ...sugg })}>{th('Use these')}</Button>
+                <Button size="sm" onClick={() => setG(o => ({ ...o, ...sugg }))}>{th('Use these')}</Button>
               </>
             : <div className="muted small" style={{ marginTop: 10 }}>{th('Enter age, height and weight.')}</div>}
         </div>}

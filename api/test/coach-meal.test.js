@@ -57,6 +57,15 @@ test('a drink without alcohol is marked as one, so the app counts it as water (d
   assert.equal(r.meal.items[1].drink, undefined);
 });
 
+test('an item keeps its sugars and fibre when sensible (docs/dev/SUGAR_FIBRE.md)', () => {
+  const r = validateMeal({ items: [{ ...buckwheat, sug: 0.9, fib: 2.7 }, { ...chicken, sug: 3, fib: 'lots' }] });
+  assert.equal(r.ok, true);
+  assert.equal(r.meal.items[0].sug, 0.9);
+  assert.equal(r.meal.items[0].fib, 2.7);
+  assert.equal('sug' in r.meal.items[1], false);   // more sugar than the 0 g of carbohydrate
+  assert.equal('fib' in r.meal.items[1], false);
+});
+
 test('a meal with nothing in it, or too much, goes back for repair', () => {
   assert.equal(validateMeal({ items: [] }).ok, false);
   assert.equal(validateMeal({}).ok, false);

@@ -92,3 +92,12 @@ test('a drink is kept as one only on a literal true', () => {
   assert.equal(validateFood({ ...water, drink: 1 }).food.drink, undefined);
   assert.equal(validateFood(good).food.drink, undefined);
 });
+
+// docs/dev/SUGAR_FIBRE.md: sugars and fibre kept when sensible, a bad one dropped, the answer kept.
+test('sugars and fibre ride along when sensible, and a bad one is dropped without failing the answer', () => {
+  assert.deepEqual(validateFood({ ...good, sug: '1.84', fib: 0 }).food, { name: 'Творог 5%', brand: 'Савушкин', kcal: 121, p: 17, f: 5, c: 1.8, sug: 1.8, fib: 0, srv: 180, confidence: 'label', note: 'С этикетки.' });
+  const r = validateFood({ ...good, sug: 40, fib: -2 });
+  assert.equal(r.ok, true);
+  assert.equal('sug' in r.food, false);
+  assert.equal('fib' in r.food, false);
+});

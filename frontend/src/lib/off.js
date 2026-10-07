@@ -61,11 +61,18 @@ export function normalizeProduct(p, lang = 'en') {
   if (!name || kcal == null) return null
   const brand = typeof p.brands === 'string' ? p.brands.split(',')[0].trim() : ''
   const srv = num(p.serving_quantity)
+  // Sugars and fibre when the label has them (docs/dev/SUGAR_FIBRE.md). A sugar figure above the
+  // carbohydrate it is part of is a typo in the community data: dropped, the rest kept.
+  const sug = num(n.sugars_100g), fib = num(n.fiber_100g)
+  const sugOk = sug != null && sug >= 0 && sug <= 100 && sug <= (c ?? 0) + 0.5
+  const fibOk = fib != null && fib >= 0 && fib <= 100
   return {
     name: name.slice(0, 120),
     ...(brand ? { brand: brand.slice(0, 60) } : {}),
     ...(cleanCode(p.code) ? { code: cleanCode(p.code) } : {}),
     kcal: Math.round(kcal), p: r1(pr ?? 0), f: r1(f ?? 0), c: r1(c ?? 0),
+    ...(sugOk ? { sug: r1(sug) } : {}),
+    ...(fibOk ? { fib: r1(fib) } : {}),
     ...(srv && srv > 0 && srv < 2000 ? { srv: Math.round(srv) } : {}),
     ...(isDrink(p) ? { drink: true } : {}),
     src: 'off',

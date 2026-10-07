@@ -3,18 +3,20 @@
  * Three lists live in the synced state (store/useStore.js DEF):
  *
  *   S.foods  — the person's own food library, values per 100 g:
- *              { id, t, name, brand?, code?, kcal, p, f, c, srv?, drink?, src: 'own' | 'off' }
+ *              { id, t, name, brand?, code?, kcal, p, f, c, sug?, fib?, srv?, drink?, src: 'own' | 'off' }
+ *              `sug` and `fib` are sugars and fibre, when the label or the person gives them
+ *              (docs/dev/SUGAR_FIBRE.md) — absent is unknown, never zero.
  *              `code` is the barcode for a product found through Open Food Facts (lib/off.js);
  *              `srv` the usual portion in grams, offered first when the food is added; `drink`
  *              marks a drink without alcohol, whose millilitres count as water (docs/dev/WATER.md).
  *   S.meals  — what was eaten, one row per food per meal:
- *              { id, d, t, slot, name, g, kcal, p, f, c, fid?, src?, drink? }
+ *              { id, d, t, slot, name, g, kcal, p, f, c, sug?, fib?, fid?, src?, drink? }
  *              The numbers are the portion's own, computed when it was logged. A meal row never
  *              looks its food up again: correcting a food's label next month must not rewrite
  *              what was eaten last month, the same way a renamed routine does not rename the
  *              workouts logged under it. `drink` is copied the same way, so a drink's grams —
  *              its millilitres, 1 ml taken as 1 g — go into that day's water (lib/health.js).
- *   S.nutri  — settings: { on, paused, goals: { kcal, p, f, c } | null, home }
+ *   S.nutri  — settings: { on, paused, goals: { kcal, p, f, c } | null, fibGoal, home }
  *
  * Built-in foods (lib/foods-base.js) are never copied into S.foods; a meal row made from one
  * carries `fid: 'b:<id>'` and `src: 'base'`.
@@ -34,6 +36,10 @@ const r1 = n => Math.round(n * 10) / 10
 export const SLOTS = ['b', 'l', 'd', 's']        // breakfast, lunch, dinner, snack
 export const SLOT_NAMES = { b: 'Breakfast', l: 'Lunch', d: 'Dinner', s: 'Snack' }
 export const MACROS = ['kcal', 'p', 'f', 'c']
+// Sugars and fibre (docs/dev/SUGAR_FIBRE.md): optional on a food and on a row, carried only when
+// known — a row without them adds nothing to the day, and the day counts how many rows had them.
+export const EXTRAS = ['sug', 'fib']
+const known = v => v != null && v !== '' && Number.isFinite(Number(v))
 
 /** The default meal slot for a time of day — what the add sheet opens on. */
 export function slotForHour(h) {
@@ -43,15 +49,18 @@ export function slotForHour(h) {
   return 's'
 }
 
-/** A food's per-100 g values scaled to `g` grams, rounded the way a label is. */
+/** A food's per-100 g values scaled to `g` grams, rounded the way a label is. Sugars and fibre
+ *  come along when the food has them. */
 export function portion(food, g) {
   const k = num(g) / 100
-  return {
+  const out = {
     kcal: Math.round(num(food?.kcal) * k),
     p: r1(num(food?.p) * k),
     f: r1(num(food?.f) * k),
     c: r1(num(food?.c) * k),
   }
+  for (const x of EXTRAS) if (known(food?.[x])) out[x] = r1(num(food[x]) * k)
+  return out
 }
 
 /** kcal from macros (Atwater 4/9/4) — the fallback when a label gives macros but no energy. */
@@ -63,14 +72,17 @@ export function mealsOn(meals, d) {
   return list(meals).filter(m => m && m.d === d).sort((a, b) => order(a.slot) - order(b.slot) || num(a.t) - num(b.t))
 }
 
-/** Sum of a set of meal rows. */
+/** Sum of a set of meal rows. Sugars and fibre are summed over the rows that have them, and
+ *  `sugN` / `fibN` say how many did, out of `n`. */
 export function totals(rows) {
-  const out = { kcal: 0, p: 0, f: 0, c: 0, n: 0 }
+  const out = { kcal: 0, p: 0, f: 0, c: 0, n: 0, sug: 0, fib: 0, sugN: 0, fibN: 0 }
   for (const m of list(rows)) {
     if (!m) continue
     out.kcal += num(m.kcal); out.p += num(m.p); out.f += num(m.f); out.c += num(m.c); out.n++
+    for (const x of EXTRAS) if (known(m[x])) { out[x] += num(m[x]); out[x + 'N']++ }
   }
   out.kcal = Math.round(out.kcal); out.p = r1(out.p); out.f = r1(out.f); out.c = r1(out.c)
+  out.sug = r1(out.sug); out.fib = r1(out.fib)
   return out
 }
 
@@ -216,6 +228,7 @@ export function mealRow({ food, g, d, slot, fid = null, src = null, id, t = Date
 export function repeatRow(prev, { g = prev?.g, d, slot, id, t = Date.now() }) {
   const base = num(prev?.g) > 0 ? 100 / num(prev.g) : 0
   const per100 = { name: prev?.name, kcal: num(prev?.kcal) * base, p: num(prev?.p) * base, f: num(prev?.f) * base, c: num(prev?.c) * base, drink: prev?.drink === true }
+  for (const x of EXTRAS) if (known(prev?.[x])) per100[x] = num(prev[x]) * base
   // A row logged without grams (a quick entry: "lunch, ~700 kcal") repeats as itself.
   if (!base) return { ...prev, id, d, slot, t }
   return mealRow({ food: per100, g, d, slot, fid: prev.fid || null, src: prev.src || null, id, t })
@@ -228,11 +241,21 @@ export function quickRow({ name, kcal, p, f, c, d, slot, id, t = Date.now() }) {
 }
 
 /** A food entered by hand is valid when it has a name and either energy or some macro — or is a
- *  drink, which may have neither: water, black coffee, a zero cola. */
+ *  drink, which may have neither: water, black coffee, a zero cola. Sugars and fibre, when given,
+ *  are 0–100 g, and sugars are part of the carbohydrate, so they cannot be more of it. */
 export function validFood(f) {
   if (!f || !String(f.name || '').trim()) return false
   const vals = MACROS.map(k => num(f[k]))
   if (vals.some(v => v < 0)) return false
   if (num(f.p) + num(f.f) + num(f.c) > 100.5) return false     // more than 100 g of macros per 100 g
+  for (const x of EXTRAS) if (known(f[x]) && (num(f[x]) < 0 || num(f[x]) > 100)) return false
+  if (known(f.sug) && num(f.sug) > num(f.c) + 0.5) return false
   return f.drink === true || vals.some(v => v > 0)
+}
+
+/** The daily fibre goal in grams: the profile's own, or 30 (docs/dev/SUGAR_FIBRE.md). */
+export const FIBRE_GOAL_DEFAULT = 30
+export const fibreGoalOf = S => {
+  const g = Number(S?.nutri?.fibGoal)
+  return S?.nutri?.fibGoal != null && Number.isFinite(g) && g >= 5 && g <= 100 ? Math.round(g) : FIBRE_GOAL_DEFAULT
 }

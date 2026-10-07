@@ -90,3 +90,17 @@ describe('drinks', () => {
     expect(normalizeProduct(product, 'ru').drink).toBeUndefined()
   })
 })
+
+// docs/dev/SUGAR_FIBRE.md: sugars and fibre from the label, an impossible sugar figure dropped.
+describe('sugar and fibre', () => {
+  const muesli = { product_name: 'Мюсли', nutriments: { 'energy-kcal_100g': 380, proteins_100g: 9, fat_100g: 7, carbohydrates_100g: 64, sugars_100g: '18.24', fiber_100g: 8 } }
+  it('come from the label when it has them', () => {
+    expect(normalizeProduct(muesli, 'ru')).toMatchObject({ c: 64, sug: 18.2, fib: 8 })
+    expect('sug' in normalizeProduct(product, 'ru')).toBe(false)
+  })
+  it('lose a sugar figure above the carbohydrate, and keep the rest', () => {
+    const bad = normalizeProduct({ ...muesli, nutriments: { ...muesli.nutriments, sugars_100g: 80 } }, 'ru')
+    expect('sug' in bad).toBe(false)
+    expect(bad.fib).toBe(8)
+  })
+})

@@ -16,7 +16,8 @@ Rules:
 4. `name` is a short name in `meta.lang`, the way it would read on a shopping list. `brand` only when the query names one.
 5. `note` is one or two short sentences in `meta.lang`: where the numbers come from, or what you assumed. Never a health claim.
 6. If the query is not a food at all, or is too vague to describe ("something tasty"), answer `found: false` with a `note` saying what to add.
-7. `drink: true` when it is a drink without alcohol: water, tea, coffee, juice, milk, kefir, a soft drink. Its millilitres then count towards the person's water, so leave it out for food, for anything with alcohol, and for a powder or a syrup that is mixed into a drink. For a drink, 100 g is 100 ml.
+7. `sug` and `fib` are its sugars and fibre per 100 g, from the label or the reference values, when you know them; leave them out when you do not. Sugars are part of the carbohydrate, so `sug` is never more than `c`.
+8. `drink: true` when it is a drink without alcohol: water, tea, coffee, juice, milk, kefir, a soft drink. Its millilitres then count towards the person's water, so leave it out for food, for anything with alcohol, and for a powder or a syrup that is mixed into a drink. For a drink, 100 g is 100 ml.
 
 ## Output
 
@@ -31,6 +32,8 @@ Rules:
   "f": <number>,
   "c": <number>,
   "srv": <grams, optional>,
+  "sug": <sugars per 100 g, optional>,
+  "fib": <fibre per 100 g, optional>,
   "drink": true (only for a drink without alcohol; leave it out otherwise),
   "confidence": "label" | "typical" | "estimate",
   "note": "<one or two sentences>"

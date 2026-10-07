@@ -11,13 +11,14 @@
  *   u     optional household portion: [grams, { en, ru }] — "1 egg", "1 slice"
  *   drink true for a drink without alcohol (D below): its millilitres count as water, 1 ml taken
  *         as 1 g (docs/dev/WATER.md). Beer and wine are F: their calories count, their water not.
+ *   sug, fib   sugars and fibre per 100 g, from SUGAR_FIBRE below (docs/dev/SUGAR_FIBRE.md)
  */
 
 const F = (id, en, ru, kcal, p, f, c, u) => ({ id, n: { en, ru }, kcal, p, f, c, ...(u ? { u } : {}) })
 const D = (...a) => ({ ...F(...a), drink: true })
 const U = (g, en, ru) => [g, { en, ru }]
 
-export const BASE_FOODS = Object.freeze([
+const LIST = [
   /* ---- grains, cooked and dry ---- */
   F('buckwheat-c', 'Buckwheat, cooked', 'Гречка варёная', 101, 4.2, 1.1, 19.9),
   F('buckwheat-d', 'Buckwheat, dry', 'Гречка (крупа)', 313, 12.6, 3.3, 62),
@@ -196,7 +197,62 @@ export const BASE_FOODS = Object.freeze([
   F('shawarma', 'Shawarma (chicken)', 'Шаурма с курицей', 210, 11, 10, 19, U(350, '1 shawarma', '1 шт')),
   F('burger', 'Burger', 'Бургер', 250, 13, 11, 25, U(220, '1 burger', '1 шт')),
   F('sushi-roll', 'Sushi roll (California-type)', 'Роллы (типа «Калифорния»)', 175, 6, 5, 26, U(30, '1 piece', '1 шт')),
-])
+]
+
+// Sugars and fibre per 100 g, [sug, fib] (docs/dev/SUGAR_FIBRE.md): rounded reference values in
+// the range of USDA FoodData Central and the usual composition tables, typical makes for the
+// prepared dishes. Sugars are part of carbohydrate and never exceed `c`; fibre is counted apart.
+const SUGAR_FIBRE = {
+  // grains, bread
+  'buckwheat-c': [0.9, 2.7], 'buckwheat-d': [1.5, 10], 'rice-w-c': [0.1, 0.4], 'rice-w-d': [0.1, 1.3],
+  'rice-b-c': [0.4, 1.8], 'oats-d': [1, 10.1], 'oats-w': [0.3, 1.7], 'oats-m': [3, 1.1],
+  'pasta-c': [0.6, 1.8], 'pasta-d': [2.7, 3.2], 'bulgur-c': [0.1, 4.5], 'quinoa-c': [0.9, 2.8],
+  'millet-c': [0.1, 1.3], 'pearl-barley-c': [0.3, 3.8], 'semolina-m': [3.8, 0.3], 'couscous-c': [0.1, 1.4],
+  'lentils-c': [1.8, 7.9], 'chickpeas-c': [4.8, 7.6], 'beans-c': [0.3, 6.4], 'green-peas': [5.7, 5.5],
+  'corn-can': [3.2, 2], 'bread-w': [5, 2.7], 'bread-rye': [3.9, 5.8], 'bread-wg': [4.4, 6],
+  'lavash': [1.3, 2.2], 'crispbread': [1.4, 16.5], 'tortilla': [2, 2.5],
+  // meat, fish
+  'chicken-breast-r': [0, 0], 'chicken-breast-c': [0, 0], 'chicken-thigh-c': [0, 0], 'turkey-breast-c': [0, 0],
+  'beef-lean-c': [0, 0], 'beef-mince-r': [0, 0], 'pork-loin-c': [0, 0], 'pork-neck-c': [0, 0],
+  'liver-chicken-c': [0, 0], 'ham': [1, 0], 'sausage-boiled': [0.5, 0], 'sausages': [1, 0], 'salami': [0.5, 0],
+  'cutlet': [1, 0.5], 'pelmeni': [1, 1], 'salmon-c': [0, 0], 'salmon-salted': [0, 0], 'cod-c': [0, 0],
+  'pollock-c': [0, 0], 'tuna-can': [0, 0], 'herring': [0, 0], 'mackerel-smoked': [0, 0], 'shrimp-c': [0, 0],
+  'crab-sticks': [4.5, 0.5],
+  // eggs, dairy, protein products
+  'egg': [0.4, 0], 'egg-white': [0.7, 0], 'omelette': [1.5, 0], 'milk-1': [5, 0], 'milk-2.5': [4.7, 0],
+  'milk-3.2': [4.7, 0], 'kefir-1': [4, 0], 'kefir-2.5': [4, 0], 'ryazhenka': [4.2, 0], 'cottage-0': [1.3, 0],
+  'cottage-5': [1.8, 0], 'cottage-9': [2, 0], 'skyr': [4, 0], 'yogurt-greek-2': [3.6, 0], 'yogurt-plain': [6.7, 0],
+  'sour-cream-15': [3, 0], 'sour-cream-20': [3.4, 0], 'cheese-hard': [0.5, 0], 'cheese-mozz': [1, 0],
+  'cheese-feta': [4, 0], 'syrniki': [6, 0.5], 'glazed-curd': [28, 0.5], 'butter': [0.1, 0], 'cream-10': [4, 0],
+  'whey': [5, 0], 'casein': [3, 0], 'protein-bar': [8, 8], 'tofu': [0.6, 0.3],
+  // vegetables
+  'potato-boiled': [0.9, 1.8], 'potato-mashed': [1.5, 1.5], 'potato-fried': [0.5, 2.4], 'fries': [0.3, 3.8],
+  'sweet-potato-b': [6.5, 3.3], 'cucumber': [1.7, 0.5], 'tomato': [2.6, 1.2], 'bell-pepper': [4.2, 2.1],
+  'carrot': [4.7, 2.8], 'cabbage': [3.2, 2.5], 'sauerkraut': [1.8, 2.9], 'broccoli': [1.7, 2.6],
+  'cauliflower': [1.9, 2], 'zucchini': [2.5, 1], 'beetroot-b': [8, 2], 'onion': [4.2, 1.7], 'mushrooms': [2, 1],
+  'spinach': [0.4, 2.2], 'lettuce': [0.8, 1.3], 'avocado': [0.7, 6.7], 'pickles': [1, 0.8], 'veg-salad-oil': [2.5, 1.5],
+  // fruit, berries, dried fruit
+  'banana': [12.2, 2.6], 'apple': [10.4, 2.4], 'pear': [9.8, 3.1], 'orange': [9.4, 2.4], 'mandarin': [10.6, 1.8],
+  'grapes': [15.5, 0.9], 'kiwi': [9, 3], 'blueberries': [10, 2.4], 'strawberries': [4.9, 2], 'raspberries': [4.4, 6.5],
+  'watermelon': [6.2, 0.4], 'dates': [64, 7], 'raisins': [59, 3.7], 'prunes': [38, 7.1], 'dried-apricots': [53, 7.3],
+  // nuts, seeds, fats
+  'almonds': [4.4, 12.5], 'walnuts': [2.6, 6.7], 'peanuts': [4.7, 8.5], 'cashews': [5.9, 3.3],
+  'sunflower-seeds': [2.6, 8.6], 'peanut-butter': [9, 6], 'olive-oil': [0, 0], 'sunflower-oil': [0, 0], 'mayonnaise': [2, 0],
+  // sweets, snacks
+  'sugar': [99.7, 0], 'honey': [82, 0.2], 'jam': [48.5, 1.1], 'choc-dark': [24, 10.9], 'choc-milk': [51.5, 3.4],
+  'cookies': [25, 2], 'ice-cream': [19, 0], 'chips': [0.5, 4.4], 'granola': [20, 7], 'cornflakes': [8, 3], 'pancakes': [5, 0.9],
+  // drinks
+  'water': [0, 0], 'tea': [0, 0], 'coffee-black': [0, 0], 'cola-zero': [0, 0], 'juice-orange': [8.4, 0.2], 'cola': [10.6, 0],
+  'beer': [0, 0], 'wine-dry': [0.6, 0], 'latte': [4, 0], 'cappuccino': [3.2, 0],
+  // prepared dishes: typical makes
+  'borscht': [2.5, 1.2], 'chicken-soup': [0.5, 0.3], 'draniki': [1, 2], 'pilaf': [0.8, 0.6], 'olivier': [2, 1.5],
+  'pizza': [3, 2], 'shawarma': [2, 1.5], 'burger': [4.5, 1.2], 'sushi-roll': [3.5, 0.8],
+}
+
+export const BASE_FOODS = Object.freeze(LIST.map(f => {
+  const sf = SUGAR_FIBRE[f.id]
+  return sf ? { ...f, sug: sf[0], fib: sf[1] } : f
+}))
 
 export const BASE_BY_ID = new Map(BASE_FOODS.map(f => [f.id, f]))
 
@@ -204,4 +260,5 @@ export const BASE_BY_ID = new Map(BASE_FOODS.map(f => [f.id, f]))
 export const baseName = (f, lang) => (f?.n && (f.n[lang] || f.n.en)) || ''
 
 /** A built-in food as the plain per-100 g shape the rest of nutrition.js uses. */
-export const baseAsFood = (f, lang) => (f ? { id: f.id, name: baseName(f, lang), kcal: f.kcal, p: f.p, f: f.f, c: f.c, srv: f.u?.[0] || null, ...(f.drink ? { drink: true } : {}) } : null)
+export const baseAsFood = (f, lang) => (f ? { id: f.id, name: baseName(f, lang), kcal: f.kcal, p: f.p, f: f.f, c: f.c, srv: f.u?.[0] || null,
+  ...(f.sug != null ? { sug: f.sug, fib: f.fib } : {}), ...(f.drink ? { drink: true } : {}) } : null)

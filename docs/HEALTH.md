@@ -31,6 +31,20 @@ and two devices filling different fields of one day keep both (`mergeHealth`).
 Each meal row keeps its own numbers, computed when it was logged, so correcting a food later
 never rewrites past days.
 
+### Sugar and fibre
+
+Two more numbers per food, when they are known ([`dev/SUGAR_FIBRE.md`](dev/SUGAR_FIBRE.md)):
+
+- **Where they come from.** Every built-in food has them. Open Food Facts gives them from the
+  label, your own foods have two optional fields, and the AI search and the Coach's meal cards
+  fill them in when they can. A quick entry has none.
+- **Unknown is not zero.** A row without them adds nothing to the day, and the Food card says
+  how many of the day's rows had them ("Fibre · 5 of 7 entries").
+- **Fibre** has a goal: 30 g a day unless changed in the Goals sheet.
+- **Sugar** is shown without a limit. Labels give total sugars, fruit and milk included, while
+  the WHO's limit is for free sugars only.
+- Rows logged before this change keep what they had.
+
 ### Reading it
 
 The screen leads with the **average of the last seven logged days** against the goals, not a

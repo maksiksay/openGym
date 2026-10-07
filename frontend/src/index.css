@@ -1563,6 +1563,8 @@ body.chips-dragging *{cursor:inherit}
 .hwater-n .chev{margin-left:auto;align-self:center}
 /* An amount is not a title: "500 ml", "1 glass" — not "500 Ml" (.chip capitalizes). */
 .chip.chip-amt{text-transform:none}
+/* docs/dev/SUGAR_FIBRE.md: the sugar line under the Food card's bars, a bar's height apart. */
+.hsugar{margin-top:10px}
 .himp-key{margin:4px 16px 8px;padding:10px 12px;border-radius:12px;background:var(--surface-2)}
 .himp-v{display:flex;align-items:center;gap:6px}
 .himp-v code{flex:1;min-width:0;font-size:13px;word-break:break-all;user-select:all}
