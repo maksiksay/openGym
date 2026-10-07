@@ -10,6 +10,7 @@ import { api } from './api.js'
 import { DEMO } from './demo.js'
 import { MOBILE } from './mobile.js'
 import { t, getLang } from './i18n.js'
+import { todayISO } from './format.js'
 import { useStore } from '../store/useStore.js'
 import { useUI } from '../store/useUI.js'
 
@@ -61,7 +62,7 @@ export const awaitedJob = () => awaited
 export const settleAwaited = id => { if (!id || awaited === id) awaited = null }
 
 export const coachStatus = async () => DEMO ? (await demo()).demoStatus() : LOCAL() ? (await local()).localStatus() : api('/api/coach/status')
-const _requestReview = async note => DEMO ? (await demo()).demoReview(S()) : LOCAL() ? (await local()).localReview(S(), note) : api('/api/coach/review', { method: 'POST', body: JSON.stringify({ note: note || '', lang: getLang() }) })
+const _requestReview = async note => DEMO ? (await demo()).demoReview(S()) : LOCAL() ? (await local()).localReview(S(), note) : api('/api/coach/review', { method: 'POST', body: JSON.stringify({ note: note || '', lang: getLang(), today: todayISO() }) })
 export const requestReview = (...a) => _requestReview(...a).then(track)
 // A message typed in the chat: the Coach decides whether it answers, proposes plan changes or
 // asks what was meant (docs/dev/COACH_CHAT.md). The demo has no model to answer with, so a
@@ -70,13 +71,13 @@ export const requestReview = (...a) => _requestReview(...a).then(track)
 // the device by lib/coach-photo.js.
 const _sendChat = async (message, photo) => DEMO ? (await demo()).demoReview(S())
   : LOCAL() ? (await local()).localChat(S(), message, photo)
-    : api('/api/coach/chat', { method: 'POST', body: JSON.stringify({ message, lang: getLang(), ...(photo ? { photo: { type: photo.type, data: photo.data } } : {}) }) })
+    : api('/api/coach/chat', { method: 'POST', body: JSON.stringify({ message, lang: getLang(), today: todayISO(), ...(photo ? { photo: { type: photo.type, data: photo.data } } : {}) }) })
 export const sendChat = (...a) => _sendChat(...a).then(track)
-const _requestPlan = async intake => DEMO ? (await demo()).demoPlan(S(), intake) : LOCAL() ? (await local()).localPlan(S(), intake) : api('/api/coach/plan', { method: 'POST', body: JSON.stringify({ intake, lang: getLang() }) })
+const _requestPlan = async intake => DEMO ? (await demo()).demoPlan(S(), intake) : LOCAL() ? (await local()).localPlan(S(), intake) : api('/api/coach/plan', { method: 'POST', body: JSON.stringify({ intake, lang: getLang(), today: todayISO() }) })
 export const requestPlan = (...a) => _requestPlan(...a).then(track)
-const _refinePlan = async text => DEMO ? (await demo()).demoRefine(S()) : LOCAL() ? (await local()).localRefine(S(), text) : api('/api/coach/plan', { method: 'POST', body: JSON.stringify({ refine: text, lang: getLang() }) })
+const _refinePlan = async text => DEMO ? (await demo()).demoRefine(S()) : LOCAL() ? (await local()).localRefine(S(), text) : api('/api/coach/plan', { method: 'POST', body: JSON.stringify({ refine: text, lang: getLang(), today: todayISO() }) })
 export const refinePlan = (...a) => _refinePlan(...a).then(track)
-const _requestDebrief = async workoutId => DEMO ? (await demo()).demoDebrief(S(), workoutId) : LOCAL() ? (await local()).localDebrief(S(), workoutId) : api('/api/coach/debrief', { method: 'POST', body: JSON.stringify({ workoutId: workoutId || null, lang: getLang() }) })
+const _requestDebrief = async workoutId => DEMO ? (await demo()).demoDebrief(S(), workoutId) : LOCAL() ? (await local()).localDebrief(S(), workoutId) : api('/api/coach/debrief', { method: 'POST', body: JSON.stringify({ workoutId: workoutId || null, lang: getLang(), today: todayISO() }) })
 export const requestDebrief = (...a) => _requestDebrief(...a).then(track)
 // A food nothing else knows (sheets-health.jsx): the query goes to the server's provider, which
 // answers inline with a candidate. Only a server runs it — a phone with its own key and the demo

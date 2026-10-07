@@ -429,10 +429,10 @@ const intIn = (v, lo, hi) => (Number.isInteger(v) && v >= lo && v <= hi ? v : un
 // The app's defaults for the goals it reads as null (frontend/src/lib/health.js, nutrition.js).
 const TARGET_DEFAULTS = { steps: 8000, water: 2000, fib: 30 };
 
-export function healthSlice(S, from, to) {
+export function healthSlice(S, from, to, now = iso(new Date())) {
   if (!healthAllowed(S) || !from) return null;
   // Never more than twelve weeks, whatever window the caller asked for.
-  const floor = new Date((to || iso(new Date())) + 'T12:00:00');
+  const floor = new Date((to || now) + 'T12:00:00');
   floor.setDate(floor.getDate() - HEALTH_DAYS_MAX);
   const start = from > iso(floor) ? from : iso(floor);
   const inside = d => d && d >= start && (!to || d <= to);
@@ -470,7 +470,7 @@ export function healthSlice(S, from, to) {
   // Food only while tracking is on, and only for days that are over: today's total is still
   // growing, and read at lunchtime it would look like a deficit.
   const tracking = S.nutri?.on === false ? 'off' : S.nutri?.paused ? 'paused' : 'on';
-  const today = iso(new Date());
+  const today = now;
   const byDay = new Map();
   for (const m of tracking === 'on' ? list(S.meals) : []) {
     const d = m && typeof m === 'object' ? day(m.d) : null;
@@ -593,6 +593,116 @@ export function workoutMeta(S, workoutId) {
   };
 }
 
+/** The language a payload is written for: the app's, else the profile's, else English. */
+export const payloadLang = (S, lang) => langTag(lang) || word(S && S.lang, 16) || 'en';
+
+/* ---------- the day, the schedule, the volume, the names (docs/dev/COACH_QUALITY.md) ---------- */
+
+export const WEEKDAY_NAMES = Object.freeze(['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']);
+// Listed in `volume` even at zero: a muscle the plan never trains is the finding.
+export const MAJOR_MUSCLES = Object.freeze(['pectorals', 'lats', 'upper back', 'delts', 'biceps', 'triceps', 'quads', 'hamstrings', 'glutes', 'calves', 'abs']);
+const SCHEDULE_DAYS = 7;
+
+const weekdayOf = d => new Date(d + 'T12:00:00Z').getUTCDay();
+const plusDays = (d, n) => { const x = new Date(d + 'T12:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return iso(x); };
+/**
+ * Today as the app sees it. The app sends its own local date; the server's is UTC, which is
+ * yesterday for the first hours of a day east of Greenwich. A date that is not a real day, or is
+ * more than a day from the server's, is not the app's today — the server's stands in for it, as
+ * it does for a scheduled review that has no app behind it.
+ */
+export function todayFrom(client) {
+  const server = iso(new Date());
+  const d = typeof client === 'string' ? day(client) : null;
+  if (!d || d !== client.trim() || iso(new Date(d + 'T12:00:00Z')) !== d) return server;
+  return Math.abs(dayIndex(d) - dayIndex(server)) <= 1 ? d : server;
+}
+
+/**
+ * What is planned on a day, the way the Home screen reads it (effectiveRoutineIds): the day's own
+ * choice first — a rest day included — then the weekly plan. Today and the six days after it.
+ */
+function scheduleSlice(S, today) {
+  const routines = new Map(list(S.routines).filter(r => r && typeof r === 'object' && typeof r.id === 'string').map(r => [r.id, r]));
+  const weekly = [0, 1, 2, 3, 4, 5, 6].some(d => [].concat(S.week?.[d] ?? []).some(id => routines.has(id)));
+  const on = date => {
+    const own = S.dayPlan && typeof S.dayPlan === 'object' ? S.dayPlan[date] : undefined;
+    if (own === 'rest') return [];
+    if (typeof own === 'string' && routines.has(own)) return [own];
+    return [].concat(S.week?.[weekdayOf(date)] ?? []).filter(id => routines.has(id));
+  };
+  const named = ids => ids.map(id => ({ id: ident(id), name: text(String(routines.get(id).name ?? ''), NAME_MAX) }));
+  const upcoming = Array.from({ length: SCHEDULE_DAYS }, (_, i) => {
+    const date = plusDays(today, i);
+    return { date, weekday: weekdayOf(date), routines: named(on(date)) };
+  });
+  return { weekly, today: upcoming[0].routines, upcoming };
+}
+
+/**
+ * The plan's weekly volume per target muscle, as written: sets, the days that train it and the
+ * exercises that do. From the weekly schedule; a plan with none is counted as one round of its
+ * routines. A plan can be read this way before it was ever trained.
+ */
+function volumeSlice(S, nameOf) {
+  const routines = new Map(list(S.routines).filter(r => r && typeof r === 'object' && typeof r.id === 'string').map(r => [r.id, r]));
+  const days = [0, 1, 2, 3, 4, 5, 6].map(d => [].concat(S.week?.[d] ?? []).filter(id => routines.has(id)));
+  const weekly = days.some(ids => ids.length);
+  const sessions = weekly
+    ? days.flatMap((ids, d) => ids.map(id => ({ d, r: routines.get(id) })))
+    : [...routines.values()].map((r, i) => ({ d: i, r }));
+  const acc = new Map();
+  for (const { d, r } of sessions) {
+    for (const e of list(r.ex)) {
+      const lib = e && LIB_BY_ID.get(e.id);
+      if (!lib || !lib.tg || modeOf(e, lib) === 'cardio') continue;
+      const a = acc.get(lib.tg) || { sets: 0, days: new Set(), exercises: [] };
+      a.sets += num(e.sets) || 0;
+      a.days.add(d);
+      const name = nameOf(e.id);
+      if (!a.exercises.includes(name)) a.exercises.push(name);
+      acc.set(lib.tg, a);
+    }
+  }
+  const muscles = [...new Set([...MAJOR_MUSCLES, ...acc.keys()])].map(m => {
+    const a = acc.get(m);
+    return { muscle: m, sets: a ? a.sets : 0, days: a ? a.days.size : 0, exercises: a ? a.exercises : [] };
+  });
+  return { basis: weekly ? 'week' : 'rotation', muscles };
+}
+
+// A name from the app's pack for a catalogue exercise, cut like any other name; null when the
+// pack has none. The pack is the app's own data, but it arrives from outside this module.
+const translated = (names, id) => {
+  const v = names && typeof names === 'object' ? names[id] : undefined;
+  return typeof v === 'string' && v.trim() ? v.trim().slice(0, NAME_MAX) : null;
+};
+/**
+ * The app's names written over the catalogue's English wherever the payload names an exercise.
+ * The library slice holds the catalogue's own objects, so its entries are copied, never edited;
+ * a custom exercise keeps the name its owner typed.
+ */
+function localize(p, names) {
+  const fix = en => {
+    if (!en || typeof en !== 'object' || !LIB_BY_ID.has(en.id)) return;
+    const t = translated(names, en.id);
+    if (t) en.name = t;
+  };
+  const entries = w => list(w?.entries).forEach(fix);
+  list(p.plan?.routines).forEach(r => list(r.ex).forEach(fix));
+  list(p.window?.workouts).forEach(entries);
+  if (p.session) entries(p.session);
+  list(p.previous).forEach(entries);
+  list(p.aggregates?.exercises).forEach(fix);
+  list(p.history?.workingWeights).forEach(fix);
+  if (Array.isArray(p.library)) {
+    p.library = p.library.map(e => {
+      const t = e && !e.custom && LIB_BY_ID.has(e.id) ? translated(names, e.id) : null;
+      return t ? { ...e, n: t } : e;
+    });
+  }
+}
+
 /**
  * Build a job payload.
  *
@@ -608,6 +718,7 @@ export function build(S, opts = {}) {
   if (typeof opts.handle !== 'string' || !opts.handle) throw new Error('payload.build: opts.handle is required');
   const coach = S.coach || {};
   const profile = opts.intake || coach.profile || null;
+  const today = todayFrom(opts.today);
   const p = {
     coach_contract: CONTRACT,
     task: opts.kind === 'review' || opts.kind === 'debrief' || opts.kind === 'chat' ? opts.kind : 'create',
@@ -616,15 +727,23 @@ export function build(S, opts = {}) {
       // Both are short codes in any real state; cut anyway, since the state is the client's.
       // `opts.lang` is the language the app is showing when it asked: a profile that never
       // picked one has it worked out per device and never stored (#303).
-      lang: langTag(opts.lang) || word(S.lang, 16) || 'en',
+      lang: payloadLang(S, opts.lang),
       unit: word(S.unit, 8) || 'kg',
       effortScale: effortOf(S),
-      today: iso(new Date())
+      // The app's date and its weekday, so no answer ever works a weekday out from a date
+      // (docs/dev/COACH_QUALITY.md). 0 is Sunday, as in `plan.week`.
+      today,
+      weekday: weekdayOf(today),
+      weekdayName: WEEKDAY_NAMES[weekdayOf(today)]
     },
     coachProfile: profile && typeof profile === 'object' ? cleanProfile(profile) : null,
     plan: cleanPlan(S)
   };
   { const season = seasonSlice(S, p.meta.today); if (season) p.season = season; }
+  // What is planned today and in the next days, read the way the app reads it; and the plan's
+  // weekly volume per muscle, so a plan can be judged before it was ever trained.
+  if (opts.kind === 'review' || opts.kind === 'chat' || opts.kind === 'debrief') p.schedule = scheduleSlice(S, today);
+  if (opts.kind === 'review' || opts.kind === 'chat') p.volume = volumeSlice(S, id => translated(opts.names, id) || libraryName(id));
 
   // What the user already turned down, so the Coach does not re-propose it without new
   // evidence (FR-26). Summaries only — the log's full before/after stays on the device.
@@ -659,7 +778,7 @@ export function build(S, opts = {}) {
       // The week up to and including the session: the nights before it and what was eaten.
       if (dated) {
         const wk = new Date(on + 'T12:00:00'); wk.setDate(wk.getDate() - 6);
-        const h = healthSlice(S, iso(wk), on);
+        const h = healthSlice(S, iso(wk), on, today);
         if (h) p.health = h;
       }
     } else {
@@ -681,7 +800,7 @@ export function build(S, opts = {}) {
     };
     p.aggregates = aggregates(S, workouts);
     p.bodyweight = { goal: num(S.targetW) ?? null, series: weighIns(S, p.window.from, null) };
-    { const h = healthSlice(S, p.window.from, null); if (h) p.health = h; }
+    { const h = healthSlice(S, p.window.from, null, today); if (h) p.health = h; }
     if (opts.note) p.userNote = String(opts.note).slice(0, MAX_NOTE_CHARS);
     if (opts.kind === 'chat' && opts.message) p.message = String(opts.message).slice(0, MAX_NOTE_CHARS);
     if (opts.kind === 'chat') { const w = waitingSlice(opts.waiting); if (w) p.waiting = w; }
@@ -717,6 +836,8 @@ export function build(S, opts = {}) {
     const said = conversation(coach, [opts.note, opts.refine, opts.message], opts.kind === 'chat' ? CHAT_CONVERSATION : null);
     if (said.length) p.conversation = said;
   }
+  // Last, over everything above: the app's exercise names in place of the catalogue's English.
+  if (opts.names) localize(p, opts.names);
   return p;
 }
 

@@ -148,6 +148,13 @@ if (kind === 'chat') {
       deleteEverything: true
     });
   }
+  // The day and the names as the payload gives them (docs/dev/COACH_QUALITY.md): what a model
+  // would read off `meta`, `schedule` and the plan, never work out.
+  if (/what('s| is) (on )?today|что сегодня/i.test(msg)) {
+    const today = (P.schedule?.today || []).map(r => r.name).join(', ') || 'a rest day';
+    const first = P.plan?.routines?.[0]?.ex?.[0]?.name || 'nothing';
+    out({ coach_contract: 1, reply: 'answer', text: `Today is ${P.meta?.weekdayName} (${P.meta?.today}): ${today}. The plan opens with ${first}.` });
+  }
   if (/where|где/i.test(msg)) {
     out({ coach_contract: 1, reply: 'answer', text: 'Settings, under Health & food.', open: ['settings.health', 'nowhere', 'settings.health', 'health', 'stats'] });
   }

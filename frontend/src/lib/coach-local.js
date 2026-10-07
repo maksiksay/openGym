@@ -29,6 +29,7 @@ import { planHash } from './coach.js'
 import { tco } from './coach-i18n.js'
 import { todayISO } from './format.js'
 import { t, getLang } from './i18n.js'
+import { exerciseNamePack } from './i18n-core.js'
 
 export const ADAPTERS = { anthropic, openai, gemini, compatible }
 export const LOCAL_DAILY_CAP = 10
@@ -158,7 +159,10 @@ async function run(S, kind, opts, d, adapter) {
   const key = await getApiKey()
   const payload = payloadLib.build(S, {
     handle: await handle(), kind, intake: opts.intake, note: opts.note, refine: opts.refine, message: opts.message, waiting: opts.waiting, photo: !!opts.photo, previous: opts.previous, workoutId: opts.workoutId,
-    lang: getLang()   // what the app shows, which a profile that never picked a language does not store (#303)
+    lang: getLang(),   // what the app shows, which a profile that never picked a language does not store (#303)
+    // The app's own date and its exercise names in that language (docs/dev/COACH_QUALITY.md).
+    today: todayISO(),
+    names: exerciseNamePack()
   })
   const attempt = await runPipeline({
     adapter, cfg: cfgOf(d), kind, payload,

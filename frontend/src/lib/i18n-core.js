@@ -64,6 +64,10 @@ let enOnly = false                // whether translated names are replaced entir
 let version = 0                 // bumped on every setLang; drives the React subscription selector
 
 export const getLang = () => lang
+// The app's own exercise names in its language, for the phone's own Coach to name exercises the
+// way the app shows them (docs/dev/COACH_QUALITY.md). null in English, and when the profile shows
+// the English names only.
+export const exerciseNamePack = () => (enOnly ? null : exerciseNames)
 export const dateLocale = () => DATE_LOCALES[lang] || 'en-GB'
 export const getVersion = () => version
 

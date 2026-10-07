@@ -15,6 +15,7 @@ import { buildPrompt, buildPromptParts } from './prompt.js';
 import { SCHEMAS } from './schemas.js';
 import { extractJSON, contractOK } from './parse.js';
 import { validatePlan, validateReview, validateDebrief, validateChat } from './validate.js';
+import { answerIssues } from './lang-check.js';
 
 /**
  * One attempt: prompt → provider → parse → validate.
@@ -72,19 +73,37 @@ export async function attemptOnce({ adapter, cfg, kind, payload, model, timeoutM
     });
 
   if (!checked.ok) return { ok: false, repairable: !repair, errors: checked.errors, raw: r.text, errorClass: 'unusable' };
-  if (checked.meal) return { ok: true, meal: checked.meal };
-  if (checked.log) return { ok: true, log: checked.log };
-  if (checked.nochange) return { ok: true, nochange: true, reading: checked.reading, ...(checked.open ? { open: checked.open } : {}) };
-  return { ok: true, result: checked.proposal || { bundle: checked.bundle, summary: checked.bundle.summary } };
+  // `raw` rides along on an accepted answer only as far as runPipeline, for the language round.
+  if (checked.meal) return { ok: true, meal: checked.meal, raw: r.text };
+  if (checked.log) return { ok: true, log: checked.log, raw: r.text };
+  if (checked.nochange) return { ok: true, nochange: true, reading: checked.reading, ...(checked.open ? { open: checked.open } : {}), raw: r.text };
+  return { ok: true, result: checked.proposal || { bundle: checked.bundle, summary: checked.bundle.summary }, raw: r.text };
 }
 
-/** The whole loop: one attempt, then one repair round if the answer was fixable (FR-48). */
+// What kind of answer a result is, so the language round cannot turn an answer into a meal card.
+const kindOf = a => (a.meal ? 'meal' : a.log ? 'log' : a.nochange ? 'nochange' : 'result');
+const bare = ({ raw, ...rest }) => rest;
+
+/**
+ * The whole loop: one attempt, then one repair round if the answer was fixable (FR-48) — or, when
+ * an accepted answer's text has slips a reader would notice, one language round
+ * (docs/dev/COACH_QUALITY.md). Never both: at most two calls a job.
+ */
 export async function runPipeline(opts) {
   let attempt = await attemptOnce(opts, null);
   if (!attempt.ok && attempt.repairable) {
     // One repair round, then done. Two failures is a provider problem, not a prompting
     // problem, and a retry loop against a paid API is a bad way to find out.
     attempt = await attemptOnce(opts, { previous: attempt.raw, errors: attempt.errors });
+    return attempt.ok ? bare(attempt) : attempt;
   }
-  return attempt;
+  if (!attempt.ok) return attempt;
+  const lang = opts.payload?.meta?.lang;
+  const issues = answerIssues(bare(attempt), lang);
+  if (!issues.length) return bare(attempt);
+  // The second answer has to be valid, the same kind and cleaner; anything else, and the first —
+  // already accepted — stands. A language round never turns a good job into a failed one.
+  const second = await attemptOnce(opts, { previous: attempt.raw, errors: issues, language: true });
+  if (second.ok && kindOf(second) === kindOf(attempt) && answerIssues(bare(second), lang).length < issues.length) return bare(second);
+  return bare(attempt);
 }

@@ -57,9 +57,14 @@ export const PROVIDERS = {
   // reads it from its environment and from nothing else, which is what makes the sanitised env
   // the only channel a credential can travel down. `claude setup-token` mints the long-lived
   // token that rides in CLAUDE_CODE_OAUTH_TOKEN — hence setupToken rather than a device login.
+  // `defaultModel`: with none chosen, the runtime picked its own, which on the subscription it is
+  // signed in with was an older Sonnet. Opus 5.5 needs the Agent SDK this image now carries
+  // (^0.3.293, Claude Code 2.1.280+); a model set in Admin → AI Coach still wins
+  // (docs/dev/COACH_QUALITY.md).
   claude: {
     label: 'Claude (Anthropic)', runtime: 'Claude Agent SDK',
-    apiKeyEnv: 'ANTHROPIC_API_KEY', oauthEnv: 'CLAUDE_CODE_OAUTH_TOKEN', setupToken: true
+    apiKeyEnv: 'ANTHROPIC_API_KEY', oauthEnv: 'CLAUDE_CODE_OAUTH_TOKEN', setupToken: true,
+    defaultModel: 'claude-opus-5-5'
   },
   // Codex keeps a refreshable login cache in $CODEX_HOME rather than taking a token on the
   // environment, so it is the one provider that needs somewhere durable to write. That

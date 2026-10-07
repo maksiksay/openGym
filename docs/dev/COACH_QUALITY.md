@@ -30,13 +30,15 @@ Coach is given, not only in the model.
   local `YYYY-MM-DD`. The server takes it when it is within one day of its own UTC date, and its
   UTC date otherwise. A scheduled review has no app behind it and uses the UTC date.
 - **`meta.weekday`**: 0 = Sunday … 6 = Saturday, with **`meta.weekdayName`** in English.
-- **`plan.today`**: the routines planned for today, as `{ id, name }`, empty for a rest day.
-  The day's own choice comes first (`dayPlan`, a rest day included), then the weekly plan, the
-  same order the Home screen uses (`effectiveRoutineIds`).
-- **`plan.upcoming`**: today and the six days after it, each `{ date, weekday, routines }`.
+- **`schedule`**, next to `plan` rather than inside it (the validator reads `plan` for changes):
+  - `today`: the routines planned for today, as `{ id, name }`, empty for a rest day. The day's
+    own choice comes first (`dayPlan`, a rest day included), then the weekly plan, the same order
+    the Home screen uses (`effectiveRoutineIds`);
+  - `upcoming`: today and the six days after it, each `{ date, weekday, routines }`;
+  - `weekly`: false when there is no weekly plan and the routines rotate.
 - **The rule, in common.md:** weekday numbers are 0 = Sunday … 6 = Saturday; today is
-  `meta.today`; what is planned on a day comes from `plan.today` and `plan.upcoming`; never work
-  out a weekday from a date.
+  `meta.today`; what is planned on a day comes from `schedule`; never work out a weekday from a
+  date.
 
 ## The names
 
@@ -61,7 +63,7 @@ Coach is given, not only in the model.
 
 ## Reading a plan before any session
 
-- **`plan.volume`**: for each target muscle, the weekly sets, the days that train it and the
+- **`volume`** (a review's and a chat's): for each target muscle, the weekly sets, the days that train it and the
   exercises that do, as `{ muscle, sets, days, exercises }`.
   - It is counted from the weekly plan. A plan with no weekly schedule counts one round of its
     routines and says so (`basis: 'rotation'`).
@@ -100,7 +102,7 @@ Coach is given, not only in the model.
 
 ## The model
 
-- **The SDK.** `@anthropic-ai/claude-agent-sdk` goes to ^0.3.292, which carries Claude Code 2.1.280
+- **The SDK.** `@anthropic-ai/claude-agent-sdk` goes to ^0.3.293, which carries Claude Code 2.1.280
   or newer, the first that runs Claude Opus 5.5.
 - **The default.** `PROVIDERS.claude.defaultModel` is `claude-opus-5-5`. A model chosen in Admin →
   AI Coach still wins.
@@ -110,10 +112,10 @@ Coach is given, not only in the model.
 - **`scripts/build-coach-assets.mjs`:** the name packs, written and checked.
 - **`api/coach/names/*.js`** (generated) and **`api/coach/names.js`** (the loader).
 - **`api/coach/core/payload.js`:**
-  - `today` and `names` in `build`;
+  - `today` and `names` in `build` (`todayFrom`, `payloadLang`);
   - `meta.weekday`, `meta.weekdayName`;
-  - `plan.today`, `plan.upcoming`, `plan.volume`;
-  - the names written in.
+  - `schedule` and `volume`;
+  - the names written in (`localize`), the health slice on the same today.
 - **`api/coach/core/lang-check.js`**, **`api/coach/core/pipeline.js`**,
   **`api/coach/prompts/language.md`**.
 - **`api/coach/prompts/common.md`, `review.md`, `chat.md`**, and `core/prompts.js` regenerated.
@@ -140,18 +142,24 @@ Coach is given, not only in the model.
 - **`api/test/payload-quality.test.js`:**
   - the client's date is taken or refused;
   - the weekday;
-  - `plan.today` with a day override and a rest day;
-  - `plan.upcoming`;
-  - `plan.volume` from a weekly plan and from a rotation;
+  - `schedule.today` with a day override and a rest day;
+  - `schedule.upcoming`, a legacy one-id weekday, no weekly plan;
+  - `volume` from a weekly plan and from a rotation;
   - names in each place, a custom exercise's own name, and no pack.
+- **`api/test/coach-quality-job.test.js`:** the name packs load by tag; a chat job through the queue
+  and the fixture provider reads the app's day, today's routine and the app's names, and without
+  them the server's day and the catalogue's.
+- **`api/test/config-migration.test.js`:** the Claude runtime defaults to Opus 5.5; a chosen model
+  wins.
 - **Generated files.** `node scripts/build-coach-assets.mjs --check`; prompts.test.js keeps passing.
 - **Frontend.**
-  - `today` is in the request bodies;
-  - the phone's Coach passes the pack and the date.
+  - `exerciseNamePack` is the loaded pack, and nothing in English or with English names only;
+  - the phone's Coach puts the app's date, the pack's names and the schedule in its payload.
 
 ## Not in this round
 
 - Names for a language with no pack in the app.
 - A model-graded check of the language (only the deterministic one above).
+- The direct Anthropic API provider (an API key, not the Agent SDK) keeps its own default model.
 - Moving the weekly plan's keys to day names: the plan, the validator and every change type speak
   `getDay()` numbers, and the payload now says what they mean.

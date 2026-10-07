@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   LANGS, INSTR_LANGS, EXERCISE_NAME_LANGS, DATE_LOCALES, DERIVED_LOCALES,
-  baseLang, derivePack, dateLocale, getLang, t, _setLangState, exerciseNameClass, exerciseNameFor, CASED_NAME_LANGS
+  baseLang, derivePack, dateLocale, getLang, t, _setLangState, exerciseNameClass, exerciseNameFor, CASED_NAME_LANGS, exerciseNamePack
 } from './i18n-core.js'
 import { EXDB } from './exercises-data.js'
 import de from '../locales/de.js'
@@ -211,5 +211,17 @@ describe('English-name switches with every exercise-name pack', () => {
       expect(exerciseNameClass(ex)).toBe('capitalize')
     }
     _setLangState('en', {}, null, null)
+  })
+})
+
+describe('exerciseNamePack (docs/dev/COACH_QUALITY.md)', () => {
+  it('is the loaded pack, and nothing in English or with English names only', () => {
+    const pack = { '0025': 'жим штанги лёжа' }
+    _setLangState('ru', {}, null, pack)
+    expect(exerciseNamePack()).toBe(pack)
+    _setLangState('ru', {}, null, pack, true, true)
+    expect(exerciseNamePack()).toBe(null)
+    _setLangState('en', {}, null, pack)
+    expect(exerciseNamePack()).toBe(null)
   })
 })

@@ -78,7 +78,7 @@ export function coachRoutes({ json, readBody, readSession, requireAdmin }) {
         const job = jobs.enqueue(user.id, {
           kind: 'create',
           intake: body.intake || null,
-          lang: body.lang,
+          lang: body.lang, today: body.today,
           refine: body.refine ? String(body.refine).slice(0, cfgStore.MAX_MESSAGE_LEN_CEILING) : null
         });
         json(res, 202, { job });
@@ -91,7 +91,7 @@ export function coachRoutes({ json, readBody, readSession, requireAdmin }) {
       try {
         const job = jobs.enqueue(user.id, {
           kind: 'review',
-          lang: body.lang,
+          lang: body.lang, today: body.today,
           note: body.note ? String(body.note).slice(0, cfgStore.MAX_MESSAGE_LEN_CEILING) : null
         });
         json(res, 202, { job });
@@ -113,7 +113,7 @@ export function coachRoutes({ json, readBody, readSession, requireAdmin }) {
       }
       if (!message && !photo) return json(res, 400, { error: 'message is required' });
       try {
-        const job = jobs.enqueue(user.id, { kind: 'chat', lang: body.lang, message, photo });
+        const job = jobs.enqueue(user.id, { kind: 'chat', lang: body.lang, today: body.today, message, photo });
         json(res, 202, { job });
       } catch (e) { failEnqueue(res, e); }
     },
@@ -123,7 +123,7 @@ export function coachRoutes({ json, readBody, readSession, requireAdmin }) {
       const user = guard(req, res); if (!user) return;
       const body = await readBody(req);
       try {
-        const job = jobs.enqueue(user.id, { kind: 'debrief', lang: body.lang, workoutId: body.workoutId ? String(body.workoutId).slice(0, 40) : null });
+        const job = jobs.enqueue(user.id, { kind: 'debrief', lang: body.lang, today: body.today, workoutId: body.workoutId ? String(body.workoutId).slice(0, 40) : null });
         json(res, 202, { job });
       } catch (e) { failEnqueue(res, e); }
     },

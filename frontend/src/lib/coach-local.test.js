@@ -92,6 +92,22 @@ describe('the Coach on a phone with its own key', () => {
     expect(wire.calls[0].body.messages[0].content).toContain('# Task: answer a message in the chat')
   })
 
+  it('the payload carries the app\'s own date and its exercise names (docs/dev/COACH_QUALITY.md)', async () => {
+    const { _setLangState } = await import('./i18n-core.js')
+    _setLangState('ru', {}, null, { [EX]: 'тестовое упражнение' })
+    try {
+      wire.answer = chat(JSON.stringify({ coach_contract: 1, reply: 'answer', text: 'Сегодня отдых.' }))
+      await local.localChat(state(), 'что сегодня?')
+      await settle()
+      const sent = wire.calls[0].body.messages[1].content
+      expect(sent).toContain(`"today":"${todayISO()}"`)
+      expect(sent).toContain('"name":"тестовое упражнение"')
+      expect(sent).toContain('"schedule":')
+    } finally {
+      _setLangState('en', {}, null, null)
+    }
+  })
+
   it('a chat answer reads the proposal waiting on the phone, and leaves it waiting', async () => {
     await local.localReview(state())
     const first = await settle()

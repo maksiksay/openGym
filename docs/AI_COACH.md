@@ -171,6 +171,10 @@ here, under the same chip; the setup token is the route for a Claude subscriptio
 The card also states two things worth reading before anyone uses it: whether jobs actually run
 unprivileged, and which account is being spent.
 
+With no model chosen, the Claude runtime answers with Claude Opus 5.5, which needs the Agent SDK
+this image installs (0.3.293 or newer). A model typed into the card's model field wins:
+`claude-sonnet-5-5`, for example, answers faster and spends less of a subscription.
+
 **4. Use it** — as above.
 
 > **On a multi-profile instance, read [Whose account pays](#whose-account-pays) first.** An API

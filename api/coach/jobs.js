@@ -30,6 +30,7 @@ import { fetchFor } from './node-fetch.js';
 import { canDropPrivileges, unprivilegedIds } from './adapters/spawn.js';
 import { cohortForPayload, invalidate as invalidateCohort } from './cohort.js';
 import { FOOD_WEB_NOTE } from './core/adapters/anthropic.js';
+import { namesFor } from './names.js';
 
 // The prompt assembly, the plan fingerprint and the invoke→parse→validate→repair loop all
 // live in ./core now, where the phone can import them too. Re-exported so nothing that
@@ -260,6 +261,7 @@ export function enqueue(uid, opts) {
     // dropped when the job ends (docs/dev/COACH_VOICE_PHOTO.md).
     photo: opts.photo && typeof opts.photo.data === 'string' ? { mediaType: opts.photo.mediaType, data: opts.photo.data } : null,
     lang: payloadLib.langTag(opts.lang),              // the language the app was showing (#303)
+    today: typeof opts.today === 'string' ? opts.today.slice(0, 10) : null, // the app's own date (docs/dev/COACH_QUALITY.md)
     state: 'queued',
     startedAt: Date.now()
   };
@@ -346,6 +348,9 @@ async function execute(job) {
   const pendingCreate = job.refine ? readUser(job.uid).pending : null;
   // A chat reads the proposal still waiting, so a question can be about it.
   const waiting = job.kind === 'chat' ? readUser(job.uid).pending : null;
+  // The app says which language it is in. A scheduled review has no app behind it: a profile
+  // that never picked a language then gets the instance's DEFAULT_LANG, like its screens do.
+  const lang = job.lang || (S.langAuto === true ? payloadLib.langTag(process.env.DEFAULT_LANG) : null);
   const payload = payloadLib.build(S, {
     handle: handleFor(job.uid),
     kind: job.kind,
@@ -357,9 +362,11 @@ async function execute(job) {
     photo: !!job.photo,
     previous: pendingCreate?.bundle || null,
     workoutId: job.workoutId,
-    // The app says which language it is in. A scheduled review has no app behind it: a profile
-    // that never picked a language then gets the instance's DEFAULT_LANG, like its screens do.
-    lang: job.lang || (S.langAuto === true ? payloadLib.langTag(process.env.DEFAULT_LANG) : null),
+    lang,
+    // The app's own date when it sent one, and its exercise names in that language
+    // (docs/dev/COACH_QUALITY.md).
+    today: job.today,
+    names: await namesFor(payloadLib.payloadLang(S, lang)),
     // The room's medians ride along on a review or a debrief when the admin allows it and
     // this person opted in; null otherwise, and the payload then carries no `cohort` at all.
     cohort: (job.kind === 'review' || job.kind === 'debrief') ? cohortForPayload(job.uid) : null

@@ -103,3 +103,14 @@ test('jobEnv carries only the active provider\'s key under its own variable', ()
   assert.equal(env.OPENAI_API_KEY, undefined);
   assert.deepEqual(Object.keys(env).sort(), ['GEMINI_API_KEY', 'HOME', 'PATH', 'TMPDIR']);
 });
+
+// docs/dev/COACH_QUALITY.md: the Agent SDK runtime has a default of its own now, Opus 5.5, and a
+// model chosen in Admin → AI Coach still wins over it.
+test('the Claude runtime defaults to Opus 5.5, and a chosen model wins', () => {
+  cfg.save({ provider: 'claude' });
+  cfg.saveModel('claude', null);
+  assert.equal(cfg.modelFor(), 'claude-opus-5-5');
+  cfg.saveModel('claude', 'claude-sonnet-5-5');
+  assert.equal(cfg.modelFor(), 'claude-sonnet-5-5');
+  cfg.saveModel('claude', null);
+});

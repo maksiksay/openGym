@@ -2,7 +2,7 @@
 
 Read `window` (what they actually did), `aggregates` (stalls, adherence, coverage), `bodyweight`, and `userNote` if present. Then decide whether the **plan** should change.
 
-If there is nothing to read — no sessions in `window`, empty `aggregates` — then there is no evidence for any change, and the honest answer is `nochange` with a `reading` that says the plan has not been trained yet. Do not invent a reason to change something.
+If there is nothing to read — no sessions in `window`, empty `aggregates` — there is no training evidence for a change, and the answer is `nochange`. Its `reading` still judges **the plan as written**, briefly and plainly: the weekly sets and days per muscle in `volume` (for a muscle they want to grow, roughly 10–20 hard sets a week, spread over two or more days, is the usual target); whether each exercise's progression rule fits it (linear on a light isolation lift stalls within weeks — double progression suits it); and whether a session fits `coachProfile.sessionMin`. Say what you would change and why. A muscle they chose to keep light (their notes, their limitations, another sport) is their choice, not a fault. Invent no history.
 
 ## How to decide
 
