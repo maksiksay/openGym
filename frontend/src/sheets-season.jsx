@@ -11,6 +11,8 @@ import {
   pastSeasons, seasonResults, seasonState, setAnchors, startNow, startSeason, suggestAnchors,
 } from './lib/season.js'
 import { tsn, slotLabel, measureText, setText, changeText } from './lib/season-i18n.js'
+import { measureLevel } from './lib/strength-levels.js'
+import { tlv, levelName } from './lib/level-i18n.js'
 import { confirmSheet, starterPlanSheet } from './sheets.jsx'
 import Icon from './components/Icon.jsx'
 import { Button, Row, SelectRow } from './components/ui.jsx'
@@ -105,6 +107,19 @@ function AnchorLine({ S, season, slot, iso, results }) {
         {ch && ch.delta !== 0 && <span className="season-delta">{changeText(ch, unit)}</span>}
       </div>}
     {(detail || (results && p.fallback)) && <div className="muted small">{[detail, results && p.fallback ? tsn('best of the test week') : ''].filter(Boolean).join(' · ')}</div>}
+    {results && <AnchorLevel S={S} season={season} id={id} p={p} />}
+  </div>
+}
+
+/** An anchor's strength level in week 1 and at its test (docs/dev/STRENGTH_LEVELS.md), where its
+ *  exercise has a standard and there is a weigh-in to read it against. */
+export function AnchorLevel({ S, season, id, p }) {
+  const from = p.base ? measureLevel(S, id, p.base, season.start) : null
+  const to = p.test ? measureLevel(S, id, p.test, lastDay(season)) : null
+  if (!from && !to) return null
+  const up = from && to && to.level > from.level
+  return <div className="season-level">
+    {tlv('Level')}: {from ? levelName(from.level) : '—'} → <span className={up ? 'up' : ''}>{to ? levelName(to.level) : '—'}{up ? ' ↑' : ''}</span>
   </div>
 }
 

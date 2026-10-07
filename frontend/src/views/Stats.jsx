@@ -24,6 +24,7 @@ import {
   effortHistogram, isHardSet, HARD_RIR
 } from '../lib/effort.js'
 import { Button, Segmented, SelectRow } from '../components/ui.jsx'
+import StrengthLevelsCard from '../components/StrengthLevels.jsx'
 import { tappable } from '../lib/use-sheet-keyboard.js'
 import { isWarmupRow } from '../lib/workout-model.js'
 
@@ -481,6 +482,7 @@ export default function Stats() {
         <div className="muted small" style={{ marginTop: 4 }}>{t('See which lift is holding back the rest.')}</div></div>
       <Button size="sm" variant="tinted" trailingIcon="chevronRight" style={{ flexShrink: 0 }} onClick={() => nav('/structural-balance')}>{t('Open')}</Button>
     </div>}
+    {workouts.length > 0 && <StrengthLevelsCard S={S} />}
     {hasEffort(S) && <EffortCard S={S} />}
 
     <div className="cols">

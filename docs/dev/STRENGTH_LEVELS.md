@@ -44,11 +44,11 @@ men, 60 kg for women) and an exponent:
 threshold(bw) = t_ref · (bw / ref) ^ b
 ```
 
-- **Where the numbers come from.** The parameters were fitted to Strength Level's published
-  tables, by least squares in log space over the rows at 60–120 kg for men and 50–90 kg for women.
-- **How close it is.** Against those tables the model is off by a few kilograms at most (up to
-  8 kg on the leg press, at the ends of the range) and by one to three reps, and it is closest
-  near the reference weight.
+- **Where the numbers come from.** Both the threshold and the exponent were fitted to Strength
+  Level's published tables, by least squares in log space over the rows at 60–120 kg for men and
+  50–90 kg for women.
+- **How close it is.** Against those tables the model is within 3.5 kg on the main barbell lifts,
+  5 kg on the leg press and the shrug, and 1.5 reps.
 - **What is in the repository.** Only the model: 23 lifts × 2 sexes × 5 levels × (threshold,
   exponent). Strength Level's tables themselves are not copied in.
 - **Credit.** The source is named in the code and on screen.
