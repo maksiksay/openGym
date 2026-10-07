@@ -32,7 +32,8 @@ docs/      guides indexed in docs/README.md (FAQ, SELF_HOSTING*, MOBILE, AI_COAC
            card from a message or a photo, photos for Claude/Anthropic only; SEASONS: six-week blocks, four
            anchor lifts, a max-reps test in the last week, program changes at the boundary;
            STRENGTH_LEVELS: Beginner–Elite per lift relative to body weight, a fitted model;
-           HEALTH_IMPORT: steps and sleep from Apple Health via Shortcuts and an import key, steps goal).
+           HEALTH_IMPORT: steps and sleep from Apple Health via Shortcuts and an import key, steps goal;
+           WATER: a daily water counter, drinks from the food log counted in, a water goal).
 ```
 
 ## Commands
