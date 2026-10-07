@@ -29,7 +29,8 @@ docs/      guides indexed in docs/README.md (FAQ, SELF_HOSTING*, MOBILE, AI_COAC
            2×40 A/B starter plan, the next session without a weekly schedule; COACH_WEB: web search
            for the Coach's plans, reviews and chat, search only; COACH_CHAT: one chat job that answers,
            proposes plan changes or asks back; COACH_VOICE_PHOTO: dictation in the chat, a meal
-           card from a message or a photo, photos for Claude/Anthropic only).
+           card from a message or a photo, photos for Claude/Anthropic only; SEASONS: six-week blocks, four
+           anchor lifts, a max-reps test in the last week, program changes at the boundary).
 ```
 
 ## Commands
