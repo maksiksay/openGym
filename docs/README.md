@@ -54,6 +54,7 @@ Design notes for specific features, kept next to the code they describe:
 | [Coach chat](dev/COACH_CHAT.md) | The Coach decides whether a message is a question, a plan change or unclear |
 | [Coach voice, meals and photos](dev/COACH_VOICE_PHOTO.md) | Dictation in the chat, a meal logged from a message or a photo, and the fix that keeps a waiting proposal |
 | [Seasons](dev/SEASONS.md) | Six-week blocks with a max-reps test on four anchor lifts, results, and program changes at the boundary |
+| [Strength levels](dev/STRENGTH_LEVELS.md) | Beginner to Elite per lift, relative to body weight, from a model fitted to Strength Level's standards |
 
 ## Still stuck?
 

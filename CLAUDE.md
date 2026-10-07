@@ -30,7 +30,8 @@ docs/      guides indexed in docs/README.md (FAQ, SELF_HOSTING*, MOBILE, AI_COAC
            for the Coach's plans, reviews and chat, search only; COACH_CHAT: one chat job that answers,
            proposes plan changes or asks back; COACH_VOICE_PHOTO: dictation in the chat, a meal
            card from a message or a photo, photos for Claude/Anthropic only; SEASONS: six-week blocks, four
-           anchor lifts, a max-reps test in the last week, program changes at the boundary).
+           anchor lifts, a max-reps test in the last week, program changes at the boundary;
+           STRENGTH_LEVELS: Beginner–Elite per lift relative to body weight, a fitted model).
 ```
 
 ## Commands
