@@ -20,6 +20,11 @@ import { monthWins } from '../lib/scoreboard.js'
 import { ts, monthLabel } from '../lib/score-i18n.js'
 import { nextUp } from '../lib/rotation.js'
 import { tp } from '../lib/plan-i18n.js'
+import { ANCHOR_SLOTS, anchorProgress, change, seasonState } from '../lib/season.js'
+import { tsn, measureShort, changeShort } from '../lib/season-i18n.js'
+import { seasonSheet, seasonStartSheet } from '../sheets-season.jsx'
+import { EXIDX } from '../lib/exercises.js'
+import { exerciseNameFor } from '../lib/i18n.js'
 
 // The month's training days against the goal (docs/dev/SCOREBOARD.md), one dot a day: filled as
 // they are trained, past the goal in the second colour. A long goal reads as a bar instead.
@@ -34,6 +39,54 @@ function QuotaDots({ q }) {
 // Today's health at a glance: the morning check-in (or the question, before it is answered) and
 // the food so far against the goals. The card opens the Health screen; its two buttons go
 // straight to the two things done every day.
+/* The season (docs/dev/SEASONS.md): the week it is in and what the anchors have done, the test
+   week, the week off, or the invitation to start one. Above the quota: both are the long view. */
+function SeasonCard({ S }) {
+  const iso = todayISO()
+  const st = seasonState(S, iso)
+  const unit = S.unit || 'kg'
+  const card = (icon, tint, title, sub, onClick, extra = null) => <div className="card tappable season-card" style={{ cursor: 'pointer' }} {...tappable(onClick)}>
+    <div className="row between">
+      <div className="row grow" style={{ gap: 9, minWidth: 0 }}>
+        <span className="lrow-i" style={{ background: tint }}><Icon name={icon} /></span>
+        <div className="grow" style={{ minWidth: 0 }}>
+          <div className="ttl">{title}</div>
+          {sub && <div className="muted small">{sub}</div>}
+        </div>
+      </div>
+      <Icon name="chevronRight" className="chev" />
+    </div>
+    {extra}
+  </div>
+  if (st.phase === 'none') {
+    if (!(S.routines || []).length) return null
+    return card('flag', 'var(--indigo)', tsn('Start a season'), tsn('Six weeks with a test at the end, on four anchor lifts that stay through any change of program.'), seasonStartSheet)
+  }
+  const s = st.season
+  if (st.phase === 'upcoming') return card('moon', 'var(--teal)', tsn('Week off · Season {0} starts {1}', s.n, fmtDate(s.start, true)), null, seasonSheet)
+  if (st.phase === 'over') return card('trophy', 'var(--yellow)', tsn('Season {0} is over', s.n), tsn('See the results and pick what comes next.'), seasonSheet)
+  const test = st.phase === 'test'
+  const name = id => exerciseNameFor(EXIDX[id] || (S.customEx || []).find(e => String(e?.id) === String(id)) || { n: String(id) })
+  const rows = ANCHOR_SLOTS.filter(k => s.anchors?.[k]).map(k => {
+    const p = anchorProgress(S, s, s.anchors[k], iso)
+    const ch = change(p.base, p.best)
+    return <div key={k} className="season-row">
+      <span className="season-row-n">{name(s.anchors[k])}</span>
+      {test
+        ? <span className={'season-row-v' + (p.tested ? ' up' : '')}>{p.tested ? <><Icon name="checkCircle" />{measureShort(p.test, unit)}</> : tsn('to test')}</span>
+        : <span className="season-row-v">{p.best ? measureShort(p.best, unit) : tsn('not yet logged')}{ch && ch.delta > 0 && <b className="up"> {changeShort(ch)}</b>}</span>}
+    </div>
+  })
+  const weeks = <div className="season-weeks" aria-hidden="true">
+    {Array.from({ length: st.weeks }, (_, i) => <i key={i} className={(i < st.week ? 'on' : '') + (i === st.weeks - 1 ? ' test' : '')} />)}
+  </div>
+  return card(test ? 'target' : 'flag', test ? 'var(--orange)' : 'var(--indigo)',
+    test ? tsn('Season {0} · test week', s.n) : tsn('Season {0} · week {1} of {2}', s.n, st.week, st.weeks),
+    test ? tsn('The last set of each anchor is the test: as many reps as you can, one or two left in the tank.') : tsn('Test from {0}', fmtDate(st.testFrom, true)),
+    seasonSheet,
+    <>{weeks}{!!rows.length && <div className="season-rows">{rows}</div>}</>)
+}
+
 function HealthCard({ S, nav }) {
   const d = todayISO()
   const h = healthOn(S.health, d)
@@ -248,6 +301,8 @@ export default function Home() {
         ? t('No entries yet — log your weight to start the curve.')
         : t("No entries yet — log your weight to start the curve. It's also asked before every workout.")}</div>}
     </div>}
+
+    <SeasonCard S={S} />
 
     <div className="card tappable" style={{ cursor: 'pointer' }} {...tappable(() => calendarSheet())}>
       <div className="row between">

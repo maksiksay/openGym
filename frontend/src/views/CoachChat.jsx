@@ -36,7 +36,7 @@ import { cardMeals, cardPortions, cardStart } from '../lib/coach-meal.js'
 import { preparePhoto } from '../lib/coach-photo.js'
 import { th } from '../lib/health-i18n.js'
 import { SLOTS, SLOT_NAMES } from '../lib/nutrition.js'
-import { confirmSheet } from '../sheets.jsx'
+import { confirmSheet, askBeforeNewPlan } from '../sheets.jsx'
 import Icon from '../components/Icon.jsx'
 import { glyphOf } from '../lib/glyphs.js'
 import LineChart from '../components/LineChart.jsx'
@@ -407,7 +407,9 @@ function PlanCard({ p, S, update, toast, nav, refresh }) {
   const r = b.routines[Math.min(tab, b.routines.length - 1)]
   const weekDays = useMemo(() => new Set(Object.keys(b.week || {}).map(Number)), [b])
 
-  const accept = () => {
+  // A whole new plan in the middle of a season is asked about first (docs/dev/SEASONS.md).
+  const accept = () => askBeforeNewPlan(acceptNow)
+  const acceptNow = () => {
     try {
       let n = 0
       update(s => {

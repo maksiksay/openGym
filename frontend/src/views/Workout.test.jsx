@@ -2130,3 +2130,18 @@ describe('the start screen without a weekly plan', () => {
     expect(startFlow).toHaveBeenCalledWith(['B'])
   })
 })
+
+// docs/dev/SEASONS.md: in a season's test week the anchors' last work set is the test, and the
+// screen says above it what the test asks for.
+describe('a season\'s test set', () => {
+  it('is announced above the set, and only above it', async () => {
+    const bench = exercise('0025', [true, false, false])
+    bench.sets[2].test = true
+    await mount([bench, exercise('0091', [false, false])])
+    const labels = [...container.querySelectorAll('.setph.test')]
+    expect(labels).toHaveLength(1)
+    expect(labels[0].textContent).toContain('Season test · as many reps as you can, one or two left in the tank')
+    // in the third set's own block, right above its row
+    expect(labels[0].parentElement.querySelector('.setrow')).toBe(container.querySelectorAll('.setrow')[2])
+  })
+})

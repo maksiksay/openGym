@@ -1486,6 +1486,36 @@ body.chips-dragging *{cursor:inherit}
 .quota-dots i.extra{background:var(--yellow)}
 .quota-bar{height:6px;border-radius:3px;background:var(--surface-2);margin-top:10px;overflow:hidden}
 .quota-bar>i{display:block;height:100%;background:var(--acc);border-radius:3px}
+/* seasons (docs/dev/SEASONS.md) */
+.season-weeks{display:flex;gap:5px;margin-top:11px}
+.season-weeks i{flex:1;height:6px;border-radius:3px;background:var(--surface-2)}
+.season-weeks i.on{background:var(--acc)}
+.season-weeks i.test:not(.on){background:color-mix(in srgb,var(--orange) 35%,var(--surface-2))}
+.season-weeks i.test.on{background:var(--orange)}
+.season-rows{margin-top:10px;display:flex;flex-direction:column;gap:5px}
+.season-row{display:flex;justify-content:space-between;gap:10px;font-size:14px}
+.season-row-n{color:var(--label-2);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-transform:capitalize}
+.season-row-v{flex:none;font-variant-numeric:tabular-nums;display:inline-flex;align-items:center;gap:4px}
+.season-row-v .icn,.season-tested .icn{color:var(--green)}
+.season-row .up,.season-anchor-v .up{color:var(--green)}
+.season-anchors{display:flex;flex-direction:column;gap:12px;margin:4px 0 14px}
+.season-anchor{padding:10px 12px;border-radius:var(--r-md,12px);background:var(--surface)}
+.season-anchor-hd{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.season-slot{font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--label-3)}
+.season-tested{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--green)}
+.season-anchor-n{font-size:16px;font-weight:500;margin:2px 0 4px;text-transform:capitalize}
+.season-anchor-v{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:15px;font-variant-numeric:tabular-nums}
+.season-anchor-v .icn{color:var(--label-3);font-size:13px}
+.season-delta{font-size:13px;color:var(--green)}
+.season-note{font-size:14px;line-height:1.45;color:var(--label-2);margin:0 0 12px}
+.season-totals{margin:0 0 16px}
+.season-actions{display:flex;gap:8px;justify-content:center;margin-top:10px}
+.season-warn{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--yellow);padding:0 16px 8px}
+.season-past{margin:8px 0;padding:10px 12px;border-radius:var(--r-md,12px);background:var(--surface)}
+.season-past summary{cursor:pointer;font-weight:500}
+.season-past .season-anchors{margin-top:10px}
+.season-past .season-anchor{background:var(--surface-2)}
+.setph.test{color:var(--orange);display:flex;align-items:center;gap:6px}
 
 /* --- toast --- */
 #toast{

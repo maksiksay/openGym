@@ -30,6 +30,7 @@ import { markAllSetsDone, sessionHistory } from '../lib/backfill.js'
 import { bestSetFor } from '../lib/exercise-history.js'
 import { scoreExercise, rowMarks } from '../lib/scoreboard.js'
 import { ts, deltaText, markText, goalText } from '../lib/score-i18n.js'
+import { tsn } from '../lib/season-i18n.js'
 import { isWarmupRow, isDropSet, isRestPauseSet, dropsOf, clustersOf, addDrop, addCluster, removeDropAt, removeClusterAt, setDropAt, setClusterAt, nextDropWeight, nextBurstReps, isSideSet, makeSideSet, setSideField, toggleSide, addSideDrop, removeSideDropAt, setSideDropAt, addSideCluster, removeSideClusterAt, setSideClusterAt, WEIGHT_ORIGIN_MANUAL } from '../lib/workout-model.js'
 import { canMoveActiveWorkoutUnit, moveActiveWorkoutUnit } from '../lib/active-workout-order.js'
 import { nextOpenSet, workoutKeyAction } from '../lib/workout-keys.js'
@@ -594,6 +595,10 @@ function ExerciseBlock({ entryIdx, compact, dense, editing, onToggle, onToggleSi
         return <div key={i}>
           {isFirstWarmup && <div className="setph">{t('Warm-up')}</div>}
           {!warm && warmBefore && <div className="setsep" />}
+          {/* A season's test set (docs/dev/SEASONS.md): the anchor's last work set in the test week. */}
+          {s.test === true && !warm && <div className="setph test"><Icon name="target" />{timed
+            ? tsn('Season test · hold as long as you can, with a little left')
+            : tsn('Season test · as many reps as you can, one or two left in the tank')}</div>}
           {perSide && !warm && isSideSet(s) ? (
             // Unilateral work set: the number sits beside a two-row L/R stack, each side logged
             // and ticked on its own (issue #60).

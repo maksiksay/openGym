@@ -34,6 +34,8 @@ import { winsOf } from './lib/scoreboard.js'
 import { monthQuota, monthGoalOf, autoMonthGoal, MAX_MONTH_GOAL } from './lib/quota.js'
 import { ts, nWins, winChips, monthLabel } from './lib/score-i18n.js'
 import { tp } from './lib/plan-i18n.js'
+import { markTests, swapGuard } from './lib/season.js'
+import { tsn } from './lib/season-i18n.js'
 import { exerciseHistory } from './lib/exercise-history.js'
 import { policyFor, defaultIncrement, POLICIES_FOR, POLICY_NAME, POLICY_DESC, MAX_BW_SETS, weightIncrement } from './lib/progression.js'
 import { normalizeRepRange } from './lib/rep-range.js'
@@ -130,6 +132,23 @@ export function confirmSheet(opts) {
   ui().openSheet(close => <ConfirmDialog {...opts} close={close} />, { kind: 'center', ...(opts.locked ? { locked: true } : {}) })
 }
 
+/**
+ * Before a whole new plan replaces the season's — a starter plan, a plan file, a plan the Coach
+ * built (docs/dev/SEASONS.md): while a season runs, ask; otherwise just go. The rule is the
+ * person's own, so it is asked about and never enforced.
+ */
+export function askBeforeNewPlan(go) {
+  const guard = swapGuard(S(), todayISO())
+  if (!guard) { go(); return }
+  confirmSheet({
+    title: tsn('Season {0} runs until {1}', guard.season.n, fmtDate(guard.until, true)),
+    message: tsn('By your own rule the program changes at the boundary, and accessories can change any time. Change the plan now?'),
+    confirmText: tsn('Change it'),
+    cancelText: tsn('Keep the season’s plan'),
+    onConfirm: go
+  })
+}
+
 /* ============================ starter plan ============================ */
 // Plan names and blurbs live here, not in lib/starter.js: check-source-strings.mjs only finds
 // string literals written inside a t() call, so copy parked in the catalog and passed in as a
@@ -164,9 +183,9 @@ const dayList = days => new Intl.ListFormat(dateLocale()).format(days.map(d => t
 function StarterPlanChooser({ close }) {
   const week = useStore(s => s.S.week)
   const routines = useStore(s => s.S.routines)
-  const choose = (id, name) => {
+  const choose = (id, name) => { close(); askBeforeNewPlan(() => chooseNow(id, name)) }
+  const chooseNow = (id, name) => {
     const days = starterPlanDays(id)
-    close()
     // A confirmation is only worth showing when one of those days is actually occupied — by a
     // routine that still exists, not by a stale id the Plan already shows as "Rest".
     const taken = day => [].concat(week[day] || []).some(id => routines.some(r => r.id === id))
@@ -1784,9 +1803,9 @@ export const planImportSheet = bundle => ui().openSheet(close => <PlanImport bun
 
 function PlanImport({ bundle, close }) {
   const [schedule, setSchedule] = useState(false)
-  const apply = () => {
+  const apply = () => { close(); askBeforeNewPlan(applyNow) }
+  const applyNow = () => {
     update(s => mergePlan(s, bundle, { schedule }))
-    close()
     toast(t(bundle.routineCount === 1 ? 'Added {0} routine to your plan' : 'Added {0} routines to your plan', bundle.routineCount))
     nav('/plan')
   }
@@ -2212,7 +2231,10 @@ export function startFlow(routineIds) {
 }
 export function beginWorkout(routineIds, bw) {
   const st = S()
-  const { entries, routineIds: rids, routines } = buildCombinedEntries(st, routineIds)
+  const built = buildCombinedEntries(st, routineIds)
+  const { routineIds: rids, routines } = built
+  // In a season's test week, the anchors' last work sets are the test (docs/dev/SEASONS.md).
+  const entries = markTests(st, built.entries, todayISO())
   update(s => {
     s.active = {
       id: uid(), d: todayISO(), start: Date.now(),
@@ -2316,7 +2338,10 @@ function beginBackfill({ iso, time, durationMin, routineIds, replaceId }) {
   const st = S()
   const start = backfillStart(iso, time)
   const past = historyAsOf(st, { d: iso, start, replaceId })
-  const { entries, routineIds: rids, routines } = buildCombinedEntries(past, routineIds || [])
+  const built = buildCombinedEntries(past, routineIds || [])
+  const { routineIds: rids, routines } = built
+  // A day logged into a season's test week gets its test sets too, judged by what came before it.
+  const entries = markTests({ ...past, seasons: st.seasons }, built.entries, iso)
   update(s => {
     s.active = {
       id: uid(), d: iso, start,
@@ -2343,7 +2368,7 @@ function AddRoutineToSession({ close }) {
   if (!active) return null
   const inSession = new Set([].concat(active.routineIds || []))
   const add = r => {
-    const entries = buildSessionEntries(sessionHistory(st), r).map(e => ({ ...e, rid: r.id }))
+    const entries = markTests(st, buildSessionEntries(sessionHistory(st), r).map(e => ({ ...e, rid: r.id })), active.d || todayISO(), active.entries)
     update(s => {
       if (!s.active) return
       // A session kept out of progression as a whole (the header ⋮) keeps the routine's

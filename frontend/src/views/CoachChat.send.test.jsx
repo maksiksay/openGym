@@ -49,7 +49,7 @@ vi.mock('../lib/coach-api.js', () => ({
   awaitedJob: () => null,
   settleAwaited: vi.fn(),
 }))
-vi.mock('../sheets.jsx', () => ({ startFlow: vi.fn(), confirmSheet: vi.fn() }))
+vi.mock('../sheets.jsx', () => ({ startFlow: vi.fn(), confirmSheet: vi.fn(), askBeforeNewPlan: go => go() }))
 vi.mock('../lib/api.js', () => ({
   api: vi.fn(() => Promise.resolve({})),
   IS_APPLE: false, IS_ANDROID: false, BIO: 'biometrics',

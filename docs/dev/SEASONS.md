@@ -90,8 +90,10 @@ A card offers a season: "Start a season — six weeks, a test at the end". It op
 
 ### A season in its first five weeks
 
-A card reads "Season 1 · week 3 of 6 · test from 13 Nov". Each anchor shows week 1 → its best so
-far. An anchor not yet logged in the season says so.
+A card reads "Season 1 · week 3 of 6 · test from 13 Nov", with a bar of six weeks, the last one
+marked. Each anchor shows its best so far, short ("≈82 kg", "9 reps"), and how far it came since
+week 1 in per cent. An anchor not yet logged in the season says so. The season sheet has the full
+numbers: week 1 → best, in the unit and in per cent.
 
 ### The test week
 
@@ -144,7 +146,9 @@ season's plan**. Nothing is ever blocked; editing a routine is never asked about
 Payloads for a review, a chat and a plan carry `season`:
 
 ```js
-{ n, week, weeks, testWeek, anchors: [ids], until }
+{ n, week, weeks, testWeek, anchors: [ids], until }   // in a season
+{ n, weeks, anchors, weekOff: true, startsInDays }      // before it starts
+{ n, weeks, anchors, over: true }                       // past its last day, not yet closed
 ```
 
 It is computed in `payload.js` from `S.seasons`, a few lines that repeat `lib/season.js`'s
@@ -165,10 +169,11 @@ arithmetic, since the core cannot import the frontend.
 - **`frontend/src/lib/season-i18n.js`** and `.ru.js`: `tsn()`, the health-i18n pattern.
 - **`frontend/src/store/useStore.js`**: `seasons: []` in `DEF`.
 - **`frontend/src/sheets.jsx`**: `markTests` in `beginWorkout`, in the logging of a past workout and
-  in a routine added mid-session; the guard in `loadStarterPlan` and the plan import.
+  in a routine added mid-session; the guard, `askBeforeNewPlan`, on the starter plan chooser and
+  the plan import.
 - **`frontend/src/views/CoachChat.jsx`**: the guard on importing a Coach plan.
-- **`frontend/src/sheets-season.jsx`**: the start sheet, the season sheet (results, past seasons)
-  and the guard's question.
+- **`frontend/src/sheets-season.jsx`**: the start sheet (also used to change the anchors) and the
+  season sheet (results, past seasons).
 - **`frontend/src/views/Home.jsx`**: the season card, above the quota card.
 - **`frontend/src/views/Workout.jsx`**: the test line above a test set.
 - **`api/coach/core/payload.js`** (`season`) and `api/coach/prompts/common.md`.

@@ -496,6 +496,26 @@ export function waitingSlice(w) {
   };
 }
 
+/* ---------- the season ----------
+ * Six-week blocks with a test at the end (docs/dev/SEASONS.md): which week it is, whether it is the
+ * test week, and the anchor lifts that stay through every change of program. A few lines that
+ * repeat frontend/src/lib/season.js's arithmetic, which the core cannot import. */
+const SEASON_SLOTS = ['squat', 'hinge', 'press', 'pull'];
+const dayIndex = d => { const [y, m, dd] = d.split('-').map(Number); return Math.round(Date.UTC(y, m - 1, dd) / 864e5); };
+export function seasonSlice(S, today) {
+  const open = list(S.seasons).filter(x => x && typeof x === 'object' && !x.closed && day(x.start));
+  const s = open[open.length - 1];
+  if (!s || !day(today)) return null;
+  const weeks = Number.isInteger(s.weeks) && s.weeks > 0 && s.weeks <= 12 ? s.weeks : 6;
+  const anchors = SEASON_SLOTS.map(k => ident(s.anchors && s.anchors[k])).filter(v => v != null && v !== '');
+  const days = dayIndex(today) - dayIndex(day(s.start));
+  const base = { n: num(s.n) ?? null, weeks, anchors };
+  if (days < 0) return { ...base, weekOff: true, startsInDays: -days };
+  if (days >= weeks * 7) return { ...base, over: true };
+  const week = Math.floor(days / 7) + 1;
+  return { ...base, week, testWeek: week === weeks, until: iso(new Date((dayIndex(day(s.start)) + weeks * 7 - 1) * 864e5)) };
+}
+
 /* The room's medians are computed on this server, but from other people's synced workouts —
    state their own clients wrote. cohort.js keeps only catalogue exercises; this copy bounds
    every field again, so what reaches one person's prompt never depends on that filter alone. */
@@ -567,6 +587,7 @@ export function build(S, opts = {}) {
     coachProfile: profile && typeof profile === 'object' ? cleanProfile(profile) : null,
     plan: cleanPlan(S)
   };
+  { const season = seasonSlice(S, p.meta.today); if (season) p.season = season; }
 
   // What the user already turned down, so the Coach does not re-propose it without new
   // evidence (FR-26). Summaries only — the log's full before/after stays on the device.

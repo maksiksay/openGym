@@ -174,6 +174,10 @@ export const DEF = {
   // Training days a month the Home quota counts towards (lib/quota.js): null follows the plan,
   // four weeks of its training days; a number of your own holds whatever the plan says.
   monthGoal: null,
+  // Six-week seasons with a test at the end (lib/season.js, docs/dev/SEASONS.md): only each
+  // season's definition — its start, its anchor lifts and how it closed. Everything else about a
+  // season is read from the log.
+  seasons: [],
   // Structural Balance (views/StructuralBalance.jsx): which built-in ratio template is active,
   // and per-role exercise overrides keyed by `${templateId}:${roleId}` — see
   // lib/structuralBalance.js's overrideKey(). An override (`{ id, _ts }`, `id: null` once
