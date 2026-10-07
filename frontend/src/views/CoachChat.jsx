@@ -743,7 +743,7 @@ function MealCard({ m, S, update, nav }) {
           <input type="number" inputMode="decimal" min="0" max="5000" value={grams[i]} disabled={!tracking}
             aria-label={tco('Grams of {0}', r.name)}
             onChange={e => { const v = e.target.value; setGrams(g => g.map((x, j) => (j === i ? v : x))) }} />
-          <span>{th('g')}</span>
+          <span>{th(r.drink ? 'ml' : 'g')}</span>
         </label>
         <div className="meal-kcal">{r.kcal}</div>
       </div>)}

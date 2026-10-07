@@ -443,6 +443,23 @@ describe('get_health_log', () => {
     expect(r.food[0].meals.map(m => m.name)).toEqual(['Oats', 'Chicken'])
     expect(r.food[0].meals[0].slot).toBe('Breakfast')
   })
+  test('water is the counter plus the drinks of the food log, and a day with only water is no check-in', () => {
+    seed()
+    S.health.push({ d: '2026-07-25', t: 3, water: 1500 })
+    S.health[1].water = 1000
+    S.meals.push({ id: 'c', d: '2026-07-26', t: 3, slot: 'b', name: 'Kefir', g: 250, kcal: 100, p: 7.5, f: 2.5, c: 10, drink: true })
+    S.waterGoal = 2500
+    _seedStateForTests(S)
+    const r = call('get_health_log')
+    expect(r.days.map(d => d.date)).toEqual(['2026-07-20', '2026-07-26'])
+    expect(r.water).toEqual([
+      { date: '2026-07-25', total_ml: 1500, from_food_ml: 0 },
+      { date: '2026-07-26', total_ml: 1250, from_food_ml: 250 },
+    ])
+    expect(r.water_goal_ml).toBe(2500)
+    expect(r.averages).toMatchObject({ water_ml_per_day: 1375, days_with_water: 2, days_with_checkin: 2 })
+    delete S.waterGoal
+  })
   test('an empty log is empty, not an error', () => {
     const r = call('get_health_log', { from: '2026-07-01', to: '2026-07-02' })
     expect(r.days).toEqual([])

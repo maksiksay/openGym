@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { cleanField, setHealth, healthOn, mergeHealth, healthSeries, recentAverages, weeklyHealth, sleepVsTraining, meanOf } from './health.js'
 import { STEPS_GOAL_DEFAULT, stepsGoalOf, stepsSummary } from './health.js'
+import { addWater, drinksOn, hasWellbeing, waterGoalOf, waterOn, waterSeries, waterSummary, WATER_GOAL_CHOICES, WATER_GOAL_DEFAULT } from './health.js'
 
 describe('cleanField', () => {
   it('keeps values in range, drops the rest instead of clamping', () => {
@@ -120,5 +121,84 @@ describe('the steps goal', () => {
     expect(stepsSummary(S, '2026-10-08')).toEqual({ goal: 8000, yesterday: { d: '2026-10-07', steps: 8123, met: true }, avg: 7062, days: 2 })
     expect(stepsSummary(S, '2026-10-07').yesterday).toEqual({ d: '2026-10-06', steps: 6000, met: false })
     expect(stepsSummary({ health: [] }, '2026-10-08')).toEqual({ goal: 8000, yesterday: null, avg: null, days: 0 })
+  })
+})
+
+// docs/dev/WATER.md: the counter, drinks from the food log, the goal.
+
+describe('water', () => {
+  const drink = (d, g, extra = {}) => ({ id: d + g, d, t: 1, slot: 'b', name: 'Kefir', g, kcal: 0, p: 0, f: 0, c: 0, drink: true, ...extra })
+
+  it('is a field of the day in whole millilitres, 0 to 10 l, merged like the others', () => {
+    expect(cleanField('water', 249.6)).toBe(250)
+    expect(cleanField('water', 10001)).toBeUndefined()
+    expect(cleanField('water', -1)).toBeUndefined()
+    expect(mergeHealth([{ d: '2026-10-05', t: 1, water: 500, sleep: 7 }], [{ d: '2026-10-05', t: 2, water: 750 }]))
+      .toEqual([{ d: '2026-10-05', t: 2, water: 750, sleep: 7 }])
+  })
+
+  it('adds, takes away, never goes below nothing, and goes at nothing', () => {
+    const S = { health: [{ d: '2026-10-05', t: 1, sleep: 7 }] }
+    expect(addWater(S, '2026-10-05', 250, 2)).toBe(250)
+    expect(addWater(S, '2026-10-05', 500, 3)).toBe(750)
+    expect(healthOn(S.health, '2026-10-05')).toEqual({ d: '2026-10-05', t: 3, sleep: 7, water: 750 })
+    expect(addWater(S, '2026-10-05', -1000, 4)).toBe(0)
+    expect(healthOn(S.health, '2026-10-05')).toEqual({ d: '2026-10-05', t: 4, sleep: 7 })
+    // A day that held only water is gone with it.
+    const T = { health: [] }
+    addWater(T, '2026-10-06', 250, 1)
+    addWater(T, '2026-10-06', -250, 2)
+    expect(T.health).toEqual([])
+    expect(addWater({ health: [{ d: '2026-10-06', t: 1, water: 9900 }] }, '2026-10-06', 500)).toBe(10000)
+  })
+
+  it('counts the drinks of the food log in, and nothing else from it', () => {
+    const S = {
+      health: [{ d: '2026-10-05', water: 1000 }],
+      meals: [drink('2026-10-05', 250), drink('2026-10-05', 300, { drink: undefined, name: 'Porridge' }),
+        drink('2026-10-04', 330), drink('2026-10-05', 0)],
+    }
+    expect(drinksOn(S.meals, '2026-10-05')).toBe(250)
+    expect(waterOn(S, '2026-10-05')).toEqual({ taps: 1000, food: 250, total: 1250 })
+    expect(waterOn(S, '2026-10-04')).toEqual({ taps: 0, food: 330, total: 330 })
+    expect(waterOn({}, '2026-10-04')).toEqual({ taps: 0, food: 0, total: 0 })
+  })
+
+  it('has a goal of the profile\'s own, or 2 l', () => {
+    expect(waterGoalOf({})).toBe(WATER_GOAL_DEFAULT)
+    expect(WATER_GOAL_DEFAULT).toBe(2000)
+    expect(waterGoalOf({ waterGoal: 2500 })).toBe(2500)
+    expect(waterGoalOf({ waterGoal: 50 })).toBe(2000)
+    expect(waterGoalOf({ waterGoal: '3l' })).toBe(2000)
+    expect(WATER_GOAL_CHOICES).toContain(2000)
+  })
+
+  it('reads a day against the goal, and the average of the week before over the days that have any', () => {
+    const S = { waterGoal: 2000,
+      health: [
+        { d: '2026-10-08', water: 1500 },
+        { d: '2026-10-07', water: 2000 },
+        { d: '2026-10-06', sleep: 7 },                // no water: unknown, not zero
+        { d: '2026-09-30', water: 3000 },             // eight days before: outside the week
+      ],
+      meals: [drink('2026-10-08', 500), drink('2026-10-05', 1000)] }
+    expect(waterSummary(S, '2026-10-08')).toEqual({
+      goal: 2000, day: { taps: 1500, food: 500, total: 2000, met: true }, avg: 1500, days: 2,
+    })
+    expect(waterSummary(S, '2026-10-07').day.met).toBe(true)
+    expect(waterSummary({ health: [] }, '2026-10-08')).toEqual({ goal: 2000, day: { taps: 0, food: 0, total: 0, met: false }, avg: null, days: 0 })
+  })
+
+  it('charts the day\'s total in litres, over the days that have any', () => {
+    const S = { health: [{ d: '2026-10-05', water: 1250 }, { d: '2026-10-03', sleep: 8 }], meals: [drink('2026-10-05', 300), drink('2026-10-04', 330)] }
+    expect(waterSeries(S).map(p => [p.d, p.y])).toEqual([['2026-10-04', 0.33], ['2026-10-05', 1.55]])
+    expect(waterSeries(S, '2026-10-05', '2026-10-05').map(p => p.d)).toEqual(['2026-10-05'])
+  })
+
+  it('is no check-in on its own', () => {
+    expect(hasWellbeing({ d: '2026-10-05', t: 1, water: 500 })).toBe(false)
+    expect(hasWellbeing({ d: '2026-10-05', t: 1, water: 500, energy: 3 })).toBe(true)
+    expect(hasWellbeing({ d: '2026-10-05', t: 1, steps: 9000 })).toBe(true)
+    expect(hasWellbeing(null)).toBe(false)
   })
 })

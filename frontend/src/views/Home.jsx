@@ -10,8 +10,8 @@ import Icon from '../components/Icon.jsx'
 import { Button } from '../components/ui.jsx'
 import { tappable } from '../lib/use-sheet-keyboard.js'
 import { glyphOf } from '../lib/glyphs.js'
-import { th, nSteps } from '../lib/health-i18n.js'
-import { healthOn, stepsSummary } from '../lib/health.js'
+import { th, nSteps, litresNum, nMl } from '../lib/health-i18n.js'
+import { healthOn, hasWellbeing, stepsSummary, waterSummary, addWater } from '../lib/health.js'
 import { dayTotals } from '../lib/nutrition.js'
 import { checkInSheet, addFoodSheet, fmt1 } from '../sheets-health.jsx'
 import { MacroBar } from './Health.jsx'
@@ -87,9 +87,25 @@ function SeasonCard({ S }) {
     <>{weeks}{!!rows.length && <div className="season-rows">{rows}</div>}</>)
 }
 
+// docs/dev/WATER.md: today's water against the goal, a glass or a bottle a tap away, and a tap too
+// many taken back. The buttons fill the counter; drinks from the food log are already in the total.
+function WaterRow({ S, d }) {
+  const w = waterSummary(S, d)
+  const add = ml => useStore.getState().update(s => { addWater(s, d, ml) })
+  return <div className="health-water" onClick={e => e.stopPropagation()}>
+    <span className="health-water-t"><Icon name="drop" />{th('{0} of {1} l', litresNum(w.day.total), litresNum(w.goal))}{w.day.met ? ' ✓' : ''}</span>
+    <span className="health-water-b">
+      {w.day.taps > 0 && <button className="iconbtn" aria-label={th('Take away {0}', nMl(250))} onClick={() => add(-250)}><Icon name="minus" /></button>}
+      <Button size="sm" aria-label={th('Add {0}', nMl(250))} onClick={() => add(250)}>+250</Button>
+      <Button size="sm" aria-label={th('Add {0}', nMl(500))} onClick={() => add(500)}>+500</Button>
+    </span>
+  </div>
+}
+
 function HealthCard({ S, nav }) {
   const d = todayISO()
-  const h = healthOn(S.health, d)
+  // Water alone is no check-in: the card keeps asking how the night was.
+  const h = hasWellbeing(healthOn(S.health, d)) ? healthOn(S.health, d) : null
   const nutri = S.nutri || {}
   const food = nutri.on !== false && !nutri.paused
   const tot = dayTotals(S.meals, d)
@@ -115,6 +131,7 @@ function HealthCard({ S, nav }) {
       <Icon name="chevronRight" className="chev" />
     </div>
     {stepsLine && <div className="muted small health-steps"><Icon name="figureRun" />{stepsLine}</div>}
+    <WaterRow S={S} d={d} />
     {food && <>
       <MacroBar label={th('Calories')} value={tot.kcal} goal={goals?.kcal} unit="kcal" color="var(--orange)" />
       <MacroBar label={th('Protein')} value={tot.p} goal={goals?.p} unit="g" color="var(--acc)" />

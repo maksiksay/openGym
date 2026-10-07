@@ -1552,6 +1552,17 @@ body.chips-dragging *{cursor:inherit}
 /* steps and the Apple Health import (docs/dev/HEALTH_IMPORT.md) */
 .health-steps{display:flex;align-items:center;gap:6px;margin:-2px 0 8px}
 .health-steps .icn{flex:none;color:var(--green)}
+/* docs/dev/WATER.md: the water row on Home's health card, and the Health screen's Water card. */
+.health-water{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:-2px 0 8px}
+.health-water-t{display:flex;align-items:center;gap:6px;font-size:14px;min-width:0}
+.health-water-t .icn{flex:none;color:var(--teal)}
+.health-water-b{display:flex;align-items:center;gap:6px;flex:none}
+.health-water-b .iconbtn{width:32px;height:30px}
+.hwater-i{color:var(--teal);display:flex}
+.hwater-n{display:flex;align-items:baseline;gap:6px;width:100%;margin:0 0 8px;padding:0;border:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.hwater-n .chev{margin-left:auto;align-self:center}
+/* An amount is not a title: "500 ml", "1 glass" — not "500 Ml" (.chip capitalizes). */
+.chip.chip-amt{text-transform:none}
 .himp-key{margin:4px 16px 8px;padding:10px 12px;border-radius:12px;background:var(--surface-2)}
 .himp-v{display:flex;align-items:center;gap:6px}
 .himp-v code{flex:1;min-width:0;font-size:13px;word-break:break-all;user-select:all}

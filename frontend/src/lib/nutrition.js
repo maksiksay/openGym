@@ -3,15 +3,17 @@
  * Three lists live in the synced state (store/useStore.js DEF):
  *
  *   S.foods  — the person's own food library, values per 100 g:
- *              { id, t, name, brand?, code?, kcal, p, f, c, srv?, src: 'own' | 'off' }
+ *              { id, t, name, brand?, code?, kcal, p, f, c, srv?, drink?, src: 'own' | 'off' }
  *              `code` is the barcode for a product found through Open Food Facts (lib/off.js);
- *              `srv` the usual portion in grams, offered first when the food is added.
+ *              `srv` the usual portion in grams, offered first when the food is added; `drink`
+ *              marks a drink without alcohol, whose millilitres count as water (docs/dev/WATER.md).
  *   S.meals  — what was eaten, one row per food per meal:
- *              { id, d, t, slot, name, g, kcal, p, f, c, fid?, src? }
+ *              { id, d, t, slot, name, g, kcal, p, f, c, fid?, src?, drink? }
  *              The numbers are the portion's own, computed when it was logged. A meal row never
  *              looks its food up again: correcting a food's label next month must not rewrite
  *              what was eaten last month, the same way a renamed routine does not rename the
- *              workouts logged under it.
+ *              workouts logged under it. `drink` is copied the same way, so a drink's grams —
+ *              its millilitres, 1 ml taken as 1 g — go into that day's water (lib/health.js).
  *   S.nutri  — settings: { on, paused, goals: { kcal, p, f, c } | null, home }
  *
  * Built-in foods (lib/foods-base.js) are never copied into S.foods; a meal row made from one
@@ -203,6 +205,7 @@ export function mealRow({ food, g, d, slot, fid = null, src = null, id, t = Date
   const row = { id, d, t, slot, name: String(food?.name || '').slice(0, 120), g: Math.round(num(g)), ...portion(food, g) }
   if (fid) row.fid = fid
   if (src) row.src = src
+  if (food?.drink === true) row.drink = true
   return row
 }
 
@@ -212,7 +215,7 @@ export function mealRow({ food, g, d, slot, fid = null, src = null, id, t = Date
  */
 export function repeatRow(prev, { g = prev?.g, d, slot, id, t = Date.now() }) {
   const base = num(prev?.g) > 0 ? 100 / num(prev.g) : 0
-  const per100 = { name: prev?.name, kcal: num(prev?.kcal) * base, p: num(prev?.p) * base, f: num(prev?.f) * base, c: num(prev?.c) * base }
+  const per100 = { name: prev?.name, kcal: num(prev?.kcal) * base, p: num(prev?.p) * base, f: num(prev?.f) * base, c: num(prev?.c) * base, drink: prev?.drink === true }
   // A row logged without grams (a quick entry: "lunch, ~700 kcal") repeats as itself.
   if (!base) return { ...prev, id, d, slot, t }
   return mealRow({ food: per100, g, d, slot, fid: prev.fid || null, src: prev.src || null, id, t })
@@ -224,11 +227,12 @@ export function quickRow({ name, kcal, p, f, c, d, slot, id, t = Date.now() }) {
   return { id, d, t, slot, name: String(name || '').slice(0, 120), g: 0, kcal: Math.round(k), p: r1(num(p)), f: r1(num(f)), c: r1(num(c)), src: 'quick' }
 }
 
-/** A food entered by hand is valid when it has a name and either energy or some macro. */
+/** A food entered by hand is valid when it has a name and either energy or some macro — or is a
+ *  drink, which may have neither: water, black coffee, a zero cola. */
 export function validFood(f) {
   if (!f || !String(f.name || '').trim()) return false
   const vals = MACROS.map(k => num(f[k]))
   if (vals.some(v => v < 0)) return false
   if (num(f.p) + num(f.f) + num(f.c) > 100.5) return false     // more than 100 g of macros per 100 g
-  return vals.some(v => v > 0)
+  return f.drink === true || vals.some(v => v > 0)
 }

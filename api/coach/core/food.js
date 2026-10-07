@@ -25,6 +25,7 @@ export const FOOD_SCHEMA = {
     f: { type: 'number' },
     c: { type: 'number' },
     srv: { type: 'number' },
+    drink: { type: 'boolean' },
     confidence: { type: 'string', enum: CONFIDENCE },
     note: { type: 'string' }
   },
@@ -97,6 +98,9 @@ export function validateFood(v) {
       name, ...(brand ? { brand } : {}),
       kcal: Math.round(kcal), p: r1(p), f: r1(f), c: r1(c),
       ...(srv && srv > 0 && srv <= 2000 ? { srv: Math.round(srv) } : {}),
+      // A drink without alcohol: its millilitres count as water in the app (docs/dev/WATER.md).
+      // Only a literal true: a model's "yes" or 1 is no answer to a yes-or-no field.
+      ...(v.drink === true ? { drink: true } : {}),
       confidence: v.confidence, note
     }
   };
@@ -127,7 +131,7 @@ export function validateMeal(v) {
     if (g == null || g < 1 || g > 3000) errors.push(`${where}\`g\` must be the grams eaten, 1 to 3000`);
     const { errors: valueErrors, kcal, p, f, c } = per100(it, where);
     errors.push(...valueErrors);
-    return { name, g: Math.round(g), kcal: Math.round(kcal), p: r1(p), f: r1(f), c: r1(c), confidence: CONFIDENCE.includes(it.confidence) ? it.confidence : 'estimate' };
+    return { name, g: Math.round(g), kcal: Math.round(kcal), p: r1(p), f: r1(f), c: r1(c), ...(it.drink === true ? { drink: true } : {}), confidence: CONFIDENCE.includes(it.confidence) ? it.confidence : 'estimate' };
   });
   if (errors.length) return { ok: false, errors };
   return {

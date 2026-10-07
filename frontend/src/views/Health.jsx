@@ -3,10 +3,10 @@ import { useNavigate } from 'react-router-dom'
 import { useStore } from '../store/useStore.js'
 import { todayISO, isoOf, fmtDate } from '../lib/format.js'
 import { dateLocale } from '../lib/i18n.js'
-import { th } from '../lib/health-i18n.js'
-import { healthOn, healthSeries, recentAverages, sleepVsTraining, stepsGoalOf } from '../lib/health.js'
+import { th, litresNum, nMl } from '../lib/health-i18n.js'
+import { healthOn, hasWellbeing, healthSeries, recentAverages, sleepVsTraining, stepsGoalOf, waterSummary, waterSeries, waterGoalOf, addWater } from '../lib/health.js'
 import { SLOTS, SLOT_NAMES, mealsOn, totals, dailySeries, progressOf } from '../lib/nutrition.js'
-import { checkInSheet, addFoodSheet, mealRowSheet, goalsSheet, foodFormSheet, fmtInt, fmt1, macroLine } from '../sheets-health.jsx'
+import { checkInSheet, addFoodSheet, mealRowSheet, goalsSheet, foodFormSheet, waterSheet, fmtInt, fmt1, macroLine, unitOf } from '../sheets-health.jsx'
 import LineChart from '../components/LineChart.jsx'
 import Icon from '../components/Icon.jsx'
 import { Button } from '../components/ui.jsx'
@@ -51,6 +51,34 @@ function WellbeingCard({ d, entry }) {
   </div>
 }
 
+// docs/dev/WATER.md: the day's water against the goal. The buttons work on the day shown, so a
+// past day can be filled in; the number opens the exact amount. Drinks from the food log are in
+// the total and named apart, since only the food log can take them back.
+function WaterCard({ S, d }) {
+  const w = waterSummary(S, d)
+  const r = progressOf(w.day.total, w.goal)
+  const add = ml => useStore.getState().update(s => { addWater(s, d, ml) })
+  return <div className="card">
+    <div className="row between" style={{ marginBottom: 6 }}>
+      <h2 style={{ margin: 0 }}>{th('Water')}</h2>
+      <span className="hwater-i"><Icon name="drop" /></span>
+    </div>
+    <button className="hwater-n" onClick={() => waterSheet(d)} aria-label={th('Exact amount')}>
+      <span className="big">{litresNum(w.day.total)}</span>
+      <span className="muted">{th('of {0} l', litresNum(w.goal))}{w.day.met ? ' ✓' : ''}</span>
+      <Icon name="pencil" className="chev" />
+    </button>
+    <div className="hbar-t"><div className="hbar-f" style={{ width: Math.min(100, r * 100) + '%', background: 'var(--teal)' }} /></div>
+    {w.day.food > 0 && <div className="small muted" style={{ marginTop: 6 }}>{th('Buttons {0} · from food {1}', nMl(w.day.taps), nMl(w.day.food))}</div>}
+    <div className="row" style={{ gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+      {w.day.taps > 0 && <Button size="sm" icon="minus" aria-label={th('Take away {0}', nMl(250))} onClick={() => add(-250)}>{nMl(250)}</Button>}
+      <Button size="sm" icon="plus" aria-label={th('Add {0}', nMl(250))} onClick={() => add(250)}>{nMl(250)}</Button>
+      <Button size="sm" icon="plus" aria-label={th('Add {0}', nMl(500))} onClick={() => add(500)}>{nMl(500)}</Button>
+    </div>
+    {w.avg != null && <div className="dim small" style={{ marginTop: 8 }}>{th('The 7 days before: {0} l a day on average', litresNum(w.avg))}</div>}
+  </div>
+}
+
 function NutritionDay({ S, d }) {
   const rows = mealsOn(S.meals, d)
   const tot = totals(rows)
@@ -79,7 +107,7 @@ function NutritionDay({ S, d }) {
         </div>
         {xs.map(m => <button key={m.id} className="frow" onClick={() => mealRowSheet(m)}>
           <span className="frow-m"><span className="frow-t">{m.name}</span>
-            <span className="frow-s">{m.g > 0 ? `${fmtInt(m.g)} ${th('g')} · ` : ''}{macroLine(m)}</span></span>
+            <span className="frow-s">{m.g > 0 ? `${fmtInt(m.g)} ${unitOf(m)} · ` : ''}{macroLine(m)}</span></span>
           <span className="frow-v">{fmtInt(m.kcal)}</span>
         </button>)}
       </div>
@@ -122,9 +150,11 @@ function TrendsCard({ S }) {
   const sleep = useMemo(() => healthSeries(S.health, 'sleep', from, today), [S.health, from, today])
   const energy = useMemo(() => healthSeries(S.health, 'energy', from, today), [S.health, from, today])
   const steps = useMemo(() => healthSeries(S.health, 'steps', from, today), [S.health, from, today])
+  // Water ends yesterday, like food: today's total is still growing (docs/dev/WATER.md).
+  const water = useMemo(() => waterSeries(S, from, yesterday), [S.health, S.meals, from, yesterday])   // eslint-disable-line react-hooks/exhaustive-deps -- S itself changes on every edit
   const pairs = useMemo(() => sleepVsTraining(S.health, S.workouts).slice(-8).reverse(), [S.health, S.workouts])
   const goals = S.nutri?.goals || null
-  if (kcal.length < 2 && sleep.length < 2 && steps.length < 2) return null
+  if (kcal.length < 2 && sleep.length < 2 && steps.length < 2 && water.length < 2) return null
   return <div className="card">
     <h2 style={{ marginTop: 0 }}>{th('Last six weeks')}</h2>
     {kcal.length > 1 && <><div className="small muted">{th('Calories per logged day')}</div>
@@ -135,6 +165,8 @@ function TrendsCard({ S }) {
       <div className="chart"><LineChart points={sleep} h={110} unit={th('h')} color="var(--blue)" /></div></>}
     {steps.length > 1 && <><div className="small muted" style={{ marginTop: 10 }}>{th('Steps a day')}</div>
       <div className="chart"><LineChart points={steps} h={110} goal={stepsGoalOf(S)} color="var(--green)" /></div></>}
+    {water.length > 1 && <><div className="small muted" style={{ marginTop: 10 }}>{th('Water a day, l')}</div>
+      <div className="chart"><LineChart points={water} h={110} unit={th('l')} goal={waterGoalOf(S) / 1000} color="var(--teal)" /></div></>}
     {energy.length > 1 && <><div className="small muted" style={{ marginTop: 10 }}>{th('Energy, 1–5')}</div>
       <div className="chart"><LineChart points={energy} h={90} color="var(--green)" /></div></>}
     {pairs.length > 0 && <>
@@ -169,7 +201,8 @@ export default function Health() {
       <button className="iconbtn" disabled={isToday} onClick={() => setD(shift(d, 1))} aria-label={th('Next day')}><Icon name="chevronRight" /></button>
     </div>
 
-    <WellbeingCard d={d} entry={entry} />
+    <WellbeingCard d={d} entry={hasWellbeing(entry) ? entry : null} />
+    <WaterCard S={S} d={d} />
 
     {nutri.on !== false && (nutri.paused
       ? <div className="card">
@@ -187,7 +220,7 @@ export default function Health() {
       <div className="flist">{[...S.foods].sort((a, b) => String(a.name).localeCompare(String(b.name), dateLocale())).map(f =>
         <button key={f.id} className="frow" onClick={() => foodFormSheet({ initial: f })}>
           <span className="frow-m"><span className="frow-t">{f.name}</span>
-            <span className="frow-s">{(f.brand ? f.brand + ' · ' : '') + `${fmtInt(f.kcal)} ${th('kcal')} · ${macroLine(f)} ${th('per 100 g')}`}</span></span>
+            <span className="frow-s">{(f.brand ? f.brand + ' · ' : '') + `${fmtInt(f.kcal)} ${th('kcal')} · ${macroLine(f)} ${th(f.drink === true ? 'per 100 ml' : 'per 100 g')}`}</span></span>
           <Icon name="pencil" className="frow-c" />
         </button>)}</div>
     </div>}

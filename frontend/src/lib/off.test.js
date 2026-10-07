@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { cleanCode, normalizeProduct, lookupBarcode, searchProducts, productUrl } from './off.js'
+import { cleanCode, normalizeProduct, lookupBarcode, searchProducts, productUrl, isDrink } from './off.js'
 
 const product = {
   code: '4810268031012',
@@ -73,4 +73,20 @@ describe('searchProducts', () => {
 
 it('productUrl points at the product page', () => {
   expect(productUrl('4810268031012')).toBe('https://world.openfoodfacts.org/product/4810268031012')
+})
+
+// docs/dev/WATER.md: a beverage's millilitres count as water, an alcoholic one's do not.
+describe('drinks', () => {
+  const water = { product_name: 'Bonaqua', nutriments: { 'energy-kcal_100g': 0, proteins_100g: 0, fat_100g: 0, carbohydrates_100g: 0 },
+    categories_tags: ['en:beverages', 'en:waters', 'en:mineral-waters'] }
+  it('come from the beverage categories, without alcohol', () => {
+    expect(isDrink(water)).toBe(true)
+    expect(isDrink({ categories_tags: ['en:beverages', 'en:alcoholic-beverages', 'en:beers'] })).toBe(false)
+    expect(isDrink({ categories_tags: ['en:plant-based-foods-and-beverages', 'en:cereals-and-potatoes'] })).toBe(false)
+    expect(isDrink(product)).toBe(false)
+  })
+  it('are kept as drinks, with no energy when the label says none', () => {
+    expect(normalizeProduct(water, 'ru')).toMatchObject({ name: 'Bonaqua', kcal: 0, drink: true, src: 'off' })
+    expect(normalizeProduct(product, 'ru').drink).toBeUndefined()
+  })
 })

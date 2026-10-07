@@ -49,6 +49,14 @@ test('a slot or a day it does not know is dropped, and a confidence it does not 
   assert.equal(r.meal.text, '');
 });
 
+test('a drink without alcohol is marked as one, so the app counts it as water (docs/dev/WATER.md)', () => {
+  const water = { name: 'Вода', g: 500, kcal: 0, p: 0, f: 0, c: 0, drink: true, confidence: 'typical' };
+  const r = validateMeal({ items: [water, { ...buckwheat, drink: 'true' }] });
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.meal.items[0], { name: 'Вода', g: 500, kcal: 0, p: 0, f: 0, c: 0, drink: true, confidence: 'typical' });
+  assert.equal(r.meal.items[1].drink, undefined);
+});
+
 test('a meal with nothing in it, or too much, goes back for repair', () => {
   assert.equal(validateMeal({ items: [] }).ok, false);
   assert.equal(validateMeal({}).ok, false);

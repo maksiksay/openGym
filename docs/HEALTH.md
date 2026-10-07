@@ -64,6 +64,26 @@ morning, so neither has to be typed ([`dev/HEALTH_IMPORT.md`](dev/HEALTH_IMPORT.
 says yesterday's count against it and the week's average over the days that have a count; the
 Health screen draws it on the steps chart.
 
+## Water
+
+A counter for the day, with what you drink as food counted in ([`dev/WATER.md`](dev/WATER.md)).
+
+- **The buttons.** Home's health card has +250, +500 and −250 ml. On the Health screen the Water
+  card has the same buttons for the day shown, so a past day can be filled in. Tapping its number
+  sets the exact amount.
+- **Drinks from the food log.** A food can be a drink. Its millilitres then go into the day's
+  water on top of the buttons, and deleting it from the food log takes them away again.
+  - Built in: water, tea, black coffee, milk, kefir, ryazhenka, juice, cola, cola zero, latte,
+    cappuccino. Beer and wine are not drinks here: their calories count, their water does not.
+  - Your own foods have a switch, "A drink — count it as water". Products from Open Food Facts
+    filed as non-alcoholic beverages come with it on.
+  - A drink's portion is in ml, 1 ml taken as 1 g.
+- **The goal.** 2 l a day unless changed (**Settings → Health & food → Water goal**). Home shows
+  "1.25 of 2 l" and a ✓ once it is reached; the Health screen draws it on the water chart. There
+  are no streaks.
+- **Water alone is not a check-in.** Home keeps asking how you slept until you answer.
+- **Not sent to the Coach yet.** MCP's `get_health_log` has it.
+
 ## The Coach
 
 The consent screen gains a sixth category, *Sleep and food*, and the consent version moves to 2,

@@ -32,9 +32,9 @@ import { ServerSyncSection, KeptChangesRows, leaveServer, connectServer, passkey
 import { passwordOn, PasswordRow, openPasswordSignIn, openPasswordRegister } from '../components/PasswordAuth.jsx'
 import { usePasskeys, PasskeysRow, DeviceLinkRow } from '../components/Passkeys.jsx'
 import { Section, Row, SelectRow, Switch, Segmented, Button, TextField } from '../components/ui.jsx'
-import { th } from '../lib/health-i18n.js'
+import { th, litresNum } from '../lib/health-i18n.js'
 import { goalsSheet } from '../sheets-health.jsx'
-import { STEPS_GOAL_CHOICES, stepsGoalOf } from '../lib/health.js'
+import { STEPS_GOAL_CHOICES, stepsGoalOf, WATER_GOAL_CHOICES, waterGoalOf } from '../lib/health.js'
 import HealthImport from '../components/HealthImport.jsx'
 
 export default function Settings() {
@@ -417,6 +417,10 @@ export default function Settings() {
         <SelectRow icon="figureRun" iconTint="var(--green)" title={th('Steps goal')} sheetTitle={th('Steps goal')}
           value={stepsGoalOf(S)} onChange={v => update(s => { s.stepsGoal = Number(v) })}
           options={STEPS_GOAL_CHOICES.map(n => ({ value: n, label: n.toLocaleString(dateLocale()) }))} />
+        {/* docs/dev/WATER.md: Home and the Health screen read the day's water against it. */}
+        <SelectRow icon="drop" iconTint="var(--teal)" title={th('Water goal')} sheetTitle={th('Water goal')}
+          value={waterGoalOf(S)} onChange={v => update(s => { s.waterGoal = Number(v) })}
+          options={WATER_GOAL_CHOICES.map(n => ({ value: n, label: th('{0} l', litresNum(n)) }))} />
         <Row icon="flame" iconTint="var(--orange)" title={th('Food tracking')} subtitle={th('Calories and macros, from your foods, the built-in basics and Open Food Facts.')}>
           <Switch checked={S.nutri?.on !== false} onChange={v => update(s => { s.nutri = { ...(s.nutri || {}), on: v } })} />
         </Row>

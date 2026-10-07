@@ -7,8 +7,8 @@ import { useStore } from './store/useStore.js'
 import { useUI } from './store/useUI.js'
 import { todayISO, fmtDate, uid } from './lib/format.js'
 import { dateLocale, getLang, baseLang } from './lib/i18n.js'
-import { th } from './lib/health-i18n.js'
-import { healthOn, setHealth } from './lib/health.js'
+import { th, nMl } from './lib/health-i18n.js'
+import { healthOn, setHealth, hasWellbeing, WELLBEING_FIELDS, waterOn, WATER_MAX } from './lib/health.js'
 import {
   SLOTS, SLOT_NAMES, portion, mealRow, repeatRow, quickRow, recentFoods, searchFoods, validFood,
   suggestGoals, kcalOf, ACTIVITY, slotForHour,
@@ -23,7 +23,7 @@ import { DEMO } from './lib/demo.js'
 import { MOBILE } from './lib/mobile.js'
 import { lastBW } from './lib/history.js'
 import Icon from './components/Icon.jsx'
-import { Button, Stepper, Segmented, SearchField, TextField, TextArea, NumberField } from './components/ui.jsx'
+import { Button, Stepper, Segmented, SearchField, TextField, TextArea, NumberField, Switch } from './components/ui.jsx'
 
 const update = (...a) => useStore.getState().update(...a)
 const ui = () => useUI.getState()
@@ -34,6 +34,8 @@ export const fmtInt = n => Math.round(Number(n) || 0).toLocaleString(dateLocale(
 export const fmt1 = n => (Math.round((Number(n) || 0) * 10) / 10).toLocaleString(dateLocale(), { maximumFractionDigits: 1 })
 /** "Б 31 · Ж 3,6 · У 0" — the macros in one line. */
 export const macroLine = x => `${th('P')} ${fmt1(x.p)} · ${th('F')} ${fmt1(x.f)} · ${th('C')} ${fmt1(x.c)}`
+/** A food's or a row's amount unit: millilitres for a drink (docs/dev/WATER.md), grams otherwise. */
+export const unitOf = x => th(x?.drink === true ? 'ml' : 'g')
 
 /* ============================ check-in ============================ */
 
@@ -74,7 +76,8 @@ function CheckInSheet({ d, close }) {
     close()
     toast(th('Saved'))
   }
-  const remove = () => { update(s => { s.health = (s.health || []).filter(e => e.d !== d) }); close() }
+  // The check-in's own fields go; the day's water counter stays, it was never part of this sheet.
+  const remove = () => { update(s => { setHealth(s, d, Object.fromEntries(WELLBEING_FIELDS.map(k => [k, null]))) }); close() }
   return <>
     <h3>{d === todayISO() ? th('How are you today?') : th('Check-in for {0}', fmtDate(d, true))}</h3>
     <div className="muted small" style={{ marginBottom: 12 }}>{th('A few taps — a week of these says more than any one night.')}</div>
@@ -108,10 +111,33 @@ function CheckInSheet({ d, close }) {
 
     <div style={{ height: 14 }} />
     <Button variant="primary" onClick={save}>{th('Save')}</Button>
-    {cur.d && <><div style={{ height: 6 }} /><Button variant="ghost" className="dim" icon="trash" onClick={remove}>{th('Clear this day')}</Button></>}
+    {hasWellbeing(cur) && <><div style={{ height: 6 }} /><Button variant="ghost" className="dim" icon="trash" onClick={remove}>{th('Clear this check-in')}</Button></>}
   </>
 }
 export const checkInSheet = (d = todayISO()) => ui().openSheet(close => <CheckInSheet d={d} close={close} />)
+
+/* ============================ water ============================ */
+
+// The exact amount on a day's water counter (docs/dev/WATER.md): a past day filled in, or a tap
+// too many put right. Drinks from the food log are shown here, not edited — they live there.
+function WaterSheet({ d, close }) {
+  const st = useStore(s => s.S)
+  const w = waterOn(st, d)
+  const [v, setV] = useState(w.taps)
+  const save = () => {
+    update(s => { setHealth(s, d, { water: v > 0 ? v : null }) })
+    close()
+  }
+  return <>
+    <h3>{d === todayISO() ? th('Water today') : th('Water on {0}', fmtDate(d, true))}</h3>
+    <div className="muted small" style={{ marginBottom: 12 }}>{th('What the buttons added. Drinks from the food log count on top.')}</div>
+    <Stepper value={v} step={50} min={0} max={WATER_MAX} unit={th('ml')} decimal={false} onChange={setV} />
+    {w.food > 0 && <div className="small muted" style={{ marginTop: 8 }}>{th('+ {0} from drinks in the food log', nMl(w.food))}</div>}
+    <div style={{ height: 14 }} />
+    <Button variant="primary" onClick={save}>{th('Save')}</Button>
+  </>
+}
+export const waterSheet = (d = todayISO()) => ui().openSheet(close => <WaterSheet d={d} close={close} />)
 
 /* ============================ food search ============================ */
 
@@ -124,7 +150,7 @@ function FoodRow({ title, sub, right, onClick }) {
   </button>
 }
 
-const per100 = f => `${fmtInt(f.kcal)} ${th('kcal')} · ${macroLine(f)} ${th('per 100 g')}`
+const per100 = f => `${fmtInt(f.kcal)} ${th('kcal')} · ${macroLine(f)} ${th(f?.drink === true ? 'per 100 ml' : 'per 100 g')}`
 
 function AddFoodSheet({ d, slot: slot0, close }) {
   const st = useStore(s => s.S)
@@ -151,7 +177,7 @@ function AddFoodSheet({ d, slot: slot0, close }) {
       toast(th('Added: {0}', m.name)); close(); return
     }
     const k = 100 / m.g
-    portionSheet({ food: { name: m.name, kcal: m.kcal * k, p: m.p * k, f: m.f * k, c: m.c * k }, fid: m.fid, src: m.src, d, slot, g: m.g, onDone: after })
+    portionSheet({ food: { name: m.name, kcal: m.kcal * k, p: m.p * k, f: m.f * k, c: m.c * k, ...(m.drink === true ? { drink: true } : {}) }, fid: m.fid, src: m.src, d, slot, g: m.g, onDone: after })
   }
   const searchOnline = async () => {
     setOnline({ state: 'busy', items: [] })
@@ -174,7 +200,7 @@ function AddFoodSheet({ d, slot: slot0, close }) {
       <h4 className="sec">{th('Recent')}</h4>
       {recent.length
         ? <div className="flist">{recent.map(m => <FoodRow key={m.id} title={m.name}
-            sub={m.g > 0 ? `${fmtInt(m.g)} ${th('g')} · ${macroLine(m)}` : macroLine(m)} right={`${fmtInt(m.kcal)} ${th('kcal')}`} onClick={() => pickRecent(m)} />)}</div>
+            sub={m.g > 0 ? `${fmtInt(m.g)} ${unitOf(m)} · ${macroLine(m)}` : macroLine(m)} right={`${fmtInt(m.kcal)} ${th('kcal')}`} onClick={() => pickRecent(m)} />)}</div>
         : <div className="muted small">{th('Nothing logged yet. Search above — basics like buckwheat, eggs or cottage cheese are built in — or scan a barcode.')}</div>}
       {(st.foods || []).length > 0 && <>
         <h4 className="sec">{th('My foods')}</h4>
@@ -259,7 +285,7 @@ function keepOffFood(s, f) {
     : s.foods.find(x => x.src === 'off' && !x.code && x.name === f.name && (x.brand || '') === (f.brand || ''))
   if (have) return have
   const food = { id: uid(), t: Date.now(), name: f.name, ...(f.brand ? { brand: f.brand } : {}), ...(f.code ? { code: f.code } : {}),
-    kcal: f.kcal, p: f.p, f: f.f, c: f.c, ...(f.srv ? { srv: f.srv } : {}), src: 'off' }
+    kcal: f.kcal, p: f.p, f: f.f, c: f.c, ...(f.srv ? { srv: f.srv } : {}), ...(f.drink === true ? { drink: true } : {}), src: 'off' }
   s.foods.push(food)
   return food
 }
@@ -268,9 +294,11 @@ function PortionSheet({ food, unit, fid, src, d, slot, g: g0, fromOff, onDone, c
   const srv = unit?.[0] || food.srv || null
   const [g, setG] = useState(g0 || srv || 100)
   const now = portion(food, g)
-  const presets = [...new Set([srv, 50, 100, 150, 200, 250, 300].filter(x => x > 0))].slice(0, 6)
+  // A drink is poured in millilitres, 1 ml taken as 1 g, and counts towards the day's water.
+  const drink = food.drink === true
+  const presets = [...new Set([srv, ...(drink ? [200, 250, 330, 500] : [50, 100, 150, 200, 250, 300])].filter(x => x > 0))].slice(0, 6)
   const add = () => {
-    if (!(g > 0)) { toast(th('Enter the grams')); return }
+    if (!(g > 0)) { toast(th(drink ? 'Enter the millilitres' : 'Enter the grams')); return }
     update(s => {
       let id = fid, source = src
       if (fromOff) { const kept = keepOffFood(s, food); id = 'o:' + kept.id; source = 'off' }
@@ -283,12 +311,13 @@ function PortionSheet({ food, unit, fid, src, d, slot, g: g0, fromOff, onDone, c
   return <>
     <h3 style={{ marginBottom: 2 }}>{food.name}</h3>
     <div className="muted small" style={{ marginBottom: 12 }}>{(food.brand ? food.brand + ' · ' : '') + per100(food)}</div>
-    <Stepper value={g} step={10} min={0} max={3000} unit={th('g')} decimal={false} onChange={setG} />
+    <Stepper value={g} step={10} min={0} max={3000} unit={unitOf(food)} decimal={false} onChange={setG} />
     <div className="chips" style={{ margin: '10px 0' }}>
-      {presets.map(x => <button key={x} className={'chip' + (x === g ? ' on' : '')} onClick={() => setG(x)}>
-        {x === srv && unit ? unit[1][lang()] || unit[1].en : `${x} ${th('g')}`}
+      {presets.map(x => <button key={x} className={'chip chip-amt' + (x === g ? ' on' : '')} onClick={() => setG(x)}>
+        {x === srv && unit ? unit[1][lang()] || unit[1].en : `${x} ${unitOf(food)}`}
       </button>)}
     </div>
+    {drink && <div className="dim small" style={{ marginBottom: 10 }}>{th('Counts towards your water for the day.')}</div>}
     <div className="hsum">
       <div><b>{fmtInt(now.kcal)}</b><span>{th('kcal')}</span></div>
       <div><b>{fmt1(now.p)}</b><span>{th('Protein')}</span></div>
@@ -305,12 +334,13 @@ export const portionSheet = opts => ui().openSheet(close => <PortionSheet {...op
 
 function FoodFormSheet({ initial = {}, note, onSaved, close }) {
   const [f, setF] = useState(() => ({ name: initial.name || '', brand: initial.brand || '', code: initial.code || '',
-    kcal: initial.kcal ?? null, p: initial.p ?? null, f: initial.f ?? null, c: initial.c ?? null, srv: initial.srv ?? null }))
+    kcal: initial.kcal ?? null, p: initial.p ?? null, f: initial.f ?? null, c: initial.c ?? null, srv: initial.srv ?? null,
+    drink: initial.drink === true }))
   const set = (k, v) => setF(o => ({ ...o, [k]: v }))
   const implied = kcalOf(f)
   const save = () => {
     const kcal = f.kcal == null || f.kcal === 0 ? implied : f.kcal
-    const food = { name: f.name.trim().slice(0, 120), kcal, p: f.p || 0, f: f.f || 0, c: f.c || 0 }
+    const food = { name: f.name.trim().slice(0, 120), kcal, p: f.p || 0, f: f.f || 0, c: f.c || 0, ...(f.drink ? { drink: true } : {}) }
     if (!validFood(food)) { toast(th('Give it a name and the values per 100 g')); return }
     let saved = null
     update(s => {
@@ -320,6 +350,7 @@ function FoodFormSheet({ initial = {}, note, onSaved, close }) {
       if (f.brand.trim()) row.brand = f.brand.trim().slice(0, 60); else delete row.brand
       const code = cleanCode(f.code); if (code) row.code = code; else delete row.code
       if (f.srv > 0) row.srv = Math.round(f.srv); else delete row.srv
+      if (!f.drink) delete row.drink
       // Replaced, not merged into: a brand or barcode cleared in the form has to be gone.
       if (existing) s.foods = s.foods.map(x => (x === existing ? row : x)); else s.foods.push(row)
       saved = { ...row }
@@ -336,14 +367,19 @@ function FoodFormSheet({ initial = {}, note, onSaved, close }) {
       <label className="hfield"><span>{th('Brand')}</span><TextField value={f.brand} onChange={e => set('brand', e.target.value)} /></label>
       <label className="hfield"><span>{th('Barcode')}</span><TextField value={f.code} inputMode="numeric" onChange={e => set('code', e.target.value)} /></label>
     </div>
-    <h4 className="sec">{th('Per 100 g, from the label')}</h4>
+    <div className="row between" style={{ gap: 12, marginTop: 12 }}>
+      <div><div>{th('A drink — count it as water')}</div>
+        <div className="dim small">{th('Water, tea, coffee, juice, milk: their millilitres go into the day\'s water. Not alcohol.')}</div></div>
+      <Switch checked={f.drink} onChange={v => set('drink', v)} aria-label={th('A drink — count it as water')} />
+    </div>
+    <h4 className="sec">{th(f.drink ? 'Per 100 ml, from the label' : 'Per 100 g, from the label')}</h4>
     <div className="grid2">
       <label className="hfield"><span>{th('kcal')}</span><NumberField className="field" value={f.kcal} nullable onChange={v => set('kcal', v)} placeholder={implied ? String(implied) : ''} /></label>
       <label className="hfield"><span>{th('Protein, g')}</span><NumberField className="field" value={f.p} nullable onChange={v => set('p', v)} /></label>
       <label className="hfield"><span>{th('Fat, g')}</span><NumberField className="field" value={f.f} nullable onChange={v => set('f', v)} /></label>
       <label className="hfield"><span>{th('Carbs, g')}</span><NumberField className="field" value={f.c} nullable onChange={v => set('c', v)} /></label>
     </div>
-    <label className="hfield" style={{ marginTop: 10 }}><span>{th('Usual portion, g (optional)')}</span><NumberField className="field" value={f.srv} nullable decimal={false} onChange={v => set('srv', v)} /></label>
+    <label className="hfield" style={{ marginTop: 10 }}><span>{th(f.drink ? 'Usual portion, ml (optional)' : 'Usual portion, g (optional)')}</span><NumberField className="field" value={f.srv} nullable decimal={false} onChange={v => set('srv', v)} /></label>
     <div className="dim small" style={{ marginTop: 6 }}>{th('Leave kcal empty to work it out from the macros.')}</div>
     <div style={{ height: 14 }} />
     <Button variant="primary" onClick={save}>{th('Save')}</Button>
@@ -405,7 +441,7 @@ function MealRowSheet({ row, close }) {
     <h3 style={{ marginBottom: 2 }}>{row.name}</h3>
     <div className="muted small" style={{ marginBottom: 12 }}>{fmtDate(row.d, true)}</div>
     <Segmented value={slot} onChange={setSlot} options={SLOTS.map(s => ({ value: s, label: th(SLOT_NAMES[s]) }))} />
-    {row.g > 0 && <><div style={{ height: 12 }} /><Stepper value={g} step={10} min={0} max={3000} unit={th('g')} decimal={false} onChange={setG} /></>}
+    {row.g > 0 && <><div style={{ height: 12 }} /><Stepper value={g} step={10} min={0} max={3000} unit={unitOf(row)} decimal={false} onChange={setG} /></>}
     <div className="hsum" style={{ marginTop: 12 }}>
       <div><b>{fmtInt(scaled.kcal)}</b><span>{th('kcal')}</span></div>
       <div><b>{fmt1(scaled.p)}</b><span>{th('Protein')}</span></div>

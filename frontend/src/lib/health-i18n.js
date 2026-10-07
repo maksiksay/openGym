@@ -28,6 +28,11 @@ export function th(s, ...args) {
 export const nSteps = n => `${Math.round(Number(n) || 0).toLocaleString(dateLocale())} ${plural(n, STEPS[baseLang(getLang())] || STEPS.en)}`
 const STEPS = { en: ['step', 'steps'], ru: ['шаг', 'шага', 'шагов'] }
 
+/** Water in litres to two places, without the unit: "1.25", "2" (docs/dev/WATER.md). */
+export const litresNum = ml => (Math.round((Number(ml) || 0) / 10) / 100).toLocaleString(dateLocale(), { maximumFractionDigits: 2 })
+/** "250 ml". */
+export const nMl = ml => `${Math.round(Number(ml) || 0).toLocaleString(dateLocale())} ${th('ml')}`
+
 export function plural(n, forms) {
   const lang = baseLang(getLang())
   if (lang !== 'ru' && lang !== 'uk') return Math.abs(n) === 1 ? forms[0] : forms[forms.length - 1]

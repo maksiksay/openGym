@@ -35,7 +35,7 @@ export function cardDate(day, now = new Date()) {
 export function cardPortions(meal, grams) {
   const rows = (meal?.items || []).map((it, i) => {
     const g = gramsOf(meal, grams, i)
-    return { name: it.name, g, confidence: it.confidence, ...portion(it, g) }
+    return { name: it.name, g, confidence: it.confidence, ...(it.drink === true ? { drink: true } : {}), ...portion(it, g) }
   })
   return { rows, total: totals(rows.filter(r => r.g > 0)) }
 }

@@ -1,10 +1,11 @@
-/* The daily health log: sleep, how the day feels, steps, waist. Pure functions over S.
+/* The daily health log: sleep, how the day feels, steps, waist, water. Pure functions over S.
  *
  * S.health is one entry per day, the shape of a weigh-in grown a few fields:
  *
  *   { d: 'YYYY-MM-DD', t: <ms of the last edit>,
  *     sleep?: hours (0…16, quarter hours), sq?: 1…5 sleep quality,
- *     energy?: 1…5, stress?: 1…5, steps?: count, waist?: cm, note?: text }
+ *     energy?: 1…5, stress?: 1…5, steps?: count, waist?: cm, note?: text,
+ *     water?: ml from the water buttons — drinks logged as food are added on reading (waterOn) }
  *
  * Every field is optional — a morning check-in writes sleep and energy, an evening one steps,
  * and a day may only ever get a waist measurement. Two devices filling different fields of the
@@ -22,12 +23,15 @@ import { workoutVolume } from './history.js'
 const list = v => (Array.isArray(v) ? v : [])
 const fin = v => v != null && v !== '' && Number.isFinite(Number(v))
 
-export const HEALTH_FIELDS = ['sleep', 'sq', 'energy', 'stress', 'steps', 'waist', 'note']
+export const HEALTH_FIELDS = ['sleep', 'sq', 'energy', 'stress', 'steps', 'waist', 'note', 'water']
 export const SCALE_FIELDS = ['sq', 'energy', 'stress']
+// What a check-in writes: every field but the water counter, which a tap on a button fills.
+export const WELLBEING_FIELDS = HEALTH_FIELDS.filter(k => k !== 'water')
+export const WATER_MAX = 10000
 
 // Bounds per field. Out of range is dropped rather than clamped: 25 h of sleep is a typo, and a
 // typo stored as 16 would read as data.
-const RANGE = { sleep: [0, 16], sq: [1, 5], energy: [1, 5], stress: [1, 5], steps: [0, 200000], waist: [30, 250] }
+const RANGE = { sleep: [0, 16], sq: [1, 5], energy: [1, 5], stress: [1, 5], steps: [0, 200000], waist: [30, 250], water: [0, WATER_MAX] }
 const NOTE_MAX = 500
 
 /** One field's value cleaned, or undefined when it is not a value worth storing. */
@@ -47,6 +51,10 @@ export function cleanField(k, v) {
 
 /** The entry for a day, or null. */
 export const healthOn = (health, d) => list(health).find(e => e && e.d === d) || null
+
+/** Whether a day's entry holds a check-in — not only water from the buttons, which is no answer
+ *  to "how did you sleep?". */
+export const hasWellbeing = e => !!e && WELLBEING_FIELDS.some(k => e[k] != null && e[k] !== '')
 
 /**
  * Write fields into a day's entry, creating it when needed. A field set to null (or to anything
@@ -190,5 +198,71 @@ export function stepsSummary(S, iso) {
     yesterday: y && fin(y.steps) ? { d: before(1), steps: Number(y.steps), met: Number(y.steps) >= goal } : null,
     avg: counts.length ? Math.round(counts.reduce((a, b) => a + b, 0) / counts.length) : null,
     days: counts.length
+  }
+}
+
+/* ---------- water (docs/dev/WATER.md) ---------- */
+
+/** The daily water goal in ml: the profile's own, or 2 l. */
+export const WATER_GOAL_DEFAULT = 2000
+export const WATER_GOAL_CHOICES = [1500, 1750, 2000, 2250, 2500, 3000, 3500, 4000]
+export const waterGoalOf = S => (Number.isInteger(S?.waterGoal) && S.waterGoal >= 500 && S.waterGoal <= WATER_MAX ? S.waterGoal : WATER_GOAL_DEFAULT)
+
+/** Millilitres of drinks in the food log on a day: a row marked `drink` counts its grams as ml. */
+export function drinksOn(meals, d) {
+  let ml = 0
+  for (const m of list(meals)) if (m && m.d === d && m.drink === true && fin(m.g) && Number(m.g) > 0) ml += Number(m.g)
+  return Math.round(ml)
+}
+
+/** A day's water in ml: the counter (`taps`), the drinks from the food log (`food`), and both. */
+export function waterOn(S, d) {
+  const e = healthOn(S?.health, d)
+  const taps = e && fin(e.water) ? Number(e.water) : 0
+  const food = drinksOn(S?.meals, d)
+  return { taps, food, total: taps + food }
+}
+
+/**
+ * Add `ml` to a day's counter, or take it away with a negative. Never below nothing, and at
+ * nothing the field goes: a day without water is unknown, not zero. The food log is never
+ * touched. Mutates S.health (call it inside store.update) and returns the counter.
+ */
+export function addWater(S, d, ml, now = Date.now()) {
+  const e = healthOn(S.health, d)
+  const cur = e && fin(e.water) ? Number(e.water) : 0
+  const next = Math.min(WATER_MAX, Math.max(0, Math.round(cur + (Number(ml) || 0))))
+  setHealth(S, d, { water: next > 0 ? next : null }, now)
+  return next
+}
+
+/** The day's total for a chart, in litres: [{ t, y, d }] of the days that have any water. */
+export function waterSeries(S, from = null, to = null) {
+  const days = new Set()
+  for (const e of list(S?.health)) if (e?.d && fin(e.water) && Number(e.water) > 0) days.add(e.d)
+  for (const m of list(S?.meals)) if (m?.d && m.drink === true && Number(m.g) > 0) days.add(m.d)
+  return [...days].filter(d => (!from || d >= from) && (!to || d <= to)).sort()
+    .map(d => ({ t: new Date(d + 'T12:00:00').getTime(), y: Math.round(waterOn(S, d).total / 10) / 100, d }))
+}
+
+/**
+ * A day's water against the goal, and the mean of the seven days before it that have any. A day
+ * with none is unknown, not zero, so it is left out, as with steps.
+ * → { goal, day: { taps, food, total, met }, avg, days }
+ */
+export function waterSummary(S, iso) {
+  const goal = waterGoalOf(S)
+  const before = n => { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() - n); return isoOf(d) }
+  const day = waterOn(S, iso)
+  const totals = []
+  for (let i = 1; i <= 7; i++) {
+    const w = waterOn(S, before(i)).total
+    if (w > 0) totals.push(w)
+  }
+  return {
+    goal,
+    day: { ...day, met: day.total >= goal },
+    avg: totals.length ? Math.round(totals.reduce((a, b) => a + b, 0) / totals.length) : null,
+    days: totals.length
   }
 }

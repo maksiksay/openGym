@@ -12,7 +12,7 @@
  */
 
 const BASE = 'https://world.openfoodfacts.org'
-const FIELDS = 'code,product_name,product_name_ru,product_name_en,generic_name,brands,nutriments,serving_quantity,quantity'
+const FIELDS = 'code,product_name,product_name_ru,product_name_en,generic_name,brands,nutriments,serving_quantity,quantity,categories_tags'
 const TIMEOUT_MS = 12000
 
 const num = v => (v != null && v !== '' && Number.isFinite(Number(v)) ? Number(v) : null)
@@ -36,8 +36,19 @@ function nameOf(p, lang) {
 }
 
 /**
- * An OFF product → { name, brand, code, kcal, p, f, c, srv, src: 'off' } per 100 g, or null when
- * it has no name or no usable nutrition. Energy in kcal when the label gives it, else from kJ.
+ * Whether a product is a drink whose millilitres count as water (docs/dev/WATER.md): OFF files it
+ * under beverages, and not under the alcoholic ones. Its categories carry every parent, so
+ * waters, sodas, juices and teas all have `en:beverages`. The person can still turn it off.
+ */
+export function isDrink(p) {
+  const tags = Array.isArray(p?.categories_tags) ? p.categories_tags : []
+  return tags.includes('en:beverages') && !tags.includes('en:alcoholic-beverages')
+}
+
+/**
+ * An OFF product → { name, brand, code, kcal, p, f, c, srv, drink, src: 'off' } per 100 g, or
+ * null when it has no name or no usable nutrition. Energy in kcal when the label gives it, else
+ * from kJ.
  */
 export function normalizeProduct(p, lang = 'en') {
   if (!p || typeof p !== 'object') return null
@@ -56,6 +67,7 @@ export function normalizeProduct(p, lang = 'en') {
     ...(cleanCode(p.code) ? { code: cleanCode(p.code) } : {}),
     kcal: Math.round(kcal), p: r1(pr ?? 0), f: r1(f ?? 0), c: r1(c ?? 0),
     ...(srv && srv > 0 && srv < 2000 ? { srv: Math.round(srv) } : {}),
+    ...(isDrink(p) ? { drink: true } : {}),
     src: 'off',
   }
 }

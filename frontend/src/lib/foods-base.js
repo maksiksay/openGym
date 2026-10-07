@@ -9,9 +9,12 @@
  *   n     names; the UI shows the current language and falls back to English
  *   kcal, p, f, c   per 100 g
  *   u     optional household portion: [grams, { en, ru }] — "1 egg", "1 slice"
+ *   drink true for a drink without alcohol (D below): its millilitres count as water, 1 ml taken
+ *         as 1 g (docs/dev/WATER.md). Beer and wine are F: their calories count, their water not.
  */
 
 const F = (id, en, ru, kcal, p, f, c, u) => ({ id, n: { en, ru }, kcal, p, f, c, ...(u ? { u } : {}) })
+const D = (...a) => ({ ...F(...a), drink: true })
 const U = (g, en, ru) => [g, { en, ru }]
 
 export const BASE_FOODS = Object.freeze([
@@ -78,12 +81,12 @@ export const BASE_FOODS = Object.freeze([
   F('egg', 'Egg', 'Яйцо куриное', 143, 12.6, 9.5, 0.7, U(50, '1 egg', '1 яйцо')),
   F('egg-white', 'Egg white', 'Яичный белок', 52, 10.9, 0.2, 0.7, U(33, '1 white', '1 белок')),
   F('omelette', 'Omelette with milk', 'Омлет с молоком', 154, 9.6, 12, 1.9),
-  F('milk-1', 'Milk 1%', 'Молоко 1%', 42, 3.4, 1, 5, U(250, '1 glass', '1 стакан')),
-  F('milk-2.5', 'Milk 2.5%', 'Молоко 2,5%', 52, 2.8, 2.5, 4.7, U(250, '1 glass', '1 стакан')),
-  F('milk-3.2', 'Milk 3.2%', 'Молоко 3,2%', 59, 2.9, 3.2, 4.7, U(250, '1 glass', '1 стакан')),
-  F('kefir-1', 'Kefir 1%', 'Кефир 1%', 40, 3, 1, 4, U(250, '1 glass', '1 стакан')),
-  F('kefir-2.5', 'Kefir 2.5%', 'Кефир 2,5%', 53, 2.9, 2.5, 4, U(250, '1 glass', '1 стакан')),
-  F('ryazhenka', 'Ryazhenka 4%', 'Ряженка 4%', 67, 2.8, 4, 4.2, U(250, '1 glass', '1 стакан')),
+  D('milk-1', 'Milk 1%', 'Молоко 1%', 42, 3.4, 1, 5, U(250, '1 glass', '1 стакан')),
+  D('milk-2.5', 'Milk 2.5%', 'Молоко 2,5%', 52, 2.8, 2.5, 4.7, U(250, '1 glass', '1 стакан')),
+  D('milk-3.2', 'Milk 3.2%', 'Молоко 3,2%', 59, 2.9, 3.2, 4.7, U(250, '1 glass', '1 стакан')),
+  D('kefir-1', 'Kefir 1%', 'Кефир 1%', 40, 3, 1, 4, U(250, '1 glass', '1 стакан')),
+  D('kefir-2.5', 'Kefir 2.5%', 'Кефир 2,5%', 53, 2.9, 2.5, 4, U(250, '1 glass', '1 стакан')),
+  D('ryazhenka', 'Ryazhenka 4%', 'Ряженка 4%', 67, 2.8, 4, 4.2, U(250, '1 glass', '1 стакан')),
   F('cottage-0', 'Cottage cheese 0%', 'Творог 0%', 71, 16.5, 0.2, 1.3),
   F('cottage-5', 'Cottage cheese 5%', 'Творог 5%', 121, 17.2, 5, 1.8),
   F('cottage-9', 'Cottage cheese 9%', 'Творог 9%', 159, 16.7, 9, 2),
@@ -172,12 +175,16 @@ export const BASE_FOODS = Object.freeze([
   F('pancakes', 'Pancakes (bliny)', 'Блины', 230, 6, 9, 31, U(50, '1 pancake', '1 блин')),
 
   /* ---- drinks ---- */
-  F('juice-orange', 'Orange juice', 'Сок апельсиновый', 45, 0.7, 0.2, 10.4, U(250, '1 glass', '1 стакан')),
-  F('cola', 'Cola', 'Кола', 42, 0, 0, 10.6, U(330, '1 can', '1 банка')),
+  D('water', 'Water', 'Вода', 0, 0, 0, 0, U(250, '1 glass', '1 стакан')),
+  D('tea', 'Tea, no sugar', 'Чай без сахара', 1, 0, 0, 0.2, U(250, '1 cup', '1 чашка')),
+  D('coffee-black', 'Black coffee', 'Кофе чёрный', 2, 0.1, 0, 0.3, U(200, '1 cup', '1 чашка')),
+  D('cola-zero', 'Cola zero', 'Кола без сахара', 0, 0, 0, 0, U(330, '1 can', '1 банка')),
+  D('juice-orange', 'Orange juice', 'Сок апельсиновый', 45, 0.7, 0.2, 10.4, U(250, '1 glass', '1 стакан')),
+  D('cola', 'Cola', 'Кола', 42, 0, 0, 10.6, U(330, '1 can', '1 банка')),
   F('beer', 'Beer, lager', 'Пиво светлое', 43, 0.5, 0, 3.6, U(500, '0.5 l', '0,5 л')),
   F('wine-dry', 'Wine, dry', 'Вино сухое', 83, 0.1, 0, 2.6, U(150, '1 glass', '1 бокал')),
-  F('latte', 'Latte (milk 2.5%)', 'Латте (молоко 2,5%)', 50, 2.6, 2, 4.2, U(300, '1 cup', '1 чашка')),
-  F('cappuccino', 'Cappuccino (milk 2.5%)', 'Капучино (молоко 2,5%)', 40, 2.1, 1.6, 3.3, U(200, '1 cup', '1 чашка')),
+  D('latte', 'Latte (milk 2.5%)', 'Латте (молоко 2,5%)', 50, 2.6, 2, 4.2, U(300, '1 cup', '1 чашка')),
+  D('cappuccino', 'Cappuccino (milk 2.5%)', 'Капучино (молоко 2,5%)', 40, 2.1, 1.6, 3.3, U(200, '1 cup', '1 чашка')),
 
   /* ---- prepared dishes ---- */
   F('borscht', 'Borscht', 'Борщ', 49, 1.5, 2.5, 5.4, U(300, '1 bowl', '1 тарелка')),
@@ -197,4 +204,4 @@ export const BASE_BY_ID = new Map(BASE_FOODS.map(f => [f.id, f]))
 export const baseName = (f, lang) => (f?.n && (f.n[lang] || f.n.en)) || ''
 
 /** A built-in food as the plain per-100 g shape the rest of nutrition.js uses. */
-export const baseAsFood = (f, lang) => (f ? { id: f.id, name: baseName(f, lang), kcal: f.kcal, p: f.p, f: f.f, c: f.c, srv: f.u?.[0] || null } : null)
+export const baseAsFood = (f, lang) => (f ? { id: f.id, name: baseName(f, lang), kcal: f.kcal, p: f.p, f: f.f, c: f.c, srv: f.u?.[0] || null, ...(f.drink ? { drink: true } : {}) } : null)

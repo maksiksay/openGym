@@ -171,3 +171,31 @@ describe('built-in foods', () => {
     expect(baseAsFood(f, 'en')).toMatchObject({ id: 'egg', name: 'Egg', kcal: 143, srv: 50 })
   })
 })
+
+// docs/dev/WATER.md: a drink's rows carry the flag, and its millilitres count as water.
+describe('drinks', () => {
+  const kefir = { name: 'Kefir 1%', kcal: 40, p: 3, f: 1, c: 4, drink: true }
+
+  it('mark the rows logged from them, and a repeat keeps the mark', () => {
+    const r = mealRow({ food: kefir, g: 250, d: '2026-10-05', slot: 'b', id: 'm1', t: 1 })
+    expect(r).toMatchObject({ g: 250, kcal: 100, drink: true })
+    expect(mealRow({ food: chicken, g: 150, d: '2026-10-05', slot: 'l', id: 'm2', t: 1 }).drink).toBeUndefined()
+    expect(repeatRow(r, { g: 500, d: '2026-10-06', slot: 's', id: 'm3', t: 2 })).toMatchObject({ g: 500, kcal: 200, drink: true })
+    expect(repeatRow({ ...r, drink: undefined }, { g: 500, d: '2026-10-06', slot: 's', id: 'm4', t: 2 }).drink).toBeUndefined()
+  })
+
+  it('may have no energy and no macros at all', () => {
+    expect(validFood({ name: 'Water', kcal: 0, p: 0, f: 0, c: 0, drink: true })).toBe(true)
+    expect(validFood({ name: 'Water', kcal: 0, p: 0, f: 0, c: 0 })).toBe(false)
+    expect(validFood({ name: ' ', drink: true })).toBe(false)
+    expect(validFood({ name: 'x', kcal: -5, drink: true })).toBe(false)
+  })
+
+  it('are marked among the built-ins, alcohol never', () => {
+    const drink = id => BASE_BY_ID.get(id)?.drink === true
+    for (const id of ['water', 'tea', 'coffee-black', 'cola-zero', 'milk-2.5', 'kefir-1', 'ryazhenka', 'juice-orange', 'cola', 'latte', 'cappuccino']) expect(drink(id), id).toBe(true)
+    for (const id of ['beer', 'wine-dry', 'yogurt-plain', 'whey', 'cream-10']) expect(drink(id), id).toBe(false)
+    expect(baseAsFood(BASE_BY_ID.get('water'), 'ru')).toMatchObject({ name: 'Вода', kcal: 0, srv: 250, drink: true })
+    expect(baseAsFood(BASE_BY_ID.get('beer'), 'en').drink).toBeUndefined()
+  })
+})

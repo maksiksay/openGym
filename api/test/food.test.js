@@ -83,3 +83,12 @@ test('alcohol carries energy the macros do not show, and is accepted', () => {
   assert.equal(validateFood(beer).ok, true);
   assert.equal(validateFood({ ...beer, name: 'Водка', kcal: 235, p: 0, c: 0.1 }).ok, true);
 });
+
+// docs/dev/WATER.md: a drink without alcohol is marked, and the app counts its millilitres as water.
+test('a drink is kept as one only on a literal true', () => {
+  const water = { coach_contract: 1, found: true, name: 'Вода', kcal: 0, p: 0, f: 0, c: 0, srv: 500, drink: true, confidence: 'typical', note: 'Вода.' };
+  assert.deepEqual(validateFood(water).food, { name: 'Вода', kcal: 0, p: 0, f: 0, c: 0, srv: 500, drink: true, confidence: 'typical', note: 'Вода.' });
+  assert.equal(validateFood({ ...water, drink: 'yes' }).food.drink, undefined);
+  assert.equal(validateFood({ ...water, drink: 1 }).food.drink, undefined);
+  assert.equal(validateFood(good).food.drink, undefined);
+});
