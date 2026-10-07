@@ -60,6 +60,7 @@ Design notes for specific features, kept next to the code they describe:
 | [Sugar and fibre](dev/SUGAR_FIBRE.md) | Sugars and fibre per food and meal row, a fibre goal, and sugar shown without a limit |
 | [RIR step](dev/RIR_STEP.md) | The last set's reps in reserve sets the next step, and a miss after a short night does not count |
 | [Coach assistant](dev/COACH_ASSISTANT.md) | The chat notes a weight, a check-in, water and goals on a card, knows the app's screens and links to them |
+| [Coach quality](dev/COACH_QUALITY.md) | The right day and today's routine, the app's exercise names, a plan read before any session, a language check, Opus 5.5 by default |
 
 ## Still stuck?
 

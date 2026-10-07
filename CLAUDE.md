@@ -37,7 +37,9 @@ docs/      guides indexed in docs/README.md (FAQ, SELF_HOSTING*, MOBILE, AI_COAC
            SUGAR_FIBRE: sugars and fibre per food and meal row, a fibre goal, no sugar limit;
            RIR_STEP: the last set's reps in reserve sets the next step, a short night's miss does not count;
            COACH_ASSISTANT: the chat logs weight, check-in, water and goals through a card, knows the
-           app's screens and links to them; consent 4 adds water, sugar and fibre).
+           app's screens and links to them; consent 4 adds water, sugar and fibre;
+           COACH_QUALITY: the app's date and weekday, today's routine, its exercise names and the plan's
+           volume in the payload, a language check with one extra round, Opus 5.5 by default).
 ```
 
 ## Commands
