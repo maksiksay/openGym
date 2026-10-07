@@ -56,6 +56,7 @@ Design notes for specific features, kept next to the code they describe:
 | [Seasons](dev/SEASONS.md) | Six-week blocks with a max-reps test on four anchor lifts, results, and program changes at the boundary |
 | [Strength levels](dev/STRENGTH_LEVELS.md) | Beginner to Elite per lift, relative to body weight, from a model fitted to Strength Level's standards |
 | [Health import](dev/HEALTH_IMPORT.md) | Steps and sleep from Apple Health through a Shortcuts automation and a personal key, and a steps goal |
+| [RIR step](dev/RIR_STEP.md) | The last set's reps in reserve sets the next step, and a miss after a short night does not count |
 
 ## Still stuck?
 
