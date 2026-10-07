@@ -33,4 +33,23 @@ export default {
   'Open': 'Открыть',
   'Food tracking is off or paused. Switch it on in Settings → Health & food to add meals from the chat.':
     'Учёт питания выключен или на паузе. Включите его в Настройки → Здоровье и питание, чтобы добавлять еду из чата.',
+
+  // The chat as the app's assistant (docs/dev/COACH_ASSISTANT.md)
+  'Open: {0}': 'Открыть: {0}',
+  'To log': 'Записать',
+  'Log': 'Записать',
+  'Logged: {0}': 'Записано: {0}',
+  'Not logged': 'Не записано',
+  'Leave out': 'Не записывать',
+  'Put back': 'Вернуть',
+  'Weight': 'Вес',
+  'Sleep': 'Сон',
+  'Calorie goal': 'Цель по калориям',
+  'Protein goal': 'Цель по белку',
+  'Fat goal': 'Цель по жирам',
+  'Carbs goal': 'Цель по углеводам',
+  'Fibre goal': 'Цель по клетчатке',
+  '{0} so far': 'уже {0}',
+  'Nothing here can be logged while the health log is off. Switch it on in Settings → Health & food.':
+    'Пока модуль здоровья выключен, записать здесь нечего. Включите его в Настройки → Здоровье и питание.',
 }

@@ -33,8 +33,10 @@ import { tco } from '../lib/coach-i18n.js'
 import { splitLinks } from '../lib/links.js'
 import { canDictate, dictate, speechLang } from '../lib/speech.js'
 import { cardMeals, cardPortions, cardStart } from '../lib/coach-meal.js'
+import { applyLog, logLines } from '../lib/coach-log.js'
+import { linkAvailable, linkLabel, openLink } from '../lib/app-links.js'
 import { preparePhoto } from '../lib/coach-photo.js'
-import { th } from '../lib/health-i18n.js'
+import { th, nMl, litresNum } from '../lib/health-i18n.js'
 import { SLOTS, SLOT_NAMES } from '../lib/nutrition.js'
 import { confirmSheet, askBeforeNewPlan } from '../sheets.jsx'
 import Icon from '../components/Icon.jsx'
@@ -106,13 +108,19 @@ export default function CoachChat() {
       // What someone ate comes back as a card for the food log (docs/dev/COACH_VOICE_PHOTO.md).
       if (ended?.outcome === 'meal' && ended.meal) {
         appendChat(s, { role: 'coach', kind: 'meal', text: ended.reading || '', meal: ended.meal, status: 'open' })
+      } else if (ended?.outcome === 'log' && ended.log) {
+        // A weight, a check-in, water or goals, for a card that writes them on a tap
+        // (docs/dev/COACH_ASSISTANT.md).
+        appendChat(s, { role: 'coach', kind: 'log', text: ended.reading || '', log: ended.log, status: 'open' })
       } else if (!proposed) {
         const cls = lastError?.errorClass || (last?.outcome === 'failed' ? (last.errorClass || 'internal') : null)
         appendChat(s, cls
           ? { role: 'coach', kind: 'error', text: jobErrorText(cls, lastError?.detail) }
           : { role: 'coach', kind: 'nochange', text: last?.reading
             ? last.reading
-            : t('I looked through everything and there is nothing I would change right now. Keep going — ask me again after a few more sessions.') })
+            : t('I looked through everything and there is nothing I would change right now. Keep going — ask me again after a few more sessions.'),
+            // The places the answer points to, as buttons under it (docs/dev/COACH_ASSISTANT.md).
+            ...(Array.isArray(last?.open) && last.open.length ? { open: last.open } : {}) })
       }
     })
   }, [job, pending, loading, last?.id])
@@ -335,6 +343,7 @@ function Bubble({ role, kind, at, children }) {
 
 function Message({ m, S, profile, openSheet, update, nav }) {
   if (m.kind === 'meal') return <MealCard m={m} S={S} update={update} nav={nav} />
+  if (m.kind === 'log') return <LogCard m={m} S={S} update={update} nav={nav} />
   if (m.kind === 'intake') {
     const lines = profileLines(profile)
     return <Bubble role="user" at={m.at}>
@@ -352,8 +361,12 @@ function Message({ m, S, profile, openSheet, update, nav }) {
   }
   if (m.kind === 'reverted' || m.kind === 'nochange' || m.kind === 'error' || m.kind === 'text') {
     // A photo that went with a message is not kept, so the thread marks where one was.
+    const links = m.role === 'coach' && Array.isArray(m.open) ? m.open.filter(id => linkAvailable(S, id)) : []
     return <Bubble role={m.role} kind={m.kind} at={m.at}>{m.role === 'coach' ? <Linked text={m.text} />
-      : <>{m.photo && <Icon name="camera" className="msg-photo" />}{m.text || (m.photo ? tco('Photo') : '')}</>}</Bubble>
+      : <>{m.photo && <Icon name="camera" className="msg-photo" />}{m.text || (m.photo ? tco('Photo') : '')}</>}
+      {links.length > 0 && <div className="msg-links">{links.map(id =>
+        <button key={id} className="msg-link" onClick={() => openLink(nav, id)}><Icon name="chevronRight" />{tco('Open: {0}', linkLabel(id))}</button>)}</div>}
+    </Bubble>
   }
   return null
 }
@@ -757,6 +770,91 @@ function MealCard({ m, S, update, nav }) {
           <Button onClick={() => settle('dismissed')}>{tco('Not now')}</Button>
         </div>
       </> : <p className="pcard-sum meal-off">{tco('Food tracking is off or paused. Switch it on in Settings → Health & food to add meals from the chat.')}</p>}
+    </div>
+    {m.at && <div className="msg-t">{stamp(m.at)}</div>}
+  </div>
+}
+
+/* ------------------------------- something to note ------------------------------- */
+
+// One line of a log card: what it is, and what is there now → what it becomes.
+const fmtW = n => fmtNum(Math.round(n * 10) / 10)
+const fmtH = h => (Math.round(h * 100) / 100).toLocaleString(dateLocale(), { maximumFractionDigits: 2 })
+const GOAL_LABEL = { kcal: 'Calorie goal', p: 'Protein goal', f: 'Fat goal', c: 'Carbs goal', fib: 'Fibre goal', steps: 'Steps goal', water: 'Water goal' }
+function lineLabel(l) {
+  if (l.part === 'weight') return tco('Weight')
+  if (l.part === 'water') return th('Water')
+  if (l.part === 'checkin') return { sleep: tco('Sleep'), sq: th('Sleep quality'), energy: th('Energy'), stress: th('Stress'), steps: th('Steps') }[l.field]
+  return l.field === 'steps' || l.field === 'water' ? th(GOAL_LABEL[l.field]) : tco(GOAL_LABEL[l.field])
+}
+function lineValue(l, S, { arrow = true } = {}) {
+  const one = v => {
+    if (l.part === 'weight') return `${fmtW(v)} ${S.unit || 'kg'}`
+    if (l.part === 'checkin') return l.field === 'sleep' ? `${fmtH(v)} ${th('h')}` : l.field === 'steps' ? Math.round(v).toLocaleString(dateLocale()) : `${v}/5`
+    if (l.field === 'water') return `${litresNum(v)} ${th('l')}`
+    if (l.field === 'steps') return Math.round(v).toLocaleString(dateLocale())
+    return `${Math.round(v).toLocaleString(dateLocale())} ${l.field === 'kcal' ? th('kcal') : th('g')}`
+  }
+  if (l.part === 'water') return '+' + nMl(l.to) + (arrow && l.from > 0 ? ' · ' + tco('{0} so far', nMl(l.from)) : '')
+  return arrow && l.from != null && l.from !== l.to ? `${one(l.from)} → ${one(l.to)}` : one(l.to)
+}
+
+// A note the Coach read from a message (docs/dev/COACH_ASSISTANT.md): nothing is written until
+// Log is tapped, a line can be left out, and the lines that belong to a day go to today or
+// yesterday. What a tap writes is lib/coach-log.js's.
+function LogCard({ m, S, update, nav }) {
+  const log = m.log && typeof m.log === 'object' ? m.log : {}
+  const [day, setDay] = useState(log.day === 'yesterday' ? 'yesterday' : 'today')
+  const [skip, setSkip] = useState([])
+  const lines = logLines(S, log, day, new Date())
+  const kept = lines.filter(l => !skip.includes(l.key))
+  const toggle = key => setSkip(xs => (xs.includes(key) ? xs.filter(x => x !== key) : [...xs, key]))
+
+  const settle = status => update(s => {
+    const line = (s.coach?.chat || []).find(x => x.id === m.id)
+    if (!line || line.status !== 'open') return
+    if (status === 'logged') {
+      const written = applyLog(s, log, { day, skip, now: new Date() })
+      line.logged = { day, lines: written.map(l => ({ key: l.key, part: l.part, field: l.field, to: l.to })) }
+    }
+    line.status = status
+  })
+
+  if (m.status === 'logged' || m.status === 'dismissed') {
+    const done = m.logged?.lines || []
+    const health = done.some(l => l.part === 'checkin' || l.part === 'water') && S.healthOn !== false
+    return <div className="msg coach">
+      <div className="bub meal-done">
+        <Icon name={m.status === 'logged' ? 'checkCircle' : 'xmark'} />
+        <span>{m.status === 'logged'
+          ? tco('Logged: {0}', done.map(l => lineLabel(l) + ' ' + lineValue(l, S, { arrow: false })).join(' · '))
+          : tco('Not logged')}</span>
+        {health && <button className="meal-open" onClick={() => nav('/health')}>{tco('Open')}</button>}
+      </div>
+      {m.at && <div className="msg-t">{stamp(m.at)}</div>}
+    </div>
+  }
+
+  return <div className="msg coach" style={{ maxWidth: '100%', width: '100%' }}>
+    <div className="pcard log">
+      <div className="pcard-hd">
+        <div className="pcard-eyebrow">{tco('To log')}</div>
+        {!!m.text && <p className="pcard-sum">{m.text}</p>}
+      </div>
+      {lines.map(l => <div key={l.key} className={'log-item' + (skip.includes(l.key) ? ' out' : '')}>
+        <div className="log-name">{lineLabel(l)}</div>
+        <div className="log-v">{lineValue(l, S)}</div>
+        <button className="iconbtn log-x" aria-label={skip.includes(l.key) ? tco('Put back') : tco('Leave out')} onClick={() => toggle(l.key)}>
+          <Icon name={skip.includes(l.key) ? 'plus' : 'xmark'} /></button>
+      </div>)}
+      {!lines.length && <p className="pcard-sum meal-off">{tco('Nothing here can be logged while the health log is off. Switch it on in Settings → Health & food.')}</p>}
+      {lines.some(l => l.day) && <div className="meal-when">
+        <Segmented options={[{ value: 'today', label: th('Today') }, { value: 'yesterday', label: tco('Yesterday') }]} value={day} onChange={setDay} />
+      </div>}
+      <div className="pcard-ft">
+        <Button variant="primary" icon="check" disabled={!kept.length} onClick={() => settle('logged')}>{tco('Log')}</Button>
+        <Button onClick={() => settle('dismissed')}>{tco('Not now')}</Button>
+      </div>
     </div>
     {m.at && <div className="msg-t">{stamp(m.at)}</div>}
   </div>

@@ -86,3 +86,45 @@ test('today\'s food is left out: the day is not over', () => {
   assert.deepEqual(p.health.food, []);
   assert.equal(p.health.days[0].sleep, 7);
 });
+
+// docs/dev/COACH_ASSISTANT.md: water, sugar and fibre, and the targets, with the fourth consent only.
+test('with the fourth consent: the day\'s water, sugar and fibre on full days, and the targets', () => {
+  const consent4 = { ...consent2, consent: { ...consent2.consent, version: 4 } };
+  const S = withHealth({
+    coach: consent4,
+    health: [
+      { d: '2026-07-19', t: 1, sleep: 5.5, water: 1000 },
+      { d: '2026-07-20', t: 2, energy: 5 },
+    ],
+    meals: [
+      { id: 'm1', d: '2026-07-19', t: 1, slot: 'b', name: 'secret kefir', g: 250, kcal: 100, p: 7, f: 2, c: 10, sug: 10, fib: 0, drink: true },
+      { id: 'm2', d: '2026-07-19', t: 2, slot: 'l', name: 'oats', g: 80, kcal: 293, p: 10, f: 5, c: 49, sug: 1, fib: 8 },
+      { id: 'm3', d: '2026-07-18', t: 3, slot: 'l', name: 'orange juice', g: 300, kcal: 135, p: 2, f: 0, c: 31, sug: 25, drink: true },
+      { id: 'm4', d: '2026-07-18', t: 4, slot: 'd', name: 'business lunch', g: 0, kcal: 700, p: 30, f: 30, c: 70 },
+    ],
+    nutri: { on: true, paused: false, goals: { kcal: 2600, p: 145, f: 75, c: 330 }, fibGoal: 35 },
+    stepsGoal: 9000,
+  });
+  const p = payload.build(S, { handle: 'h'.repeat(16), kind: 'debrief', workoutId: 'w1' });
+  assert.deepEqual(p.health.days, [
+    { d: '2026-07-18', water: 300 },                          // only juice that day: water, nothing else
+    { d: '2026-07-19', sleep: 5.5, water: 1250 },             // the buttons and the kefir
+    { d: '2026-07-20', energy: 5 },
+  ]);
+  assert.deepEqual(p.health.food, [
+    { d: '2026-07-18', kcal: 835, p: 32, f: 30, c: 101 },     // a quick entry without them: no sugar or fibre for the day
+    { d: '2026-07-19', kcal: 393, p: 17, f: 7, c: 59, sug: 11, fib: 8 },
+  ]);
+  assert.deepEqual(p.health.targets, { steps: 9000, water: 2000, fib: 35 });
+  for (const leak of ['kefir', 'juice', 'lunch']) assert.ok(!JSON.stringify(p).includes(leak), leak);
+});
+
+test('before the fourth consent, none of them leave', () => {
+  const consent3 = { ...consent2, consent: { ...consent2.consent, version: 3 } };
+  const S = withHealth({ coach: consent3, health: [{ d: '2026-07-19', t: 1, sleep: 7, water: 1000 }],
+    meals: [{ id: 'm1', d: '2026-07-19', t: 1, slot: 'b', name: 'oats', g: 80, kcal: 293, p: 10, f: 5, c: 49, sug: 1, fib: 8, drink: false }] });
+  const p = payload.build(S, { handle: 'h'.repeat(16), kind: 'debrief', workoutId: 'w1' });
+  assert.deepEqual(p.health.days, [{ d: '2026-07-19', sleep: 7 }]);
+  assert.deepEqual(p.health.food, [{ d: '2026-07-19', kcal: 293, p: 10, f: 5, c: 49 }]);
+  assert.equal('targets' in p.health, false);
+});

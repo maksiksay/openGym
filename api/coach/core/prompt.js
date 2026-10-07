@@ -13,7 +13,10 @@ const CHANGE_RULES_AT = '### Allowed change types';
 export const CHANGE_RULES = PROMPTS.review.includes(CHANGE_RULES_AT)
   ? PROMPTS.review.slice(PROMPTS.review.indexOf(CHANGE_RULES_AT))
   : '';
-const taskPrompt = task => (task === 'chat' ? PROMPTS.chat + '\n\n' + CHANGE_RULES : PROMPTS[task]);
+// The chat also answers questions about the app itself, from the app map (app.md), and links to
+// the places it names (docs/dev/COACH_ASSISTANT.md). Only the chat gets it: a review, a debrief
+// or a plan has nothing to point at.
+const taskPrompt = task => (task === 'chat' ? PROMPTS.chat + '\n\n' + CHANGE_RULES + (PROMPTS.app ? '\n\n---\n\n' + PROMPTS.app : '') : PROMPTS[task]);
 
 /**
  * The prompt in two parts: `system` is the rules — byte-identical for every job of the same

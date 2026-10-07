@@ -290,9 +290,9 @@ export function Check({ checked, onChange, className = '', size }) {
 // The inset-grouped list is the app's main structural primitive: a titled
 // section holding rows separated by hairlines that stop short of the leading
 // edge, so the icon column reads as a continuous rail.
-export function Section({ title, footer, children, className = '' }) {
+export function Section({ id, title, footer, children, className = '' }) {
   return (
-    <section className={'sect ' + className}>
+    <section id={id} className={'sect ' + className}>
       {title && <h2 className="sect-t">{title}</h2>}
       <div className="sect-b">{children}</div>
       {footer && <p className="sect-f">{footer}</p>}

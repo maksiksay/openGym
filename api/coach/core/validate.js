@@ -17,6 +17,8 @@
 import { libraryHas, libraryName } from './library.js';
 import { glyphStr } from './glyphs.js';
 import { validateMeal } from './food.js';
+import { validateLog } from './log.js';
+import { cleanOpen } from './app-links.js';
 
 // The closed list (FR-23 / C3). Adding a member here is a deliberate act with an apply
 // implementation on the client to match; there is no default case anywhere.
@@ -629,7 +631,7 @@ export function validateDebrief(data) {
 
 /* ================================= chat messages ================================= */
 
-const CHAT_REPLIES = ['answer', 'clarify', 'changes', 'meal'];
+const CHAT_REPLIES = ['answer', 'clarify', 'changes', 'meal', 'log'];
 const CHAT_TEXT_MAX = 3000;
 const CHAT_SOURCES_MAX = 5;
 const SOURCE_TITLE_MAX = 80;
@@ -654,8 +656,11 @@ function sourceLine(s) {
  * the reply: `answer` and `clarify` are text for the chat, and take the path a review that changes
  * nothing takes (`nochange` with a `reading`); `changes` is a review's change set and is judged by
  * validateReview, against the same plan, into the same proposal; `meal` is what someone ate, for
- * a card in the chat (food.js validateMeal, docs/dev/COACH_VOICE_PHOTO.md).
- * Returns { ok, nochange, reading } | { ok, proposal } | { ok, meal } | { ok:false, errors }.
+ * a card in the chat (food.js validateMeal, docs/dev/COACH_VOICE_PHOTO.md); `log` is a weight, a
+ * check-in, water or goals for a card of its own (log.js, docs/dev/COACH_ASSISTANT.md). An
+ * answer may name up to two places in the app to open (`open`, app-links.js).
+ * Returns { ok, nochange, reading, open? } | { ok, proposal } | { ok, meal } | { ok, log }
+ * | { ok:false, errors }. `ctx.unit` is the profile's weight unit, for a log's weight.
  */
 export function validateChat(data, plan, ctx = {}) {
   if (!data || typeof data !== 'object') return fail(['the answer was not an object']);
@@ -663,6 +668,10 @@ export function validateChat(data, plan, ctx = {}) {
   if (data.reply === 'meal') {
     const m = validateMeal(data);
     return m.ok ? { ok: true, meal: m.meal } : fail(m.errors);
+  }
+  if (data.reply === 'log') {
+    const l = validateLog(data, { unit: ctx.unit });
+    return l.ok ? { ok: true, log: l.log } : fail(l.errors);
   }
   if (data.reply === 'changes') {
     if (!Array.isArray(data.changes) || !data.changes.length) {
@@ -678,5 +687,7 @@ export function validateChat(data, plan, ctx = {}) {
     const lines = [...new Set(data.sources.map(sourceLine).filter(Boolean))].slice(0, CHAT_SOURCES_MAX);
     if (lines.length) reading += '\n\n' + lines.join('\n');
   }
-  return { ok: true, nochange: true, reading: clampStr(reading, CHAT_READING_MAX) };
+  // Places to open under an answer: a fixed list, so a made-up id is dropped, not shown.
+  const open = data.reply === 'answer' ? cleanOpen(data.open) : [];
+  return { ok: true, nochange: true, reading: clampStr(reading, CHAT_READING_MAX), ...(open.length ? { open } : {}) };
 }

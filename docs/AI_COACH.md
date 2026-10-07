@@ -99,6 +99,15 @@ answer, a request to change the plan gets a proposal like a review's, and a mess
 place gets one short question back ([`docs/dev/COACH_CHAT.md`](dev/COACH_CHAT.md)). Users cannot
 switch the Coach off themselves — only the admin can, from the card above.
 
+The chat is also the app's assistant ([`docs/dev/COACH_ASSISTANT.md`](dev/COACH_ASSISTANT.md)):
+
+- **It notes things for you.** "72.4 this morning, slept 6 hours, drank a litre" or "set my
+  protein goal to 140" comes back as a *To log* card: a weight, a check-in, water and goals. Each
+  line shows what it changes and can be left out. Nothing is written until you tap **Log**.
+- **It never** deletes anything, and never touches the account or any other setting.
+- **It knows the app.** Ask where a setting is or how to do something. The answer may carry up to
+  two buttons, such as *Open: Settings → Health & food*, which go straight there.
+
 A key, a model and the account binding described below belong to the provider they were
 entered for. Switching chips does not clear them: the Anthropic key is still there when you
 come back from trying Gemini, and each chip shows a mark when it holds one.

@@ -181,8 +181,13 @@ async function run(S, kind, opts, d, adapter) {
     last = { id: job.id, kind, outcome: 'meal', errorClass: null, at: Date.now(), reading: attempt.meal.text || null, meal: attempt.meal }
     return
   }
+  if (attempt.log) {
+    // A weight, a check-in, water or goals: a card of its own (docs/dev/COACH_ASSISTANT.md).
+    last = { id: job.id, kind, outcome: 'log', errorClass: null, at: Date.now(), reading: attempt.log.text || null, log: attempt.log }
+    return
+  }
   if (attempt.nochange) {
-    last = { id: job.id, kind, outcome: 'nochange', errorClass: null, at: Date.now(), reading: attempt.reading }
+    last = { id: job.id, kind, outcome: 'nochange', errorClass: null, at: Date.now(), reading: attempt.reading, ...(attempt.open ? { open: attempt.open } : {}) }
     if (notify) notify({ kind: 'nochange', reading: attempt.reading, job: kind })
     return
   }

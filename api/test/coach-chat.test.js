@@ -37,7 +37,10 @@ test('a chat job is a task of its own, with a prompt of its own', () => {
   assert.match(parts.system, /clarify/);
   // the change set's rules are the review's own, not a copy
   assert.ok(CHANGE_RULES.startsWith('### Allowed change types'), 'review.md still has the section chat.md borrows');
-  assert.ok(parts.system.endsWith(CHANGE_RULES));
+  // …included whole, and followed only by the app map (docs/dev/COACH_ASSISTANT.md), which
+  // cannot sit inside chat.md's last section that the rules continue.
+  assert.ok(parts.system.includes(CHANGE_RULES + '\n\n---\n\n# The app map'));
+  assert.ok(parts.system.trimEnd().endsWith('`settings.account`'));
   assert.match(parts.system, /\| `swap-exercise` \|/);
 });
 

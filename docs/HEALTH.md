@@ -107,6 +107,15 @@ quality, energy, stress and steps, and per day the food **totals** with the goal
 names of foods, never the notes, never the waist. The prompts treat it as context — a short night
 explains a weak session; it is not a reason to change the plan on its own.
 
+Consent version 4 adds three things ([`dev/COACH_ASSISTANT.md`](dev/COACH_ASSISTANT.md)):
+
+- the day's water;
+- sugar and fibre in the food totals of the days whose every row had them;
+- the fibre, steps and water goals.
+
+Everyone is asked once more, and until then those three stay home. In the chat the Coach can note
+a weight, a check-in, water or a goal for you on a card you confirm.
+
 ## MCP
 
 `get_health_log` (see `mcp/README.md`) gives a local assistant the full log, including notes and,

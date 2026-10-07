@@ -418,10 +418,16 @@ export const HEALTH_CONSENT_VERSION = 2;
 // consent version that names photos (docs/dev/COACH_VOICE_PHOTO.md). The photo itself never
 // passes through this module: the payload says only that there is one.
 export const PHOTO_CONSENT_VERSION = 3;
+// Water, sugar and fibre, and the fibre, steps and water goals beside the food goals, leave only
+// once the person has agreed to the consent version that names them (docs/dev/COACH_ASSISTANT.md).
+export const WATER_CONSENT_VERSION = 4;
 const HEALTH_DAYS_MAX = 84;
 const healthAllowed = S => S.healthOn !== false && (Number(S.coach?.consent?.version) || 0) >= HEALTH_CONSENT_VERSION;
 const scale = v => (Number.isInteger(v) && v >= 1 && v <= 5 ? v : undefined);
 const bounded = (v, lo, hi) => (typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi ? v : undefined);
+const intIn = (v, lo, hi) => (Number.isInteger(v) && v >= lo && v <= hi ? v : undefined);
+// The app's defaults for the goals it reads as null (frontend/src/lib/health.js, nutrition.js).
+const TARGET_DEFAULTS = { steps: 8000, water: 2000, fib: 30 };
 
 export function healthSlice(S, from, to) {
   if (!healthAllowed(S) || !from) return null;
@@ -430,6 +436,23 @@ export function healthSlice(S, from, to) {
   floor.setDate(floor.getDate() - HEALTH_DAYS_MAX);
   const start = from > iso(floor) ? from : iso(floor);
   const inside = d => d && d >= start && (!to || d <= to);
+  const more = (Number(S.coach?.consent?.version) || 0) >= WATER_CONSENT_VERSION;
+  // A day's water: the counter the buttons fill and the drinks of the food log (docs/dev/WATER.md),
+  // today's included — "how much have I had today?" is a fair question, and the prompt says the
+  // day is not over. Only the total leaves, never what was drunk.
+  const water = new Map();
+  if (more) {
+    for (const e of list(S.health)) {
+      const d = e && typeof e === 'object' ? day(e.d) : null;
+      const w = bounded(e?.water, 0, 10000);
+      if (inside(d) && w) water.set(d, (water.get(d) || 0) + w);
+    }
+    for (const m of list(S.meals)) {
+      const d = m && typeof m === 'object' ? day(m.d) : null;
+      const g = m?.drink === true ? bounded(m.g, 0, 5000) : undefined;
+      if (inside(d) && g) water.set(d, (water.get(d) || 0) + g);
+    }
+  }
   const days = list(S.health)
     .filter(e => e && typeof e === 'object' && inside(day(e.d)))
     .map(e => {
@@ -437,10 +460,13 @@ export function healthSlice(S, from, to) {
       const sl = bounded(e.sleep, 0, 16); if (sl !== undefined) o.sleep = sl;
       for (const k of ['sq', 'energy', 'stress']) { const x = scale(e[k]); if (x !== undefined) o[k] = x; }
       const st = bounded(e.steps, 0, 200000); if (st !== undefined) o.steps = Math.round(st);
+      if (water.has(o.d)) o.water = Math.round(water.get(o.d));
       return o;
     })
-    .filter(o => Object.keys(o).length > 1)
-    .sort((a, b) => (a.d < b.d ? -1 : 1));
+    .filter(o => Object.keys(o).length > 1);
+  // A day with water and nothing else in the log: drinks logged as food on a day with no check-in.
+  for (const [d, w] of water) if (!days.some(o => o.d === d)) days.push({ d, water: Math.round(w) });
+  days.sort((a, b) => (a.d < b.d ? -1 : 1));
   // Food only while tracking is on, and only for days that are over: today's total is still
   // growing, and read at lunchtime it would look like a deficit.
   const tracking = S.nutri?.on === false ? 'off' : S.nutri?.paused ? 'paused' : 'on';
@@ -449,16 +475,27 @@ export function healthSlice(S, from, to) {
   for (const m of tracking === 'on' ? list(S.meals) : []) {
     const d = m && typeof m === 'object' ? day(m.d) : null;
     if (!inside(d) || d >= today) continue;
-    const t = byDay.get(d) || { d, kcal: 0, p: 0, f: 0, c: 0 };
+    const t = byDay.get(d) || { d, kcal: 0, p: 0, f: 0, c: 0, n: 0, sug: 0, fib: 0, sugN: 0, fibN: 0 };
     for (const k of ['kcal', 'p', 'f', 'c']) { const x = bounded(m[k], 0, 20000); if (x !== undefined) t[k] += x; }
+    t.n++;
+    for (const k of ['sug', 'fib']) { const x = bounded(m[k], 0, 2000); if (x !== undefined) { t[k] += x; t[k + 'N']++; } }
     byDay.set(d, t);
   }
+  // Sugar and fibre only for a day whose every row had them (docs/dev/SUGAR_FIBRE.md): a sum over
+  // part of a day would read as a low day, and unknown is not zero.
   const food = [...byDay.values()].sort((a, b) => (a.d < b.d ? -1 : 1))
-    .map(t => ({ d: t.d, kcal: Math.round(t.kcal), p: Math.round(t.p), f: Math.round(t.f), c: Math.round(t.c) }));
+    .map(t => ({ d: t.d, kcal: Math.round(t.kcal), p: Math.round(t.p), f: Math.round(t.f), c: Math.round(t.c),
+      ...(more && t.sugN === t.n ? { sug: Math.round(t.sug) } : {}), ...(more && t.fibN === t.n ? { fib: Math.round(t.fib) } : {}) }));
   const g = S.nutri && typeof S.nutri === 'object' && S.nutri.goals && typeof S.nutri.goals === 'object' ? S.nutri.goals : null;
   const goals = g && tracking === 'on' ? Object.fromEntries(['kcal', 'p', 'f', 'c'].map(k => [k, bounded(g[k], 0, 20000) ?? null])) : null;
+  // The goals that are not food's own: steps and water always, fibre while food is tracked.
+  const targets = more ? {
+    steps: intIn(S.stepsGoal, 1000, 50000) ?? TARGET_DEFAULTS.steps,
+    water: intIn(S.waterGoal, 500, 10000) ?? TARGET_DEFAULTS.water,
+    ...(tracking === 'on' ? { fib: intIn(S.nutri?.fibGoal, 5, 100) ?? TARGET_DEFAULTS.fib } : {})
+  } : null;
   if (!days.length && !food.length) return null;
-  return { from: start, to: to || null, days, food, goals, foodTracking: tracking };
+  return { from: start, to: to || null, days, food, goals, foodTracking: tracking, ...(targets ? { targets } : {}) };
 }
 
 /* ---------- a proposal still waiting, for a chat ----------

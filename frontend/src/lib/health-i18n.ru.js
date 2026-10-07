@@ -190,7 +190,8 @@ export default {
   'Found by the AI ({0}). Check the numbers against the package before saving.': 'Найдено ИИ ({0}). Сверь цифры с упаковкой перед сохранением.',
   // consent screen
   'Sleep and food': 'Сон и питание',
-  'Your daily check-ins (sleep, energy, stress, steps) and each day’s food totals against your goals — never what you ate or your notes.': 'Ежедневные отметки (сон, энергия, стресс, шаги) и итог еды за каждый день в сравнении с целями. Что именно ты ел и твои заметки не передаются.',
+  'Your daily check-ins (sleep, energy, stress, steps), the water you drink, and each day’s food totals with sugar and fibre, against your goals — never what you ate or your notes.':
+    'Ежедневные отметки (сон, энергия, стресс, шаги), выпитая вода и итог еды за каждый день с сахаром и клетчаткой в сравнении с целями. Что именно ты ел и твои заметки не передаются.',
   'Enter hours slept': 'Указать часы сна',
   'Clear': 'Очистить',
   'Open Plan → Coach once and agree to it — then the AI can look foods up.': 'Открой один раз «План → Коуч» и дай согласие — после этого ИИ сможет искать продукты.',

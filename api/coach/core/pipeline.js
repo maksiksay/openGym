@@ -19,7 +19,7 @@ import { validatePlan, validateReview, validateDebrief, validateChat } from './v
 /**
  * One attempt: prompt → provider → parse → validate.
  *
- * @returns {{ ok:true, nochange?:boolean, reading?:string, result?:object, meal?:object }
+ * @returns {{ ok:true, nochange?:boolean, reading?:string, open?:string[], result?:object, meal?:object, log?:object }
  *        | { ok:false, errorClass:string, detail?:string, repairable?:boolean, errors?:string[], raw?:string }}
  */
 export async function attemptOnce({ adapter, cfg, kind, payload, model, timeoutMs, invokeOpts = {} }, repair) {
@@ -62,7 +62,7 @@ export async function attemptOnce({ adapter, cfg, kind, payload, model, timeoutM
   const checked = kind === 'review'
     ? validateReview(parsed.value, payload.plan, { customIds })
     : kind === 'chat'
-      ? validateChat(parsed.value, payload.plan, { customIds })
+      ? validateChat(parsed.value, payload.plan, { customIds, unit: payload.meta?.unit })
     : kind === 'debrief'
       ? validateDebrief(parsed.value)
       : validatePlan(parsed.value, {
@@ -73,7 +73,8 @@ export async function attemptOnce({ adapter, cfg, kind, payload, model, timeoutM
 
   if (!checked.ok) return { ok: false, repairable: !repair, errors: checked.errors, raw: r.text, errorClass: 'unusable' };
   if (checked.meal) return { ok: true, meal: checked.meal };
-  if (checked.nochange) return { ok: true, nochange: true, reading: checked.reading };
+  if (checked.log) return { ok: true, log: checked.log };
+  if (checked.nochange) return { ok: true, nochange: true, reading: checked.reading, ...(checked.open ? { open: checked.open } : {}) };
   return { ok: true, result: checked.proposal || { bundle: checked.bundle, summary: checked.bundle.summary } };
 }
 

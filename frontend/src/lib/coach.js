@@ -26,7 +26,10 @@ import { t } from './i18n.js'
 // (api/coach/core/payload.js HEALTH_CONSENT_VERSION).
 // 3: photos attached in the chat (docs/dev/COACH_VOICE_PHOTO.md). Until a profile agrees, a photo
 // is refused; everything else goes on as agreed (payload.js PHOTO_CONSENT_VERSION).
-export const CONSENT_VERSION = 3
+// 4: water, sugar and fibre, and the fibre, steps and water goals, join "Sleep and food"
+// (docs/dev/COACH_ASSISTANT.md). Until a profile agrees, its payloads leave them out
+// (payload.js WATER_CONSENT_VERSION).
+export const CONSENT_VERSION = 4
 
 // Bounds. The whole state has to stay inside the server's 5 MB body limit, and a Coach log
 // that grows forever is exactly the kind of thing that eats it invisibly. Worst case here is
@@ -72,7 +75,7 @@ export const CATEGORY_TEXT = {
   training: ['Your logged training', 'Sets you logged in the review window — weights, reps, times, effort ratings and how long sessions took.'],
   bodyweight: ['Body weight', 'Weigh-ins from the same window, and your goal weight if you set one.'],
   profile: ['What you tell the Coach', 'Your intake answers, including any limitations or injuries you describe.'],
-  health: ['Sleep and food', 'Your daily check-ins (sleep, energy, stress, steps) and each day’s food totals against your goals — never what you ate or your notes.'],
+  health: ['Sleep and food', 'Your daily check-ins (sleep, energy, stress, steps), the water you drink, and each day’s food totals with sugar and fibre, against your goals — never what you ate or your notes.'],
   prefs: ['A few preferences', 'Your unit, your language and which effort scale you log.'],
   photos: ['Photos you attach', 'A photo you attach to a message in the chat, for that message only. It is not kept — not in the chat, not on the server.']
 }

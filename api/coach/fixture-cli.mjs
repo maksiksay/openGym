@@ -136,6 +136,21 @@ if (kind === 'chat') {
       ]
     });
   }
+  // Something to note (docs/dev/COACH_ASSISTANT.md): a weight in the profile's unit, a check-in,
+  // water and a goal, with a key the validator must drop.
+  if (/\b(weigh|slept|drank)\b|вес|спал|выпил/i.test(msg)) {
+    out({
+      coach_contract: 1, reply: 'log', day: 'today', text: 'Noted: the weight, the night and the water.',
+      weight: P.meta?.unit === 'lb' ? 160.4 : 72.4,
+      checkin: { sleep: 6, energy: 2, mood: 'meh' },
+      water: 1000,
+      goals: { p: 140 },
+      deleteEverything: true
+    });
+  }
+  if (/where|где/i.test(msg)) {
+    out({ coach_contract: 1, reply: 'answer', text: 'Settings, under Health & food.', open: ['settings.health', 'nowhere', 'settings.health', 'health', 'stats'] });
+  }
   const r = (P.plan?.routines || [])[0];
   const e = r?.ex?.[0];
   if (/\b(swap|add a set|more sets|replace)\b/i.test(msg) && r && e) {

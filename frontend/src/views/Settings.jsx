@@ -4,6 +4,7 @@ import { useStore, DEF, hasData } from '../store/useStore.js'
 import { workoutControls } from '../lib/workout-controls.js'
 import { speedUnitOf } from '../lib/speed.js'
 import { copyText } from '../lib/clipboard.js'
+import { pendingSection, clearPendingSection } from '../lib/app-links.js'
 import { useUI } from '../store/useUI.js'
 import { ACCENTS, ACCENT_NAMES, todayISO, localTZ, weekStartOf, MONDAY, SUNDAY, fmtPlate } from '../lib/format.js'
 import { inventoryFor, ownsPlates } from '../lib/plates.js'
@@ -41,6 +42,18 @@ import HealthImport from '../components/HealthImport.jsx'
 export default function Settings() {
   const nav = useNavigate()
   const S = useStore(s => s.S)
+  // Opened from a Coach answer's link (docs/dev/COACH_ASSISTANT.md): scroll to the section it
+  // named, once the sections are on the page. The timer is set again if an effect runs twice.
+  useEffect(() => {
+    const section = pendingSection()
+    if (!section) return
+    const tm = setTimeout(() => {
+      const el = document.getElementById('set-' + section)
+      if (el && typeof el.scrollIntoView === 'function') el.scrollIntoView({ block: 'start', behavior: 'smooth' })
+      clearPendingSection()
+    }, 60)
+    return () => clearTimeout(tm)
+  }, [])
   const user = useStore(s => s.user)
   const coachLocal = useStore(s => s.coachLocal)
   // Name-and-password sign-in, where the instance offers it (#118).
@@ -294,7 +307,7 @@ export default function Settings() {
     </ServerSyncSection>}
 
     {/* ---------- account (demo and mobile builds have nothing to sign in to) ---------- */}
-    {!(MOBILE && user) && <Section title={MOBILE ? t('Your data') : DEMO ? t('Demo') : t('Account')}>
+    {!(MOBILE && user) && <Section id="set-account" title={MOBILE ? t('Your data') : DEMO ? t('Demo') : t('Account')}>
       {MOBILE ? <>
         <Row icon="lock" iconTint="var(--acc)" title={t('All data stays on this phone')} subtitle={t('No account, no cloud — back it up anytime with Export below.')} />
         <Row icon="link" iconTint="var(--indigo)" title={t('Connect to my server')} subtitle={t('Sync this device to your own self-hosted openGym instead.')} accessory="chevron"
@@ -341,7 +354,7 @@ export default function Settings() {
     </Section>}
 
     {/* ---------- general ---------- */}
-    <Section title={t('General')} footer={t('Switching the unit offers to convert every stored weight.')}>
+    <Section id="set-general" title={t('General')} footer={t('Switching the unit offers to convert every stored weight.')}>
       <SelectRow
         icon="globe" iconTint="var(--blue)" title={t('Language')}
         value={lang} onChange={v => update(s => { s.lang = v; s.langAuto = false })}
@@ -409,7 +422,7 @@ export default function Settings() {
     </Section>
 
     {/* ---------- health & food (views/Health.jsx) ---------- */}
-    <Section title={th('Health & food')} footer={th('Off hides the Health card, screen and the Coach\'s view of it. Nothing logged is deleted.')}>
+    <Section id="set-health" title={th('Health & food')} footer={th('Off hides the Health card, screen and the Coach\'s view of it. Nothing logged is deleted.')}>
       <Row icon="heart" iconTint="var(--pink, #ff375f)" title={th('Health')} subtitle={th('Daily check-in: sleep, energy, stress, steps.')}>
         <Switch checked={S.healthOn !== false} onChange={v => update(s => { s.healthOn = v })} />
       </Row>
@@ -438,13 +451,13 @@ export default function Settings() {
     {/* ---------- steps and sleep from Apple Health (docs/dev/HEALTH_IMPORT.md) ----------
         A server feature: the key lives there, so a guest, the demo and a phone with no server
         have nothing to make one on. */}
-    {S.healthOn !== false && user && !DEMO && <Section title={th('Import from Apple Health')}
+    {S.healthOn !== false && user && !DEMO && <Section id="set-import" title={th('Import from Apple Health')}
       footer={th('A Shortcuts automation sends yesterday\'s steps and last night\'s sleep every morning. The key can only add them to your log.')}>
       <HealthImport />
     </Section>}
 
     {/* ---------- during a workout ---------- */}
-    <Section title={t('During a workout')} footer={wakeOK ? t('The screen stays on while a workout is running, so you don’t have to unlock your phone between sets.') : null}>
+    <Section id="set-workout" title={t('During a workout')} footer={wakeOK ? t('The screen stays on while a workout is running, so you don’t have to unlock your phone between sets.') : null}>
       {/* The quick weigh-in that opens on Start (sheets.jsx startFlow, issue #137); off skips straight
           to the session. Home and Stats still log weight by hand. */}
       <Row icon="scale" iconTint="var(--green)" title={t('Weigh in before workouts')}
@@ -565,7 +578,7 @@ export default function Settings() {
     <EquipmentCard S={S} update={update} />
 
     {/* ---------- appearance ---------- */}
-    <Section title={t('Appearance')} footer={DEMO || MOBILE ? undefined : t('synced with your profile')}>
+    <Section id="set-appearance" title={t('Appearance')} footer={DEMO || MOBILE ? undefined : t('synced with your profile')}>
       <Row icon="moon" iconTint="var(--indigo)" title={t('Theme')}>
         <Segmented
           className="seg-inline"
@@ -599,7 +612,7 @@ export default function Settings() {
     </Section>
 
     {/* ---------- data: fill it, bring things over, back it up, wipe it ---------- */}
-    <Section title={t('Data')}>
+    <Section id="set-data" title={t('Data')}>
       <Row icon="sparkles" iconTint="var(--acc)" title={t('Load starter plan')} accessory="chevron" onClick={starterPlanSheet} />
       <Row icon="shuffle" iconTint="var(--teal)" title={t('Import from another app')}
         subtitle={t('FitNotes, Strong, Hevy — or body weight from Apple Health')}
@@ -771,7 +784,7 @@ function MobileReminderCard({ S, update, toast }) {
     setReminder({ on })
   }
   return (
-    <Section title={t('Notifications')}
+    <Section id="set-notifications" title={t('Notifications')}
       footer={S.reminder?.on ? t('Reminds you at this time on days that have a routine planned.') : null}>
       <Row icon="calendar" iconTint="var(--orange)" title={t('Workout day reminder')}>
         <Switch checked={!!S.reminder?.on} onChange={toggle} />
@@ -818,7 +831,7 @@ function PushCard({ S, update, toast }) {
   }
 
   if (!supported) return (
-    <Section title={t('Notifications')}>
+    <Section id="set-notifications" title={t('Notifications')}>
       <Row icon="bellSlash" iconTint="var(--grey)" title={t('Not supported in this browser.')} />
     </Section>
   )
@@ -867,7 +880,7 @@ function EquipmentCard({ S, update }) {
   const plateSummary = ownsPlates(S)
     ? inventoryFor(S).map(p => fmtPlate(p.w) + '×' + p.n).join(' · ') || t('None')
     : t('Standard set — tap to count the pairs you own.')
-  return <Section title={t('Equipment')} footer={t('Filters the exercise library and picker, and flags routine exercises that need something you don’t have in the active profile.')}>
+  return <Section id="set-equipment" title={t('Equipment')} footer={t('Filters the exercise library and picker, and flags routine exercises that need something you don’t have in the active profile.')}>
     <Row icon="plate" iconTint="var(--orange)" title={t('Plates')} subtitle={plateSummary} accessory="chevron" onClick={() => plateInventorySheet()} />
     {profiles.length > 0 && <Row icon="dumbbell" iconTint="var(--acc)" title={t('Filter by equipment')}>
       <Switch checked={!!S.equipFilterOn} onChange={v => update(s => { s.equipFilterOn = v })} />

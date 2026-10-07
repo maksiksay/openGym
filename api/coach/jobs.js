@@ -158,7 +158,8 @@ export function status(uid) {
 }
 function lastOutcome(rec) {
   const h = (rec.history || []).at(-1);
-  return h ? { id: h.id, kind: h.kind, outcome: h.outcome, errorClass: h.errorClass || null, at: h.at, ...(h.reading ? { reading: h.reading } : {}), ...(h.meal ? { meal: h.meal } : {}) } : null;
+  return h ? { id: h.id, kind: h.kind, outcome: h.outcome, errorClass: h.errorClass || null, at: h.at, ...(h.reading ? { reading: h.reading } : {}), ...(h.meal ? { meal: h.meal } : {}),
+    ...(h.log ? { log: h.log } : {}), ...(h.open ? { open: h.open } : {}) } : null;
 }
 function archive(uid, rec, outcome) {
   const history = [...(rec.history || []), {
@@ -300,7 +301,11 @@ function finish(job, result) {
     ...(result.reading ? { reading: String(result.reading).slice(0, CHAT_READING_MAX) } : {}),
     // A meal read from the chat, as validated (core/food.js bounds it): the card the client
     // turns into rows for the food log once the person adds it.
-    ...(result.meal ? { meal: result.meal } : {})
+    ...(result.meal ? { meal: result.meal } : {}),
+    // A weight, a check-in, water or goals (core/log.js), for the card that writes them on a tap,
+    // and the places an answer links to (core/app-links.js) — docs/dev/COACH_ASSISTANT.md.
+    ...(result.log ? { log: result.log } : {}),
+    ...(result.open ? { open: result.open } : {})
   }].slice(-HISTORY_MAX);
   writeUser(job.uid, {
     ...rec,
@@ -392,11 +397,16 @@ async function execute(job) {
       // one that is waiting (docs/dev/COACH_VOICE_PHOTO.md).
       return finish(job, { outcome: 'meal', pending: undefined, detail: null, reading: attempt.meal.text || null, meal: attempt.meal });
     }
+    if (attempt.log) {
+      // Something to note for the person (docs/dev/COACH_ASSISTANT.md): a card like a meal's, so
+      // it leaves a waiting proposal where it is too.
+      return finish(job, { outcome: 'log', pending: undefined, detail: null, reading: attempt.log.text || null, log: attempt.log });
+    }
     if (attempt.nochange) {
       // A review that finds nothing to change supersedes the proposal waiting; a chat that
       // answers a question, or asks one back, leaves it where it is: the question may well be
       // about it (docs/dev/COACH_VOICE_PHOTO.md).
-      return finish(job, { outcome: 'nochange', pending: job.kind === 'chat' ? undefined : null, detail: null, reading: attempt.reading });
+      return finish(job, { outcome: 'nochange', pending: job.kind === 'chat' ? undefined : null, detail: null, reading: attempt.reading, ...(attempt.open ? { open: attempt.open } : {}) });
     }
     const pending = {
       id: job.id,
