@@ -32,8 +32,9 @@ home cooking, and tracking everything is the habit the health notes argue agains
 - **Open Food Facts:** `sugars_100g` and `fiber_100g` from the label.
 - **Own foods:** two optional fields in the food form, "Sugar, g" and "Fibre, g".
 - **The AI lookup and the Coach's meal card:** optional `sug` and `fib` in both contracts
-  (`api/coach/core/food.js`). The prompts ask for them when the label or reference values give
-  them.
+  (`api/coach/core/food.js`). The prompts ask for them from the label or reference values, with 0
+  for a food that has none (kefir's fibre is 0, not unknown), and leave them out only when
+  unknown.
 - **A quick entry:** none. It is the totals as eaten, and nobody knows a business lunch's fibre.
 
 ### Checks
