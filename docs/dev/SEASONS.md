@@ -154,9 +154,10 @@ Payloads for a review, a chat and a plan carry `season`:
 It is computed in `payload.js` from `S.seasons`, a few lines that repeat `lib/season.js`'s
 arithmetic, since the core cannot import the frontend.
 
-`common.md` tells the model:
+`common.md` tells the model, in the app's words ("anchor lifts", «опорные упражнения»):
 
-- keep the anchors in the plan;
+- keep the anchors in the plan; asked to replace one mid-season, remind the person of their rule
+  and offer the boundary, and do it if they insist;
 - leave a whole new program for the boundary;
 - accessories may change any time;
 - in the test week, leave the anchors' sets and reps alone.
