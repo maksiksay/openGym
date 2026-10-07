@@ -12,7 +12,7 @@ import { unlock, playOnSilentSupported, vibrateSupported } from '../lib/sound.js
 import { api, webauthnOK, passkeyRegister, IS_ANDROID } from '../lib/api.js'
 import { pushSupported, enablePush, disablePush, sendTestPush, syncPushSubscription } from '../lib/push.js'
 import { wakeLockSupported } from '../lib/wakelock.js'
-import { t, LANGS, INSTR_LANGS, EXERCISE_NAME_LANGS, baseLang } from '../lib/i18n.js'
+import { t, LANGS, INSTR_LANGS, EXERCISE_NAME_LANGS, baseLang, dateLocale } from '../lib/i18n.js'
 import { effectiveLang } from '../lib/default-lang.js'
 import { DEMO, REPO } from '../lib/demo.js'
 import { MOBILE, isAndroid, shareExport, shareExportBlob, syncReminder } from '../lib/mobile.js'
@@ -34,6 +34,8 @@ import { usePasskeys, PasskeysRow, DeviceLinkRow } from '../components/Passkeys.
 import { Section, Row, SelectRow, Switch, Segmented, Button, TextField } from '../components/ui.jsx'
 import { th } from '../lib/health-i18n.js'
 import { goalsSheet } from '../sheets-health.jsx'
+import { STEPS_GOAL_CHOICES, stepsGoalOf } from '../lib/health.js'
+import HealthImport from '../components/HealthImport.jsx'
 
 export default function Settings() {
   const nav = useNavigate()
@@ -411,6 +413,10 @@ export default function Settings() {
         <Switch checked={S.healthOn !== false} onChange={v => update(s => { s.healthOn = v })} />
       </Row>
       {S.healthOn !== false && <>
+        {/* docs/dev/HEALTH_IMPORT.md: Home holds yesterday and the week's average against it. */}
+        <SelectRow icon="figureRun" iconTint="var(--green)" title={th('Steps goal')} sheetTitle={th('Steps goal')}
+          value={stepsGoalOf(S)} onChange={v => update(s => { s.stepsGoal = Number(v) })}
+          options={STEPS_GOAL_CHOICES.map(n => ({ value: n, label: n.toLocaleString(dateLocale()) }))} />
         <Row icon="flame" iconTint="var(--orange)" title={th('Food tracking')} subtitle={th('Calories and macros, from your foods, the built-in basics and Open Food Facts.')}>
           <Switch checked={S.nutri?.on !== false} onChange={v => update(s => { s.nutri = { ...(s.nutri || {}), on: v } })} />
         </Row>
@@ -423,6 +429,14 @@ export default function Settings() {
         </>}
       </>}
     </Section>
+
+    {/* ---------- steps and sleep from Apple Health (docs/dev/HEALTH_IMPORT.md) ----------
+        A server feature: the key lives there, so a guest, the demo and a phone with no server
+        have nothing to make one on. */}
+    {S.healthOn !== false && user && !DEMO && <Section title={th('Import from Apple Health')}
+      footer={th('A Shortcuts automation sends yesterday\'s steps and last night\'s sleep every morning. The key can only add them to your log.')}>
+      <HealthImport />
+    </Section>}
 
     {/* ---------- during a workout ---------- */}
     <Section title={t('During a workout')} footer={wakeOK ? t('The screen stays on while a workout is running, so you don’t have to unlock your phone between sets.') : null}>

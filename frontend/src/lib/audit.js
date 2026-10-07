@@ -49,6 +49,9 @@ const LABELS = {
   'auth.link.create': 'Made a one-time code for another device',
   'auth.link.ok': 'Added a device with a one-time code',
   'auth.link.fail': 'Adding a device with a code failed',
+  // The key a Shortcuts automation sends steps and sleep with (docs/dev/HEALTH_IMPORT.md).
+  'auth.import.create': 'Made a health import key',
+  'auth.import.revoke': 'Turned the health import key off',
   // The owner's proof (current password or a passkey) for one of the changes below was refused.
   'auth.proof.fail': 'Confirming a change failed',
   // The password throttle paused an address; `msg` says for what (password, signup).
@@ -95,6 +98,7 @@ const REASONS = {
   'password': 'wrong passwords or reset codes',
   'signup': 'wrong invite codes on password signup',
   'link': 'wrong one-time device codes',
+  'import': 'wrong health import keys',
   'email': 'e-mail addresses already in use',
   // What a `media.throttled` pause was for.
   'upload': 'photo and video uploads',

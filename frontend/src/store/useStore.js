@@ -194,6 +194,9 @@ export const DEF = {
   health: [], meals: [], foods: [],
   nutri: { on: true, paused: false, goals: null, body: null },
   healthOn: true,
+  // Steps a day to aim at (lib/health.js stepsGoalOf, docs/dev/HEALTH_IMPORT.md); null reads as
+  // 8,000. The counts themselves are in `health`, typed or imported from Apple Health.
+  stepsGoal: null,
 }
 const clone = o => JSON.parse(JSON.stringify(o))
 

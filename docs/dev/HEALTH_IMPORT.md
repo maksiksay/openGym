@@ -104,7 +104,10 @@ or set to connect on demand.
 ## Where it lives
 
 - **`api/health-import.js`** (pure bookkeeping, tested): `createImportKey`, `revokeImportKey`,
-  `importKeyStatus`, `userOfImportKey`, `noteImport`, `applyHealthImport`.
+  `importKeyStatus`, `userOfImportKey`, `noteImport`, `applyHealthImport`. It is on the
+  Dockerfile's `COPY` line like every root-level module.
+- **The audit events:** `auth.import.create` and `auth.import.revoke`, labelled in
+  `frontend/src/lib/audit.js`.
 - **`api/server.js`:**
   - `GET`, `POST` and `DELETE /api/health/import-key` (signed in);
   - `POST /api/health/import` (the key);

@@ -45,7 +45,6 @@ export default function LineChart({ points, h = 150, unit = '', color = 'var(--a
 
   if (!points || points.length === 0) return <div className="empty small">{t('No data yet')}</div>
   const H = h
-  const P = { l: axes ? 34 : 8, r: 12, t: 10, b: axes ? 22 : 8 }
   const single = points.length === 1
   const pts = single ? [points[0], points[0]] : points
   const ys = pts.map(p => p.y)
@@ -53,6 +52,10 @@ export default function LineChart({ points, h = 150, unit = '', color = 'var(--a
   if (goal != null && isFinite(goal)) { ymin = Math.min(ymin, goal); ymax = Math.max(ymax, goal) }
   if (ymin === ymax) { ymin -= 1; ymax += 1 }
   const pad = (ymax - ymin) * 0.12; ymin -= pad; ymax += pad
+  // Room on the left for the widest axis label: a five-digit step count ("10 000") needs more than
+  // a body weight does, and was cut at its first digit.
+  const widest = axes ? Math.max(fmtNum(ymin).length, fmtNum(ymax).length) : 0
+  const P = { l: axes ? Math.max(34, Math.round(widest * 5.4) + 8) : 8, r: 12, t: 10, b: axes ? 22 : 8 }
   const t0 = pts[0].t, t1 = pts[pts.length - 1].t || t0 + 1
   const X = t => (t1 === t0 ? (P.l + W - P.r) / 2 : P.l + (t - t0) / (t1 - t0) * (W - P.l - P.r))
   const Y = y => {

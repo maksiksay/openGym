@@ -38,6 +38,32 @@ red or green verdict on today. A day with no entries is unknown, never zero. Cou
 **paused** at any time without losing the log or the goals. Goals can be worked out from age,
 height, weight, activity and goal (Mifflin–St Jeor, protein 1.8 g/kg) or typed in.
 
+## Steps and sleep from Apple Health
+
+A Shortcuts automation on the iPhone can send yesterday's step count and last night's sleep every
+morning, so neither has to be typed ([`dev/HEALTH_IMPORT.md`](dev/HEALTH_IMPORT.md)).
+
+- **Settings → Import from Apple Health → Make a key.** This shows the address and a personal key,
+  once. The key can only add steps and sleep to its owner's log: it reads nothing and is not a
+  sign-in. **New key** replaces it and **Turn off** removes it. Settings shows the last import.
+- **The Shortcut** posts `{ "today": "YYYY-MM-DD", "steps": …, "sleep": … }` to
+  `/api/health/import`, with `Authorization: Bearer <key>`.
+  - The steps are yesterday's, and the sleep is the night that ended this morning, which the log
+    files under today.
+  - `sleepMinutes` works in place of `sleep`, and a decimal comma is fine.
+- **The automation** runs it every morning: Time of Day, 09:00, Run Immediately. **How to set up
+  the Shortcut** in Settings walks through every action.
+- **Reaching the server.** When the automation runs, the phone has to reach the server. With
+  Tailscale, keep it connected or turn on VPN On Demand.
+- **Merging.** An imported day is merged field by field with whatever the phone holds, like any
+  other edit, so a morning check-in keeps its own fields.
+
+## The steps goal
+
+8,000 steps a day unless changed (**Settings → Health & food → Steps goal**). Home's health card
+says yesterday's count against it and the week's average over the days that have a count; the
+Health screen draws it on the steps chart.
+
 ## The Coach
 
 The consent screen gains a sixth category, *Sleep and food*, and the consent version moves to 2,
@@ -61,8 +87,10 @@ with `detail: true`, every food eaten — it runs on your machine against your o
 
 ## Not yet
 
-- Apple Health / Shortcuts import of steps and sleep (an ingest endpoint with a personal token).
-- Photo of a plate → estimate.
 - A Telegram bot for the morning check-in and the post-workout debrief.
+- Weight, heart rate and HRV from Apple Health, and Android's Health Connect.
+
+A photo of a plate is no longer on this list: in the Coach chat it becomes a meal card for the
+food log ([`dev/COACH_VOICE_PHOTO.md`](dev/COACH_VOICE_PHOTO.md)).
 - Translations beyond English and Russian: the module's strings sit in
   `frontend/src/lib/health-i18n*.js` until they move into `src/locales/`.

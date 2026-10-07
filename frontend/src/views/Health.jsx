@@ -4,7 +4,7 @@ import { useStore } from '../store/useStore.js'
 import { todayISO, isoOf, fmtDate } from '../lib/format.js'
 import { dateLocale } from '../lib/i18n.js'
 import { th } from '../lib/health-i18n.js'
-import { healthOn, healthSeries, recentAverages, sleepVsTraining } from '../lib/health.js'
+import { healthOn, healthSeries, recentAverages, sleepVsTraining, stepsGoalOf } from '../lib/health.js'
 import { SLOTS, SLOT_NAMES, mealsOn, totals, dailySeries, progressOf } from '../lib/nutrition.js'
 import { checkInSheet, addFoodSheet, mealRowSheet, goalsSheet, foodFormSheet, fmtInt, fmt1, macroLine } from '../sheets-health.jsx'
 import LineChart from '../components/LineChart.jsx'
@@ -121,9 +121,10 @@ function TrendsCard({ S }) {
   const prot = useMemo(() => dailySeries(S.meals, from, yesterday).map(x => ({ t: new Date(x.d + 'T12:00:00').getTime(), y: x.p, d: x.d })), [S.meals, from, yesterday])
   const sleep = useMemo(() => healthSeries(S.health, 'sleep', from, today), [S.health, from, today])
   const energy = useMemo(() => healthSeries(S.health, 'energy', from, today), [S.health, from, today])
+  const steps = useMemo(() => healthSeries(S.health, 'steps', from, today), [S.health, from, today])
   const pairs = useMemo(() => sleepVsTraining(S.health, S.workouts).slice(-8).reverse(), [S.health, S.workouts])
   const goals = S.nutri?.goals || null
-  if (kcal.length < 2 && sleep.length < 2) return null
+  if (kcal.length < 2 && sleep.length < 2 && steps.length < 2) return null
   return <div className="card">
     <h2 style={{ marginTop: 0 }}>{th('Last six weeks')}</h2>
     {kcal.length > 1 && <><div className="small muted">{th('Calories per logged day')}</div>
@@ -132,6 +133,8 @@ function TrendsCard({ S }) {
       <div className="chart"><LineChart points={prot} h={110} unit={th('g')} goal={goals?.p || null} /></div></>}
     {sleep.length > 1 && <><div className="small muted" style={{ marginTop: 10 }}>{th('Sleep, h')}</div>
       <div className="chart"><LineChart points={sleep} h={110} unit={th('h')} color="var(--blue)" /></div></>}
+    {steps.length > 1 && <><div className="small muted" style={{ marginTop: 10 }}>{th('Steps a day')}</div>
+      <div className="chart"><LineChart points={steps} h={110} goal={stepsGoalOf(S)} color="var(--green)" /></div></>}
     {energy.length > 1 && <><div className="small muted" style={{ marginTop: 10 }}>{th('Energy, 1–5')}</div>
       <div className="chart"><LineChart points={energy} h={90} color="var(--green)" /></div></>}
     {pairs.length > 0 && <>

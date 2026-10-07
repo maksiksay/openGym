@@ -10,8 +10,8 @@ import Icon from '../components/Icon.jsx'
 import { Button } from '../components/ui.jsx'
 import { tappable } from '../lib/use-sheet-keyboard.js'
 import { glyphOf } from '../lib/glyphs.js'
-import { th } from '../lib/health-i18n.js'
-import { healthOn } from '../lib/health.js'
+import { th, nSteps } from '../lib/health-i18n.js'
+import { healthOn, stepsSummary } from '../lib/health.js'
 import { dayTotals } from '../lib/nutrition.js'
 import { checkInSheet, addFoodSheet, fmt1 } from '../sheets-health.jsx'
 import { MacroBar } from './Health.jsx'
@@ -94,6 +94,13 @@ function HealthCard({ S, nav }) {
   const food = nutri.on !== false && !nutri.paused
   const tot = dayTotals(S.meals, d)
   const goals = nutri.goals || null
+  // Steps against the goal (docs/dev/HEALTH_IMPORT.md): yesterday, the last whole day, and the
+  // week's average over the days that have a count. Nothing until some day has one.
+  const steps = stepsSummary(S, d)
+  const stepsLine = steps.days ? [
+    steps.yesterday ? th('Yesterday {0}', nSteps(steps.yesterday.steps)) + (steps.yesterday.met ? ' ✓' : '') : null,
+    th('7 days: {0} on average of {1}', steps.avg.toLocaleString(dateLocale()), steps.goal.toLocaleString(dateLocale()))
+  ].filter(Boolean).join(' · ') : null
   return <div className="card tappable" style={{ cursor: 'pointer' }} {...tappable(() => nav('/health'))}>
     <div className="row between" style={{ marginBottom: 8 }}>
       <div className="row" style={{ gap: 9 }}>
@@ -107,6 +114,7 @@ function HealthCard({ S, nav }) {
       </div>
       <Icon name="chevronRight" className="chev" />
     </div>
+    {stepsLine && <div className="muted small health-steps"><Icon name="figureRun" />{stepsLine}</div>}
     {food && <>
       <MacroBar label={th('Calories')} value={tot.kcal} goal={goals?.kcal} unit="kcal" color="var(--orange)" />
       <MacroBar label={th('Protein')} value={tot.p} goal={goals?.p} unit="g" color="var(--acc)" />

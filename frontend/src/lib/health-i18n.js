@@ -8,7 +8,7 @@
  *
  * Moving these into src/locales/ is the step that comes with translating them.
  */
-import { getLang, baseLang, t } from './i18n-core.js'
+import { getLang, baseLang, t, dateLocale } from './i18n-core.js'
 import ru from './health-i18n.ru.js'
 
 const PACKS = { ru }
@@ -24,6 +24,10 @@ export function th(s, ...args) {
 }
 
 /** Russian plural for a count: one / few / many — "1 день", "2 дня", "5 дней". */
+/** "8,123 steps", in the language's own plural form. */
+export const nSteps = n => `${Math.round(Number(n) || 0).toLocaleString(dateLocale())} ${plural(n, STEPS[baseLang(getLang())] || STEPS.en)}`
+const STEPS = { en: ['step', 'steps'], ru: ['шаг', 'шага', 'шагов'] }
+
 export function plural(n, forms) {
   const lang = baseLang(getLang())
   if (lang !== 'ru' && lang !== 'uk') return Math.abs(n) === 1 ? forms[0] : forms[forms.length - 1]

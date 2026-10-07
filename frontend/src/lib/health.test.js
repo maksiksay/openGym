@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { cleanField, setHealth, healthOn, mergeHealth, healthSeries, recentAverages, weeklyHealth, sleepVsTraining, meanOf } from './health.js'
+import { STEPS_GOAL_DEFAULT, stepsGoalOf, stepsSummary } from './health.js'
 
 describe('cleanField', () => {
   it('keeps values in range, drops the rest instead of clamping', () => {
@@ -95,5 +96,29 @@ describe('sleepVsTraining', () => {
       { d: '2026-10-03', vol: 5000, entries: [] },
     ]
     expect(sleepVsTraining(H, W)).toEqual([{ d: '2026-10-05', sleep: 5.5, energy: 2, vol: 4200 }])
+  })
+})
+
+// docs/dev/HEALTH_IMPORT.md: the steps goal, and what Home says against it.
+
+describe('the steps goal', () => {
+  it('is the profile\'s own, or 8,000', () => {
+    expect(stepsGoalOf({})).toBe(STEPS_GOAL_DEFAULT)
+    expect(stepsGoalOf({ stepsGoal: 10000 })).toBe(10000)
+    expect(stepsGoalOf({ stepsGoal: 'lots' })).toBe(8000)
+    expect(stepsGoalOf({ stepsGoal: 99 })).toBe(8000)
+  })
+
+  it('reads yesterday against it, and the week\'s average over the days that have a count', () => {
+    const S = { stepsGoal: 8000, health: [
+      { d: '2026-10-07', steps: 8123 },
+      { d: '2026-10-06', steps: 6000, energy: 3 },
+      { d: '2026-10-05', energy: 4 },                // no count: unknown, not zero
+      { d: '2026-09-29', steps: 20000 },             // eight days before: outside the week
+      { d: '2026-10-08', steps: 500 },               // today, still growing: not counted
+    ] }
+    expect(stepsSummary(S, '2026-10-08')).toEqual({ goal: 8000, yesterday: { d: '2026-10-07', steps: 8123, met: true }, avg: 7062, days: 2 })
+    expect(stepsSummary(S, '2026-10-07').yesterday).toEqual({ d: '2026-10-06', steps: 6000, met: false })
+    expect(stepsSummary({ health: [] }, '2026-10-08')).toEqual({ goal: 8000, yesterday: null, avg: null, days: 0 })
   })
 })

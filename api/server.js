@@ -30,6 +30,7 @@ import {
   listPasskeys, addPasskeyRecord, renamePasskeyRecord, removePasskeyRecord, passkeyRemovalRefused, MAX_PASSKEYS
 } from './passkeys-store.js';
 import { createDeviceLink, findDeviceLink, burnDeviceLink, dropDeviceLinks } from './device-link.js';
+import { createImportKey, revokeImportKey, importKeyStatus, userOfImportKey, noteImport, applyHealthImport } from './health-import.js';
 import { createMediaStore, mediaLimits, mediaConfig, MediaError, HASH_RE } from './media.js';
 
 const PORT = +(process.env.PORT || 3000);
@@ -814,7 +815,10 @@ const ACCOUNT_FAILS = createBackoff({
   // At most one per profile with a password, so this cannot grow without bound.
   keep: k => k.startsWith('acct:') && hasPassword(db.users.find(u => u.id === k.slice(5)))
 });
-setInterval(() => { AUTH_BURST.sweep(); ADDR_FAILS.sweep(); ACCOUNT_FAILS.sweep(); }, 60000).unref();
+// Imports of steps and sleep (docs/dev/HEALTH_IMPORT.md): a morning automation sends one a day, so
+// thirty an hour per key is room for a few retries and a backfill, and nothing like a flood.
+const IMPORT_BURST = createWindow({ max: 30, windowMs: 3600000 });
+setInterval(() => { AUTH_BURST.sweep(); ADDR_FAILS.sweep(); ACCOUNT_FAILS.sweep(); IMPORT_BURST.sweep(); }, 60000).unref();
 
 // Route -> the kind of failure it can count. Every route listed here also spends the burst
 // budget; `null` spends only that.
@@ -829,7 +833,10 @@ const THROTTLED = {
   // budget: the password that may prove them counts its own failures (passwordAttempt).
   'POST /api/device-link/options': 'link', 'POST /api/device-link/verify': 'link',
   'POST /api/account/passkeys/options': null, 'POST /api/account/device-link': null,
-  'DELETE /api/account/passkeys': null
+  'DELETE /api/account/passkeys': null,
+  // An import key (docs/dev/HEALTH_IMPORT.md) is a credential sent by a phone with no session:
+  // wrong ones pause the address the way wrong device-link codes do.
+  'POST /api/health/import': 'import'
 };
 
 // Which address the throttle counts against. Unlike clientIp() above, which only labels a log
@@ -1935,9 +1942,10 @@ const routes = {
     if (!user) return json(res, 401, { error: 'not signed in' });
     user.sv = sessionVersion(user) + 1;
     // An unredeemed pairing code is a session-in-waiting for this account; it goes too, and so
-    // does an unused device link.
+    // do an unused device link and the health import key.
     for (const [k, v] of pairings) if (v.uid === user.id) pairings.delete(k);
     dropDeviceLinks(db, user.id);
+    revokeImportKey(db, user.id);
     saveDb();
     audit(req, 'auth.logout.all', { user });
     json(res, 200, { ok: true }, { 'Set-Cookie': clearCookie });
@@ -2070,6 +2078,57 @@ const routes = {
       try { MEDIA.noteState(user.id, body.state); } catch (e) { console.error('media noteState', e); }
     }
     json(res, 200, { ok: true, ts: body.state._ts || null, rev: body.state._rev });
+  },
+
+  /* ---------- steps and sleep from Apple Health (docs/dev/HEALTH_IMPORT.md) ---------- */
+
+  // The import key, for the Settings screen: whether there is one and how it was last used.
+  'GET /api/health/import-key': async (req, res) => {
+    const user = readSession(req);
+    if (!user) return notSignedIn(res);
+    json(res, 200, { ...importKeyStatus(db, user.id), url: ORIGIN + '/api/health/import' });
+  },
+  // A new key, shown once; the old one stops working.
+  'POST /api/health/import-key': async (req, res) => {
+    const user = readSession(req);
+    if (!user) return notSignedIn(res);
+    const { key } = createImportKey(db, user.id);
+    saveDb();
+    audit(req, 'auth.import.create', { user });
+    json(res, 200, { key, url: ORIGIN + '/api/health/import', ...importKeyStatus(db, user.id) });
+  },
+  'DELETE /api/health/import-key': async (req, res) => {
+    const user = readSession(req);
+    if (!user) return notSignedIn(res);
+    if (revokeImportKey(db, user.id)) { saveDb(); audit(req, 'auth.import.revoke', { user }); }
+    json(res, 200, { ok: true });
+  },
+  // The import itself, from a Shortcuts automation. The key in the Authorization header is the whole
+  // credential, and this is all it can do: set steps and sleep on days of its owner's health log.
+  // The state is written the way PUT /api/data writes it, a revision up, so the phone pulls it on
+  // its next look; a phone with unsynced edits meets a 409 there and merges, field by field.
+  'POST /api/health/import': async (req, res) => {
+    const auth = String(req.headers.authorization || '');
+    const uid = userOfImportKey(db, auth.startsWith('Bearer ') ? auth.slice(7).trim() : '');
+    const user = uid && db.users.find(u => u.id === uid);
+    if (!user || user.disabled) {
+      strikeAddress(req, 'import');
+      return json(res, 401, { error: 'unknown import key' });
+    }
+    const wait = IMPORT_BURST.take(user.id);
+    if (wait) return tooMany(res, wait);
+    const body = await readBody(req);
+    const cur = readState(user.id);
+    if (!cur) return json(res, 409, { error: 'open the app once first: there is no profile data to add to yet' });
+    if (cur.healthOn === false) return json(res, 409, { error: 'the health log is switched off in Settings' });
+    const r = applyHealthImport(cur, body);
+    if (!r.ok) return json(res, 400, { error: r.error });
+    cur._rev = (cur._rev || 0) + 1;
+    atomicWrite(stateFile(user.id), JSON.stringify(cur));
+    stateCache.delete(user.id);   // see PUT /api/data: a same-size write inside one mtime tick
+    noteImport(db, user.id, r.wrote);
+    saveDb();
+    json(res, 200, { ok: true, wrote: r.wrote, rev: cur._rev });
   },
 
   'GET /api/push/public-key': async (req, res) => json(res, 200, { key: vapid.publicKey }),
@@ -2251,6 +2310,7 @@ const routes = {
     db.creds = (db.creds || []).filter(c => c.userId !== u.id);
     db.subs = (db.subs || []).filter(x => x.userId !== u.id);
     dropDeviceLinks(db, u.id);
+    revokeImportKey(db, u.id);
     presence.delete(u.id);
     // The training history and any Coach credential of theirs, both outside db.json.
     try { fs.unlinkSync(stateFile(u.id)); } catch { /* already gone */ }

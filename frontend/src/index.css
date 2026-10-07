@@ -1549,6 +1549,16 @@ body.chips-dragging *{cursor:inherit}
 .level-title{text-transform:capitalize}
 .level-you{width:28px;flex:none;text-align:right;font-size:12px;font-weight:600;color:var(--acc)}
 .season-level{font-size:13px;color:var(--label-2);margin-top:3px}
+/* steps and the Apple Health import (docs/dev/HEALTH_IMPORT.md) */
+.health-steps{display:flex;align-items:center;gap:6px;margin:-2px 0 8px}
+.health-steps .icn{flex:none;color:var(--green)}
+.himp-key{margin:4px 16px 8px;padding:10px 12px;border-radius:12px;background:var(--surface-2)}
+.himp-v{display:flex;align-items:center;gap:6px}
+.himp-v code{flex:1;min-width:0;font-size:13px;word-break:break-all;user-select:all}
+.himp-actions{display:flex;flex-wrap:wrap;gap:8px;padding:6px 16px 12px}
+.himp-step{display:flex;gap:10px;margin:12px 0}
+.himp-step b{display:block;margin-bottom:2px}
+.himp-n{flex:none;width:24px;height:24px;border-radius:50%;background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600}
 .season-level .up{color:var(--green)}
 
 /* --- toast --- */

@@ -1760,6 +1760,120 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
               example: { error: "too many uploads — try again later", code: "locked", retryAfter: 1200 }
 
+  /api/health/import-key:
+    get:
+      tags: [data]
+      operationId: getHealthImportKey
+      summary: Whether this profile has a health import key, and its last use
+      description: |
+        For the Settings screen (docs/dev/HEALTH_IMPORT.md). The key itself is never returned
+        here: only that there is one, when it was made, and what the last import wrote.
+      responses:
+        '200':
+          description: The key's state, and the address an import goes to.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  exists: { type: boolean }
+                  created: { type: integer, description: Milliseconds since the epoch. }
+                  lastUsed: { type: integer, nullable: true }
+                  last: { type: array, nullable: true, items: { type: object } }
+                  url: { type: string }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [data]
+      operationId: createHealthImportKey
+      summary: Make a new health import key, replacing the old one
+      description: |
+        Returns the key once; only its SHA-256 is stored. All the key can do is
+        `POST /api/health/import` for this profile.
+      responses:
+        '200':
+          description: The new key, and the address to send imports to.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  key: { type: string }
+                  url: { type: string }
+                  exists: { type: boolean }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    delete:
+      tags: [data]
+      operationId: deleteHealthImportKey
+      summary: Turn the health import key off
+      responses:
+        '200': { description: Done, whether or not there was a key. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/health/import:
+    post:
+      tags: [data]
+      operationId: postHealthImport
+      summary: Add steps and sleep to the health log, from a Shortcuts automation
+      description: |
+        Authenticated by the import key alone (`Authorization: Bearer <key>`), never by a session
+        (docs/dev/HEALTH_IMPORT.md). The morning shape is `{ today, steps?, sleep? }`: the steps
+        are yesterday's, the sleep is the night that ended on `today`. `sleepMinutes` may stand
+        for `sleep`, numbers may be strings with a decimal comma, and `days` may come instead,
+        for up to 14 days of backfill within the last 60. The state's revision goes up, so the
+        app pulls the change; each day is merged field by field with what the app holds.
+        Thirty imports an hour per key; wrong keys pause the address.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                today: { type: string, format: date }
+                steps: { oneOf: [{ type: number }, { type: string }] }
+                sleep: { oneOf: [{ type: number }, { type: string }], description: Hours. }
+                sleepMinutes: { oneOf: [{ type: number }, { type: string }] }
+                days:
+                  type: array
+                  maxItems: 14
+                  items:
+                    type: object
+                    properties:
+                      d: { type: string, format: date }
+                      steps: { type: number }
+                      sleep: { type: number }
+                      sleepMinutes: { type: number }
+      responses:
+        '200':
+          description: What was written, and the new revision.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  wrote: { type: array, items: { type: object } }
+                  rev: { type: integer }
+        '400':
+          description: A field out of the log's bounds, a missing or far-off `today`, or nothing to write.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: "sleep must be between 0 and 16" }
+        '401':
+          description: No key, or not one this server knows.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: "unknown import key" }
+        '409':
+          description: The profile has no data yet, or its health log is switched off.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: "the health log is switched off in Settings" }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
   /api/push/public-key:
     get:
       tags: [push]

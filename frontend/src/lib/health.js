@@ -163,3 +163,32 @@ export function sleepVsTraining(health, workouts) {
   }
   return out
 }
+
+/* ---------- the steps goal (docs/dev/HEALTH_IMPORT.md) ---------- */
+
+/** The daily steps goal: the profile's own, or 8,000, the low end of 8,000–10,000 a day. */
+export const STEPS_GOAL_DEFAULT = 8000
+export const STEPS_GOAL_CHOICES = [5000, 6000, 7000, 8000, 9000, 10000, 12000, 15000]
+export const stepsGoalOf = S => (Number.isInteger(S?.stepsGoal) && S.stepsGoal >= 1000 && S.stepsGoal <= 50000 ? S.stepsGoal : STEPS_GOAL_DEFAULT)
+
+/**
+ * Steps against the goal, seen on `iso`: yesterday's count (the last whole day, which the morning
+ * import brings) and the average of the seven days before `iso` that have a count. A day without
+ * one is unknown, not zero, so it is left out of the average.
+ */
+export function stepsSummary(S, iso) {
+  const goal = stepsGoalOf(S)
+  const before = n => { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() - n); return isoOf(d) }
+  const counts = []
+  for (let i = 1; i <= 7; i++) {
+    const e = healthOn(S?.health, before(i))
+    if (e && fin(e.steps)) counts.push(Number(e.steps))
+  }
+  const y = healthOn(S?.health, before(1))
+  return {
+    goal,
+    yesterday: y && fin(y.steps) ? { d: before(1), steps: Number(y.steps), met: Number(y.steps) >= goal } : null,
+    avg: counts.length ? Math.round(counts.reduce((a, b) => a + b, 0) / counts.length) : null,
+    days: counts.length
+  }
+}
