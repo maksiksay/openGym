@@ -7,7 +7,7 @@ import { useUI } from '../store/useUI.js'
 import { exOr, betterWeight } from '../lib/exercises.js'
 import { usesBar } from '../lib/bar.js'
 import { loadKindFor, baseWeightFor, inventoryFor, rowLoad, sameLoad, plateDelta, dropGrid } from '../lib/plates.js'
-import { effectiveRoutines, effectiveRoutineIds, lastEntryFor, bestWeightFor, bestWeightForEntry, buildSets, freestyleConfig, defaultConfig, setsDoneActive, setUnitsTotal, supersetUnits, unitOf, setLabel, modeOf, isBw, isPerSide, repStep, EFFORT, effortOf, stepEffort, capEffort, cascadeWeight, insertWarmupRow, removeRowAt, pairAdjacent, unpairSuperset, cleanupSg, applyIntensifierPlan, pinnedNoteFor, exNoteFor } from '../lib/history.js'
+import { effectiveRoutines, effectiveRoutineIds, lastEntryFor, bestWeightFor, bestWeightForEntry, buildSets, freestyleConfig, defaultConfig, setsDoneActive, setUnitsTotal, supersetUnits, unitOf, setLabel, modeOf, isBw, isPerSide, repStep, EFFORT, effortOf, effortScopeOf, stepEffort, capEffort, cascadeWeight, insertWarmupRow, removeRowAt, pairAdjacent, unpairSuperset, cleanupSg, applyIntensifierPlan, pinnedNoteFor, exNoteFor } from '../lib/history.js'
 import { fmtNum, fmtPlate, exerciseNameText, fmtDate, todayISO, exCount, DAYN } from '../lib/format.js'
 import { speedUnitOf, toSpeed, fromSpeed } from '../lib/speed.js'
 import { beep, vibrate, unlock } from '../lib/sound.js'
@@ -16,7 +16,8 @@ import { api, beacon } from '../lib/api.js'
 import { insertionIndexAfterCurrentUnit, nextUnfinishedUnit, setProgressHighWater, supersetFlowStep, restAfterSet, restOnRecheck, restSecFor, warmupRestSecFor } from '../lib/supersetFlow.js'
 import Media from '../components/Media.jsx'
 import { startFlow, exercisePicker, exConfigSheet, exerciseDetailSheet, finishWorkout, exitWorkoutEdit, workoutCompleteSheet, confirmSheet, exerciseNoteSheet, sessionNoteSheet, renameWorkoutSheet, swapActiveWorkoutExercise, barWeightSheet, menuSheet, effortPickerSheet, exerciseHistorySheet, addRoutineToSessionSheet } from '../sheets.jsx'
-import { effortColor } from '../lib/effort.js'
+import { effortColor, EFFORT_PRESETS, rirOf, toScale } from '../lib/effort.js'
+import { te, whyText } from '../lib/effort-i18n.js'
 import Icon from '../components/Icon.jsx'
 import { Button, Check, NumberField } from '../components/ui.jsx'
 import { defaultIncrement, weightIncrement, stepWeight } from '../lib/progression.js'
@@ -115,6 +116,8 @@ function ExerciseBlock({ entryIdx, compact, dense, editing, onToggle, onToggleSi
   const S = useStore(s => s.S)
   const update = useStore(s => s.update)
   const working = useUI(s => s.work)
+  // The rating row under the plan's last work set, reopened from its chip to change the value.
+  const [rerate, setRerate] = useState(false)
   const entry = S.active.entries[entryIdx]
   // Drops/bursts mutate the row in place — same card, not a new set with its own long rest.
   // A planned exercise (see the exercise's "Intensifier" config) arrives with these already
@@ -211,15 +214,19 @@ function ExerciseBlock({ entryIdx, compact, dense, editing, onToggle, onToggleSi
   const goalLine = (() => {
     if (!goal) return null
     const nums = goalText(goal, S.unit)
-    const text = goal.kind === 'first' ? ts('First time — this sets your baseline')
-      : goal.kind === 'deload' ? ts('Deload: {0}', nums)
-        : goal.kind === 'plain' ? ts('Today: {0}', nums)
-          : ts('Beat: {0}', nums)
-    const why = guidance ? `${t(guidance.policyLabel)} · ${t(...guidance.why)}` : null
+    // A first session with effort on says how to find the working weight (docs/dev/RIR_STEP.md):
+    // that is the line itself, not a reason behind a tap nobody makes on a phone.
+    const calibrate = goal.kind === 'first' && plan?.calibrate === true
+    const text = calibrate ? whyText(plan.why)
+      : goal.kind === 'first' ? ts('First time — this sets your baseline')
+        : goal.kind === 'deload' ? ts('Deload: {0}', nums)
+          : goal.kind === 'plain' ? ts('Today: {0}', nums)
+            : ts('Beat: {0}', nums)
+    const why = guidance ? `${t(guidance.policyLabel)} · ${whyText(guidance.why)}` : null
     const cls = 'goalline' + (goal.kind === 'deload' ? ' warn' : goal.kind === 'goal' ? '' : ' quiet')
     const body = <>
       <Icon name={goal.kind === 'deload' ? 'arrowDown' : 'target'} />
-      <span>{text}{goal.kind === 'deload' && guidance && <span className="why"> · {t(...guidance.why)}</span>}</span>
+      <span>{text}{goal.kind === 'deload' && guidance && <span className="why"> · {whyText(guidance.why)}</span>}</span>
     </>
     return onProgressionSettings
       ? <button type="button" className={cls} title={why || undefined}
@@ -289,7 +296,16 @@ function ExerciseBlock({ entryIdx, compact, dense, editing, onToggle, onToggleSi
   const eff = EFFORT[kind]
   // The effort column carries the scale key (`eff`) and its field name; unlike weight/reps it
   // is not a stepper — it opens a colour-coded picker (see effortCell). `f` is s.rir or s.rpe.
-  const col3 = mode === 'reps' && eff ? { f: eff.f, eff: kind, hd: t(eff.hd) } : null
+  // Under "the last set" (Settings → Effort per set → Ask on, docs/dev/RIR_STEP.md) there is no
+  // column: the one rating asked for is a row under the plan's last work set (rateRow, below).
+  const askLast = effortScopeOf(S) === 'last'
+  const col3 = mode === 'reps' && eff && !askLast ? { f: eff.f, eff: kind, hd: t(eff.hd) } : null
+  // That set is the one the RIR step reads (readSession): the last of the plan's own work sets,
+  // never a warm-up or a set added on top. -1 when nothing here is asked.
+  const workRows = entry.sets.reduce((a, s, i) => (isWarmupRow(s) ? a : [...a, i]), [])
+  const rateIdx = mode === 'reps' && eff && askLast && workRows.length
+    ? workRows[Math.min(Math.max(1, entry.target?.sets || workRows.length), workRows.length) - 1]
+    : -1
   // The effort column walks its own scale — see stepEffort. Weight and reps step up from 0
   // with no ceiling, as they always did.
   const bump = (s, i, col, dir) => {
@@ -486,6 +502,47 @@ function ExerciseBlock({ entryIdx, compact, dense, editing, onToggle, onToggleSi
       </div>
     )
   }
+  // The rating under the plan's last work set (docs/dev/RIR_STEP.md): the picker's presets in a
+  // row, there from the moment that set is the one in hand (every earlier work set of the plan
+  // done), folding into a tinted chip once one is picked. Picking also ticks the set, the way the
+  // column does (issue #64): one tap instead of two, and the rating is stored before the tick's
+  // flow runs — the "That was the whole workout" sheet after the last exercise, or a superset
+  // moving on to the partner, would otherwise cover a row that only appeared after the tick.
+  // A drop set or a rest-pause set is not asked: its last rep is meant to be the last in the tank.
+  // A per-side set gets one rating for both sides, so its derived rating (the harder side) is it.
+  const rateRow = (s, i) => {
+    if (i !== rateIdx || isDropSet(s) || isRestPauseSet(s)) return null
+    if (!s.done && !workRows.filter(ix => ix < i).every(ix => entry.sets[ix].done)) return null
+    const rir = rirOf(s)
+    const pick = nv => {
+      if (isSideSet(s)) mutSet(i, row => setSideField(setSideField(row, 'L', eff.f, nv), 'R', eff.f, nv))
+      else onField(i, eff.f, nv)
+      setRerate(false)
+      // Read live from the store: the write above, and the first side's tick, replace the row.
+      const fresh = () => useStore.getState().S.active?.entries[entryIdx]?.sets[i]
+      if (!fresh()) return
+      if (isSideSet(fresh())) ['L', 'R'].forEach(side => { if (!fresh().sides[side].done) onToggleSide(i, side) })
+      else if (!fresh().done) onToggle(i)
+    }
+    if (rir != null && !rerate) {
+      const color = effortColor(rir)
+      return <div className="raterow">
+        <button type="button" className="ratechip" aria-label={te('Change the rating')} onClick={() => setRerate(true)}
+          style={color ? { color, borderColor: color, background: `color-mix(in srgb, ${color} 20%, var(--surface-2))` } : undefined}>
+          {t(eff.hd)} {fmtNum(s[eff.f])}
+        </button>
+      </div>
+    }
+    return <div className="raterow">
+      <span className="raterow-q">{s.done ? te('How many reps were left?') : te('How many reps were left? A tap ticks the set.')}</span>
+      <div className="raterow-b">
+        {EFFORT_PRESETS.map(p => <button type="button" key={p.rir} className={'ratebtn' + (rir === p.rir ? ' on' : '')}
+          style={{ '--bc': p.color }} onClick={() => pick(toScale(kind, p.rir))}>
+          {fmtNum(toScale(kind, p.rir))}{p.tail && kind === 'rir' ? '+' : ''}
+        </button>)}
+      </div>
+    </div>
+  }
   // One side's row: the L or R badge, then the same weight/reps/effort controls as a straight
   // row but bound to that side, and the side's own done tick.
   const sideRow = (s, i, side, col1, col2, col3) => {
@@ -630,6 +687,7 @@ function ExerciseBlock({ entryIdx, compact, dense, editing, onToggle, onToggleSi
           </div>
           )}
           {loadLine(String(i))}
+          {rateRow(s, i)}
           {/* Drop-sets and rest-pause bursts extend this same row — no long rest, no new set.
               A planned exercise arrives with these already filled in (applyIntensifierPlan);
               every value here is just as editable as the main row's own weight/reps. */}

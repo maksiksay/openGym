@@ -16,10 +16,11 @@
 //   · fewer sets than prescribed                       → miss
 // So a session that fell apart can never advance the load as though it had succeeded.
 
-import { modeOf, repStep, rerampWarmups, isBw, isPerSide, entryExcluded, entryRoutineId } from './history.js'
+import { modeOf, repStep, rerampWarmups, isBw, isPerSide, entryExcluded, entryRoutineId, effortOf, workoutDay } from './history.js'
 import { EXIDX, isAssisted, isLoadedEq } from './exercises.js'
-import { isWarmupRow, isSideSet, syncSideAggregate, makeSideSet } from './workout-model.js'
+import { isWarmupRow, isSideSet, syncSideAggregate, makeSideSet, setType } from './workout-model.js'
 import { normalizeRepRange } from './rep-range.js'
+import { rirOf } from './effort.js'
 
 export const POLICIES = ['off', 'linear', 'greyskull', 'double', 'time']
 
@@ -58,6 +59,24 @@ export function isValidDeloadFactor(value) {
 }
 export function deloadFactorOf(cfg) {
   return isValidDeloadFactor(cfg?.deloadFactor) ? Number(cfg.deloadFactor) : DELOAD_FACTOR
+}
+
+// The RIR step (docs/dev/RIR_STEP.md): how hard the plan's last work set was sets the size of the
+// next step. Every rep with this many or more left is an easy session, and the step may double…
+export const EASY_RIR = 4
+// …below this many it had nothing left, and the weight holds once before it moves on.
+export const LIMIT_RIR = 1
+// A doubled step may be at most this share of the weight: 5 kg on a 60 kg bench, never on a
+// 12.5 kg cable fly, where one step is already a fifth of the load.
+export const MAX_JUMP = 0.1
+// Under this many hours of sleep a missed session does not count toward a deload.
+export const SHORT_NIGHT_H = 6
+
+/** Which zone a rating in RIR falls into: 'limit', 'range' or 'easy'; null when there is none. */
+export function effortZone(rir) {
+  if (rir == null || rir === '' || !Number.isFinite(Number(rir))) return null
+  const v = Number(rir)
+  return v < LIMIT_RIR ? 'limit' : v >= EASY_RIR ? 'easy' : 'range'
 }
 
 // Epley uses the reps performed by one side for unilateral work. Callers pass the stored total
@@ -230,6 +249,37 @@ export function plannedOf(cfg) {
 // progression leads (issue #232), and from there the work is a plain pull-up or dip.
 const climbsReps = cfg => isBw(cfg) || !isLoadedEq(cfg.id) || isAssisted(cfg)
 
+// The first session (docs/dev/RIR_STEP.md). With effort on, a loaded lift is told how to find its
+// working weight, because the step after it reads how hard that weight turned out to be.
+// `calibrate` marks that reason as one the workout shows on the goal line, not only on a tap.
+function firstOf(S, cfg, mode, policy) {
+  if (mode === 'reps' && !climbsReps(cfg) && effortOf(S) !== 'none') {
+    const reps = policy === 'double' ? normalizeRepRange(cfg.reps || 10, cfg.repsMin, repStep(cfg)).repsMin : cfg.reps
+    if (reps > 0) return { calibrate: true, why: ['First time: add weight through your warm-ups until {0} reps leave about 2 in reserve — that is your working weight.', reps] }
+  }
+  return { why: ['Nothing logged yet — this session sets the baseline.'] }
+}
+
+// The latest weigh-in by date, in the profile's unit, or null.
+function latestBodyWeight(S) {
+  const last = (S.bodyweight || []).filter(e => e && e.w > 0).sort((a, b) => String(a.d).localeCompare(String(b.d))).at(-1)
+  return last ? Number(last.w) : null
+}
+
+// Whether a doubled step stays within MAX_JUMP of the work being done: the weight lifted, or on an
+// assistance machine the body weight the help leaves you — so without a weigh-in it never doubles.
+function doubleFits(S, w, inc, assisted) {
+  const work = assisted ? (latestBodyWeight(S) ?? 0) - w : w
+  return work > 0 && 2 * inc <= MAX_JUMP * work + 1e-9
+}
+
+// Whether the last session is the first clean one at its weight in the current run. The hold at
+// the limit applies to that one only; the next clean session at the weight takes its step.
+function firstCleanAt(sessions, w) {
+  for (let j = sessions.length - 2; j >= 0 && sessions[j].weight === w; j--) if (sessions[j].ok) return false
+  return true
+}
+
 const PLAN_KEYS = ['sets', 'reps', 'repsMin', 'sec']
 const samePlan = (a, b) => PLAN_KEYS.every(k => (a[k] ?? null) === (b[k] ?? null))
 /** Did the routine's sets or reps change since the session that stamped `planned`? */
@@ -284,13 +334,19 @@ export function readSession(entry, fallback) {
   }
   const goal = target.reps || 0
   const reps = sets.map(s => (s.done ? (s.r || 0) : 0))
+  // The rating the RIR step reads (docs/dev/RIR_STEP.md): the plan's own last set, done. A drop set
+  // or a rest-pause set is meant to end at failure, so its rating says nothing about the load. A
+  // per-side row already carries its harder side's rating (syncSideAggregate).
+  const lastSet = sets[sets.length - 1]
+  const rir = lastSet && lastSet.done && setType(lastSet) === 'straight' ? rirOf(lastSet) : null
   return {
     mode, target, goal, reps,
     weight: loadOf(entry, sets),
     count: reps.length,                                   // the dimension bodyweight work grows (#33)
     low: reps.length ? Math.min(...reps) : 0,
     amrap: reps.length ? reps[reps.length - 1] : 0,       // Greyskull's final set
-    ok: goal > 0 && enough && reps.length > 0 && reps.every(r => r >= goal)
+    ok: goal > 0 && enough && reps.length > 0 && reps.every(r => r >= goal),
+    rir
   }
 }
 
@@ -312,6 +368,14 @@ export function sessionsFor(S, exId, fallback, rid) {
   return sessionsIn(S, exId, fallback, null)
 }
 
+// The night before a day, in hours, from the health log (lib/health.js: `sleep` on a day is the
+// night that ended that morning), or null when none was logged.
+function sleepOn(S, day) {
+  const e = (S.health || []).find(h => h && h.d === day)
+  const v = e && e.sleep
+  return v != null && v !== '' && Number.isFinite(Number(v)) ? Number(v) : null
+}
+
 function sessionsIn(S, exId, fallback, rid) {
   const out = []
   ;(S.workouts || []).forEach(w => {
@@ -325,7 +389,11 @@ function sessionsIn(S, exId, fallback, rid) {
     if (entryExcluded(w, entry)) return
     if (!entry.sets.some(s => s.done && !isWarmupRow(s))) return
     const slot = entryRoutineId(w, entry)
-    out.push({ d: w.d, ...(slot ? { rid: slot } : {}), ...(entry.planned ? { planned: entry.planned } : {}), ...readSession(entry, fallback) })
+    // A short night (docs/dev/RIR_STEP.md) travels with the session, so a miss on it can be left
+    // out of the stall count without losing the session itself.
+    const sleep = sleepOn(S, workoutDay(w))
+    const night = sleep != null && sleep < SHORT_NIGHT_H ? { short: true, sleep } : {}
+    out.push({ d: w.d, ...(slot ? { rid: slot } : {}), ...(entry.planned ? { planned: entry.planned } : {}), ...readSession(entry, fallback), ...night })
   })
   return out
 }
@@ -391,7 +459,7 @@ export function nextPrescription(S, cfg, routine) {
   // routine has none yet (issue #216) — see sessionsFor.
   const sessions = sessionsFor(S, cfg.id, cfg, routine?.id).filter(s => s.mode === mode)
   const last = sessions[sessions.length - 1]
-  if (!last) return { policy, kind: 'first', why: ['Nothing logged yet — this session sets the baseline.'] }
+  if (!last) return { policy, kind: 'first', ...firstOf(S, cfg, mode, policy) }
 
   // Start again from the plan (issue #275) when the last session was built from a different one:
   // the routine's sets or reps were edited since, or the session is borrowed from another routine
@@ -423,8 +491,12 @@ export function nextPrescription(S, cfg, routine) {
     return { policy, kind: 'hold', ...held, reps: cfg.reps || undefined, why }
   }
 
-  const stalls = stallCount(sessions, policy)
+  // A miss after a short night neither counts toward a deload nor ends a run (docs/dev/RIR_STEP.md):
+  // the count runs over the sessions without one. A deload already earned on ordinary nights stands.
+  const stalls = stallCount(sessions.filter(s => s.ok || !s.short), policy)
   const deloadAt = DELOAD_AFTER[policy] || 3
+  const shortMiss = !last.ok && !!last.short && stalls < deloadAt
+  const nightWhy = ['Short night ({0} h) — the same target again; this miss does not count.', last.sleep]
 
   if (mode === 'time') {
     if (last.ok) {
@@ -435,7 +507,7 @@ export function nextPrescription(S, cfg, routine) {
       const sec = deloadTo(last.goal || cfg.sec || 0, 5)
       return { policy, kind: 'deload', sec, why: ['Short {0} sessions in a row — back off to {1}s and build up again.', stalls, sec] }
     }
-    return { policy, kind: 'hold', sec: last.goal || cfg.sec, why: ['Last time came up short — same target again.'] }
+    return { policy, kind: 'hold', sec: last.goal || cfg.sec, why: shortMiss ? nightWhy : ['Last time came up short — same target again.'] }
   }
 
   const w = last.weight
@@ -454,7 +526,7 @@ export function nextPrescription(S, cfg, routine) {
     const planSets = Math.max(1, cfg.sets || 1)
     const reached = last.planned ? Math.max(planSets, (last.target && last.target.sets) || 0) : planSets
     const keep = reached > planSets ? { sets: reached } : {}
-    if (!last.ok || goal <= 0) return { policy, kind: 'hold', weight: 0, reps: goal || undefined, ...keep, why: ['Bodyweight — same target again until every set is clean.'] }
+    if (!last.ok || goal <= 0) return { policy, kind: 'hold', weight: 0, reps: goal || undefined, ...keep, why: shortMiss ? nightWhy : ['Bodyweight — same target again until every set is clean.'] }
     // A ceiling turns "+1 rep forever" into a plan (issue #33). Past the top of the range the
     // reps go back to the bottom and a set is added instead, which is how bodyweight work
     // actually progresses once a set of 30 push-ups stops being a strength stimulus.
@@ -466,6 +538,12 @@ export function nextPrescription(S, cfg, routine) {
       // Out of sets worth adding: more volume is no longer the answer, load or a harder
       // variation is — and that is a decision for a person, not a policy.
       return { policy, kind: 'hold', weight: 0, reps: goal, ...keep, why: ['{0} sets of {1} — time to add weight or move to a harder variation.', sets - 1, goal] }
+    }
+    // 4+ left climbs two rep steps instead of one, never past the ceiling (docs/dev/RIR_STEP.md).
+    if (effortZone(last.rir) === 'easy') {
+      const two = goal + 2 * repStep(cfg)
+      const next = top > 0 ? Math.min(top, two) : two
+      return { policy, kind: 'up', weight: 0, reps: next, ...keep, why: ['Bodyweight — every rep with 4+ left, so go for {0}.', next] }
     }
     // Unilateral work steps by two, so the total stays even and both sides get the rep.
     const next = goal + repStep(cfg)
@@ -537,11 +615,30 @@ export function nextPrescription(S, cfg, routine) {
     // from before the exercise moved to double progression. Hitting it is compliance with that
     // session, not "reached the top". Double progression must not add weight until every set
     // actually reaches the top of the range (issue #278).
-    if (last.ok && last.low >= top) return {
-      policy, kind: 'up', weight: harder(w, inc), reps: bottom,
-      why: assisted
-        ? ['Top of the rep range in every set — {0} {1} less help, back to {2} reps.', inc, unit, bottom]
-        : ['Top of the rep range in every set — {0} {1} more, back to {2} reps.', inc, unit, bottom]
+    // Every set clean with 4+ left in the last: a double step at the top of the range, two reps
+    // below it (docs/dev/RIR_STEP.md). The reps decide the clean session, the rating only its size.
+    const easy = last.ok && effortZone(last.rir) === 'easy'
+    if (last.ok && last.low >= top) {
+      if (easy) {
+        const fits = doubleFits(S, w, inc, assisted)
+        const step = fits ? inc * 2 : inc
+        return {
+          policy, kind: 'up', weight: harder(w, step), reps: bottom,
+          why: assisted
+            ? fits
+              ? ['Top of the rep range with 4+ left — a double step: {0} {1} less help, back to {2} reps.', step, unit, bottom]
+              : ['Top of the rep range with 4+ left — {0} {1} less help, back to {2} reps (a double step would be over 10 %).', step, unit, bottom]
+            : fits
+              ? ['Top of the rep range with 4+ left — a double step: {0} {1} more, back to {2} reps.', step, unit, bottom]
+              : ['Top of the rep range with 4+ left — {0} {1} more, back to {2} reps (a double step would be over 10 %).', step, unit, bottom]
+        }
+      }
+      return {
+        policy, kind: 'up', weight: harder(w, inc), reps: bottom,
+        why: assisted
+          ? ['Top of the rep range in every set — {0} {1} less help, back to {2} reps.', inc, unit, bottom]
+          : ['Top of the rep range in every set — {0} {1} more, back to {2} reps.', inc, unit, bottom]
+      }
     }
     if (stalls >= deloadAt) {
       const selected = epleyDeload()
@@ -554,12 +651,37 @@ export function nextPrescription(S, cfg, routine) {
           : ['Stalled {0} sessions — deload to {1} {2}.', stalls, dw, unit]
       }
     }
-    const aim = Math.min(top, Math.max(bottom, last.low + repStep(cfg)))
-    return { policy, kind: 'hold', weight: w, reps: aim, why: ['Same weight — aim for {0} reps this time.', aim] }
+    // After a short night the reps that session was given stand, not one more than its worst set.
+    if (shortMiss) return { policy, kind: 'hold', weight: w, reps: Math.min(top, Math.max(bottom, last.goal || bottom)), why: nightWhy }
+    const aim = Math.min(top, Math.max(bottom, last.low + (easy ? 2 : 1) * repStep(cfg)))
+    return {
+      policy, kind: 'hold', weight: w, reps: aim,
+      why: easy ? ['Same weight — 4+ left last time, so aim for {0} reps.', aim] : ['Same weight — aim for {0} reps this time.', aim]
+    }
   }
 
   // linear + greyskull
   if (last.ok) {
+    // The RIR step (docs/dev/RIR_STEP.md) is linear's alone: Greyskull's last set is an AMRAP and
+    // keeps its own double jump below.
+    const zone = policy === 'linear' ? effortZone(last.rir) : null
+    if (zone === 'limit' && firstCleanAt(sessions, w)) {
+      return { policy, kind: 'hold', weight: w, why: ['Every rep, nothing left in the tank — the same again, to make it yours.'] }
+    }
+    if (zone === 'easy') {
+      const fits = doubleFits(S, w, inc, assisted)
+      const step = fits ? inc * 2 : inc
+      return {
+        policy, kind: 'up', weight: harder(w, step),
+        why: assisted
+          ? fits
+            ? ['Every rep with 4+ left — a double step: {0} {1} less help.', step, unit]
+            : ['Every rep with 4+ left — {0} {1} less help (a double step would be over 10 %).', step, unit]
+          : fits
+            ? ['Every rep with 4+ left — a double step: {0} {1} more.', step, unit]
+            : ['Every rep with 4+ left — {0} {1} more (a double step would be over 10 %).', step, unit]
+      }
+    }
     // Greyskull's final set is taken to failure: double the target reps there and you have
     // earned a double jump.
     const dbl = policy === 'greyskull' && last.goal > 0 && last.amrap >= last.goal * 2
@@ -586,6 +708,7 @@ export function nextPrescription(S, cfg, routine) {
           : ['Missed reps — reset to {0} {1} and work back up.', dw, unit]
     }
   }
+  if (shortMiss) return { policy, kind: 'hold', weight: w, why: nightWhy }
   return { policy, kind: 'hold', weight: w, why: ['Missed reps last time — same weight again ({0} of {1} to go).', deloadAt - stalls, deloadAt] }
 }
 

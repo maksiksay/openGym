@@ -69,7 +69,8 @@ if you want to try it before installing anything.
   session is.
 - A quiet workout screen: one menu per exercise, the set number as the set's own menu, card or
   list view. Switches in Settings bring the old button rows back if you liked them.
-- Optional effort column as RIR or RPE, colour-coded, with a plain-language line per level.
+- Optional effort as RIR or RPE, colour-coded, with a plain-language line per level: one tap
+  under the last work set of each exercise, or a column on every set.
 - Plate math for barbell, EZ bar, trap bar and Smith machine, worked out from the plates you own.
 - Bodyweight exercises know they carry no load: log reps, add a dip belt if you use one.
 - Per-side reps for lunges and single-arm work, the screen stays awake while you train, and a
@@ -79,7 +80,9 @@ if you want to try it before installing anything.
 
 - Progression rules per routine or per exercise: linear, Greyskull LP, double progression through a
   visible rep range, or adding time. Each target explains why it is that number; missed reps never
-  add load, stalls trigger a deload.
+  add load, stalls trigger a deload. With effort on, the last set's rating sizes the step: 4+ in
+  reserve doubles it, nothing left holds the weight once, and a miss after a short night (from the
+  health log) does not count toward a deload.
 - Estimated 1RM per exercise with its own curve, Structural Balance ratios (Poliquin, Thibaudeau,
   ATG), a year-long activity heatmap.
 - A muscle map in three modes: where your volume went, what is still recovering, and what has gone

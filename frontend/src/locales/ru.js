@@ -787,7 +787,6 @@ export default {
   'Exact {0}': 'Точный {0}',
   'Clear rating': 'Сбросить оценку',
   'RIR counts the reps you left; RPE reads the same effort off a 10-point scale — so RPE ≈ 10 − RIR. Pick the one you already think in.': 'RIR считает повторения, оставшиеся в запасе; RPE читает то же усилие по 10-балльной шкале — то есть RPE ≈ 10 − RIR. Выберите ту, в которой вы уже думаете.',
-  'The highlighted row is where most working sets land. Sets you have already logged keep their own scale, and nothing else reads the value — progression and estimated 1RM are unaffected.': 'Выделенная строка — это диапазон, в который попадает большинство рабочих подходов. Уже записанные подходы сохраняют свою шкалу, и больше это значение нигде не используется: прогрессия и расчётный 1ПМ не меняются.',
   // --- effort in the stats ---
   'Effort': 'Усилие',
   'how close to failure': 'насколько близко к отказу',

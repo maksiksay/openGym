@@ -596,7 +596,6 @@ export default {
   'Three more reps': 'Ще три повторення',
   'Easy — warm-up territory': 'Легко — розминкова зона',
   'RIR counts the reps you left; RPE reads the same effort off a 10-point scale — so RPE ≈ 10 − RIR. Pick the one you already think in.': 'RIR рахує повторення, що лишилися в запасі; RPE читає те саме зусилля за 10-бальною шкалою — тобто RPE ≈ 10 − RIR. Обери ту, у якій ти вже думаєш.',
-  'The highlighted row is where most working sets land. Sets you have already logged keep their own scale, and nothing else reads the value — progression and estimated 1RM are unaffected.': 'Виділений рядок — це діапазон, у який потрапляє більшість робочих підходів. Уже записані підходи зберігають свою шкалу, і більше це значення ніде не використовується: прогресія й розрахунковий 1ПМ не змінюються.',
   // --- effort in the stats ---
   'Effort': 'Зусилля',
   'how close to failure': 'наскільки близько до відмови',

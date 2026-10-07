@@ -98,6 +98,9 @@ export const effortOf = S => {
   const e = S && S.effort
   return e === 'none' || EFFORT[e] ? e : (S && S.showRir ? 'rir' : 'none')
 }
+// Where a profile is asked for it: one row under the plan's last work set ('last', what the RIR
+// step reads, docs/dev/RIR_STEP.md) or the column on every set ('all'). Anything else reads 'last'.
+export const effortScopeOf = S => (S && S.effortScope === 'all' ? 'all' : 'last')
 // The "(RIR 2)" / "(RPE 8)" tail on a set summary, empty when nothing was logged.
 const effortTail = s => {
   const k = s.rir != null ? 'rir' : s.rpe != null ? 'rpe' : null

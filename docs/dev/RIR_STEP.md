@@ -26,20 +26,26 @@ Stored as `S.effortScope`, `'last' | 'all'`, default `'last'`. The choice shows 
 on. The default applies to every profile, including one that already rates every set; "every
 set" brings its column back.
 
-**The row.** With "the last set", the set rows have no effort column. Ticking the plan's last
-work set opens a row under it:
+**The row.** With "the last set", the set rows have no effort column. Once the plan's last work set
+is the one in hand (every earlier work set of the plan done), a row sits under it:
 
-> How many reps were left? 0 · 0.5 · 1 · 2 · 3 · 4+
+> How many reps were left? A tap ticks the set. 0 · 0.5 · 1 · 2 · 3 · 4+
 
 - **The buttons** are the picker's presets (`EFFORT_PRESETS`), in their colours. On the RPE scale
   they read 10 · 9.5 · 9 · 8 · 7 · 6.
-- **A tap** stores the value on the set (`s.rir` or `s.rpe`, as the column does). The row then
-  folds into a coloured chip ("RIR 2"); tapping the chip opens the row again.
-- **Unticking** the set hides the row. A stored rating stays on the set.
+- **A tap** stores the value on the set (`s.rir` or `s.rpe`, as the column does) and ticks the set
+  if it is not ticked yet, the way the column's picker does (issue #64): one tap instead of two.
+  The row then folds into a coloured chip ("RIR 2"); tapping the chip opens the row again, and a
+  new value leaves the set ticked.
+- **Why before the tick.** The rating has to be stored before the tick's own flow runs. After the
+  last exercise the tick opens "That was the whole workout!", and in a superset it moves the card
+  on to the partner. A row that only appeared after the tick would be covered or off screen.
+- **Ticked first** with the checkbox, the set keeps its row, now asking "How many reps were left?",
+  for as long as it is on screen. Skipping it is fine: an unrated set progresses as today.
 - **The plan's last work set** is the last of the plan's own sets: not a warm-up, and not a set
   added on top (those never move the plan, see `readSession`).
 - **Per-side sets** get one row. The rating goes to both sides, so the row's derived rating (the
-  harder side) is that value.
+  harder side) is that value, and the tap ticks whichever side is not ticked yet.
 - **Supersets:** each exercise has its own last set.
 - **No row** for timed or cardio work, nor for an exercise with a drop set or rest-pause (see
   [The rules](#the-rules)).
@@ -108,8 +114,13 @@ of "Nothing logged yet — this session sets the baseline." it reads:
 > First time: add weight through your warm-ups until {0} reps leave about 2 in reserve — that is
 > your working weight.
 
-`{0}` is the plan's reps (the bottom of the range under double progression). With effort off,
-the old sentence stays.
+`{0}` is the plan's reps (the bottom of the range under double progression). With effort off, or
+for work with no weight to add (body weight, an assistance machine, a timed hold), the old
+sentence stays.
+
+The prescription carries `calibrate: true` with it. The workout then shows the sentence as the
+goal line itself, in place of "First time — this sets your baseline": the other reasons only sit
+behind a tap on the line, which nobody makes on a phone in the middle of a set.
 
 ## What it says
 
@@ -130,57 +141,72 @@ machines get the same lines with "less help" in place of "more".
 - **Short night:** "Short night ({0} h) — the same target again; this miss does not count."
 - **First session:** the sentence above.
 
-**The help sheet.** The (i) next to "Effort per set" says "nothing else reads the value —
-progression and estimated 1RM are unaffected". That is no longer true. It becomes: "Progression
-reads the last set's rating: 4+ left takes a bigger step, nothing left holds the weight. Estimated
-1RM is unaffected."
+**The help sheet.** The (i) next to "Effort per set" said "nothing else reads the value —
+progression and estimated 1RM are unaffected". That is no longer true. It now ends: "Progression
+reads the last set's rating: 4+ left takes a bigger step, nothing left holds the weight once.
+Estimated 1RM is unaffected."
 
 **Strings.** The new strings live in their own pack, `lib/effort-i18n.js` and
 `lib/effort-i18n.ru.js`, with English as the key, the way `score-i18n.js` keeps the
-scoreboard's. `scripts/check-locales.mjs` fails a key that only some of `src/locales/` carry. The
-places that show a prescription's reason look it up in the pack first and fall back to `t()`.
-The old help sentence goes out of every locale.
+scoreboard's. `scripts/check-locales.mjs` fails a key that only some of `src/locales/` carry.
+`te` looks a string up in the pack first and falls back to `t()`, and `whyText(why)` says a
+prescription's reason through it, so the goal line says the old reasons and the new ones the
+same way. The old help sentence is gone from every locale.
 
 ## Where it lives
 
 - **`frontend/src/lib/progression.js`:**
-  - `readSession` carries the RIR of the plan's last work set;
-  - sessions carry `short` (from `S.health`);
+  - `readSession` carries `rir`, the rating of the plan's last work set;
+  - sessions carry `short` and `sleep` for a night under 6 hours (from `S.health`);
   - `stallCount` runs without short-night misses;
-  - `nextPrescription` applies the zones;
-  - constants `EASY_RIR = 4` (from it up), `LIMIT_RIR = 1` (below it), `MAX_JUMP = 0.1`,
-    `SHORT_NIGHT_H = 6` (below it).
+  - `nextPrescription` applies the zones, and a first session with effort on carries
+    `calibrate: true`;
+  - `effortZone`, and the constants `EASY_RIR = 4` (from it up), `LIMIT_RIR = 1` (below it),
+    `MAX_JUMP = 0.1`, `SHORT_NIGHT_H = 6` (below it).
 - **`frontend/src/lib/history.js`:** `effortScopeOf(S)`.
 - **`frontend/src/store/useStore.js`:** `effortScope: 'last'`.
-- **`frontend/src/views/Workout.jsx`:** the row under the last set and its chip; no column under
-  "the last set".
+- **`frontend/src/views/Workout.jsx`:**
+  - the row under the plan's last work set and its chip (`rateRow`); no column under "the last
+    set";
+  - the goal line says a reason through `whyText`, and the first session's sentence as the line.
 - **`frontend/src/views/Settings.jsx`:** "Ask on" and the help sheet's sentence.
-- **`frontend/src/lib/effort-i18n.js`, `effort-i18n.ru.js`:** the strings and the lookup.
+- **`frontend/src/lib/effort-i18n.js`, `effort-i18n.ru.js`:** the strings, `te` and `whyText`.
+- **`frontend/src/locales/*.js`:** the old help sentence removed.
 - **`frontend/src/index.css`:** the row and the chip.
 
 ## Tests
 
-- **`frontend/src/lib/progression.test.js`:**
+- **`frontend/src/lib/progression.rir.test.js`:**
+  - `effortZone`, with no gaps for a typed value;
+  - `readSession`: RIR and RPE, unrated and undone, the plan's last set (not a set added on top or
+    a warm-up), a drop set and rest-pause, the harder side of a per-side set;
   - every cell of the table, for linear, double and bodyweight;
-  - the cap: 60 kg doubles, 40 kg does not, a light dumbbell never does;
-  - assistance: doubles with a weigh-in that allows it, single without one;
-  - no rating behaves as today; a miss rated 4+ is a miss;
-  - at the limit holds once, then steps; a typed 0.75 is at the limit, 3.75 in range;
-  - RPE: RPE 6 is easy;
+  - the cap: 50 kg doubles at exactly 10 %, 40 kg does not, a light cable lift never does;
+  - at the limit holds once, then steps, also with a miss in between; a typed 0.75 holds;
+  - a miss rated 4+ is a miss; RPE 6 is easy and RPE 9.5 at the limit;
+  - assistance: doubles with a weigh-in that allows it, single with a small one or none, the
+    latest weigh-in by date;
   - per-side: the harder side decides;
-  - only the plan's last set counts, not a set added on top or a warm-up;
-  - Greyskull, timed, drop set and rest-pause are unchanged;
+  - Greyskull, drop set and rest-pause keep the usual step;
   - short nights:
     - three misses with one short night do not deload;
-    - the target repeats;
-    - no sleep logged is an ordinary miss;
-    - a hit after a short night is a hit;
-  - the first-session sentence with effort on and off.
-- **Frontend:**
-  - the row appears when the plan's last work set is ticked; not on other sets, not under "every
-    set";
-  - a tap stores `rir` (or `rpe`) and folds into the chip; per-side stores both sides;
-  - Settings: "Ask on" switches between the row and the column.
+    - the short night says so, and double progression repeats the reps it asked for;
+    - a deload already earned on ordinary nights stands;
+    - no sleep logged, or six hours, is an ordinary miss;
+    - a hit after a short night is a hit; timed holds too;
+  - the first session: the sentence and `calibrate` with effort on, the old one with effort off
+    and for body weight, assistance and timed work.
+- **`frontend/src/views/Workout.rate-last.test.jsx`:**
+  - the row appears once the plan's last work set is the one in hand, not before, with no column;
+  - a tap stores `rir` (or `rpe`) and folds into the chip; the chip opens the row again;
+  - the tap ticks the set after storing the rating, and the end-of-workout sheet comes after it;
+  - per-side: one rating for both sides, both ticked;
+  - a set added on top and a warm-up are not asked; a drop set is not asked;
+  - "every set" brings the column back; effort off asks nothing;
+  - the first session's goal line.
+- **`frontend/src/views/Settings.effort-scope.test.jsx`:** "Ask on" reads an absent choice as the
+  last set, writes `effortScope`, is hidden with effort off; the help sheet's new sentence.
+- **`frontend/src/views/Workout.test.jsx`:** its effort-column tests now say "every set".
 
 ## What it changes elsewhere
 

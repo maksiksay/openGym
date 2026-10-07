@@ -1146,6 +1146,27 @@ body.chips-dragging *{cursor:inherit}
 .menu-list .menu-item.disabled{opacity:.4;pointer-events:none}
 .menu-on{color:transparent;font-size:16px;flex:none}
 .menu-on.is-on{color:var(--acc)}
+/* The one rating under the plan's last work set (docs/dev/RIR_STEP.md): the picker's presets as a
+   row of tinted buttons, indented under the set like its drops, folding into one chip once rated. */
+.raterow{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:4px 0 8px 32px}
+.raterow-q{width:100%;font-size:12px;color:var(--label-2)}
+.raterow-b{display:flex;flex-wrap:wrap;gap:6px}
+.ratebtn{
+  box-sizing:border-box;min-width:40px;height:36px;padding:0 8px;border-radius:10px;
+  border:1.5px solid var(--bc);color:var(--bc);
+  background:color-mix(in srgb, var(--bc) 14%, var(--surface-2));
+  font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1;
+  transition:transform var(--fast),background var(--fast);
+}
+.ratebtn:active{transform:scale(.94)}
+.ratebtn.on{background:color-mix(in srgb, var(--bc) 30%, var(--surface-2))}
+.ratechip{
+  box-sizing:border-box;height:30px;padding:0 10px;border-radius:9px;border:1.5px solid transparent;
+  background:var(--surface-2);color:var(--label);
+  font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1;
+  transition:transform var(--fast);
+}
+.ratechip:active{transform:scale(.96)}
 .setextra{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 8px 32px}
 .setextra .chip.add{display:inline-flex;align-items:center;gap:4px;color:var(--acc)}
 .setextra .chip.add svg{width:13px;height:13px}

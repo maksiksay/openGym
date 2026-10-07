@@ -787,7 +787,6 @@ export default {
   'Exact {0}': '{0} exacto',
   'Clear rating': 'Borrar valoración',
   'RIR counts the reps you left; RPE reads the same effort off a 10-point scale — so RPE ≈ 10 − RIR. Pick the one you already think in.': 'El RIR cuenta las repeticiones que dejas; el RPE lee ese mismo esfuerzo en una escala de 10 — así que RPE ≈ 10 − RIR. Elige la que ya usas para pensar.',
-  'The highlighted row is where most working sets land. Sets you have already logged keep their own scale, and nothing else reads the value — progression and estimated 1RM are unaffected.': 'La fila resaltada es donde cae la mayoría de las series efectivas. Las series ya registradas conservan su escala, y nada más lee el valor: la progresión y el 1RM estimado no cambian.',
   // --- effort in the stats ---
   'Effort': 'Esfuerzo',
   'how close to failure': 'qué tan cerca del fallo',

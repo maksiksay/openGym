@@ -760,7 +760,6 @@ export default {
   'Exact {0}': 'Pontos {0}',
   'Clear rating': 'Értékelés törlése',
   'RIR counts the reps you left; RPE reads the same effort off a 10-point scale — so RPE ≈ 10 − RIR. Pick the one you already think in.': 'A RIR a megmaradt ismétléseket számolja; az RPE ugyanazt a megerőltetést egy 10 pontos skálán olvassa le — tehát RPE ≈ 10 − RIR. Válaszd azt, amelyikben amúgy is gondolkodsz.',
-  'The highlighted row is where most working sets land. Sets you have already logged keep their own scale, and nothing else reads the value — progression and estimated 1RM are unaffected.': 'A kiemelt sor az, ahova a legtöbb munkasorozat esik. A már rögzített sorozatok megtartják a saját skálájukat, és semmi más nem olvassa ki az értéket — a progressziót és a becsült 1RM-et nem érinti.',
   // --- effort in the stats ---
   'Effort': 'Megerőltetés',
   'how close to failure': 'milyen közel a kimerüléshez',

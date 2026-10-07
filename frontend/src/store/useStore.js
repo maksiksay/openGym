@@ -94,6 +94,9 @@ export const DEF = {
   // server pull, backup import) still falls back to the `showRir` boolean this replaced and
   // keeps the column it had. See effortOf.
   reminder: { on: false, time: '08:00', tz: null }, effort: null, autoBackup: false,
+  // effortScope: where the rating is asked — 'last' (one row under the plan's last work set, the
+  // one the RIR step reads, docs/dev/RIR_STEP.md) | 'all' (the column on every set). See effortScopeOf.
+  effortScope: 'last',
   // Equipment profiles (issue: filter Library/picker/routines by what you actually own —
   // e.g. "Home" vs "Gym" — building on the session-only equipment filter from issue #6).
   equipProfiles: [], activeEquipId: null, equipFilterOn: false,

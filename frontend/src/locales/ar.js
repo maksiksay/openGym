@@ -628,7 +628,6 @@ export default {
   'Three more reps': 'ثلاثة تكرارات في الاحتياط',
   'Easy — warm-up territory': 'سهل — في نطاق الإحماء',
   'RIR counts the reps you left; RPE reads the same effort off a 10-point scale — so RPE ≈ 10 − RIR. Pick the one you already think in.': 'يعدّ RIR التكرارات التي تركتها؛ بينما يقيس RPE الجهد نفسه على مقياس من 10 — إذن RPE ≈ 10 − RIR. اختر المقياس الذي تعتاد التفكير به.',
-  'The highlighted row is where most working sets land. Sets you have already logged keep their own scale, and nothing else reads the value — progression and estimated 1RM are unaffected.': 'الصف المميز يمثل مستوى الجهد الذي تقع فيه معظم مجموعاتك. المجموعات المسجلة سابقًا تحتفظ بمقياسها الخاص، ولا تتأثر قواعد التدرّج ولا 1RM التقديري بهذه القيمة.',
   'Effort': 'الجهد',
   'how close to failure': 'مدى القرب من الفشل',
   'by hard sets': 'حسب المجموعات عالية الجهد',

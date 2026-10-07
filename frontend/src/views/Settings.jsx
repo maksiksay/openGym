@@ -7,7 +7,8 @@ import { copyText } from '../lib/clipboard.js'
 import { useUI } from '../store/useUI.js'
 import { ACCENTS, ACCENT_NAMES, todayISO, localTZ, weekStartOf, MONDAY, SUNDAY, fmtPlate } from '../lib/format.js'
 import { inventoryFor, ownsPlates } from '../lib/plates.js'
-import { effortOf } from '../lib/history.js'
+import { effortOf, effortScopeOf } from '../lib/history.js'
+import { te } from '../lib/effort-i18n.js'
 import { unlock, playOnSilentSupported, vibrateSupported } from '../lib/sound.js'
 import { api, webauthnOK, passkeyRegister, IS_ANDROID } from '../lib/api.js'
 import { pushSupported, enablePush, disablePush, sendTestPush, syncPushSubscription } from '../lib/push.js'
@@ -546,6 +547,16 @@ export default function Settings() {
           options={[{ value: 'none', label: t('Off') }, { value: 'rir', label: t('RIR') }, { value: 'rpe', label: t('RPE') }]}
           value={effortOf(S)} onChange={v => update(s => { s.effort = v; delete s.showRir })} />
       </Row>
+      {/* Where the rating is asked (docs/dev/RIR_STEP.md): the RIR step reads the plan's last work
+          set either way, so "the last set" asks for only the number it uses. */}
+      {effortOf(S) !== 'none' && <Row icon="list" iconTint="var(--purple)" title={te('Ask on')}
+        subtitle={effortScopeOf(S) === 'last'
+          ? te('One rating under the last work set of each exercise; it sets the size of the next step.')
+          : te('A rating on every set, in its own column.')}>
+        <Segmented className="seg-inline"
+          options={[{ value: 'last', label: te('The last set') }, { value: 'all', label: te('Every set') }]}
+          value={effortScopeOf(S)} onChange={v => update(s => { s.effortScope = v })} />
+      </Row>}
     </Section>
 
     {(user || MOBILE) && <NotificationsCard S={S} update={update} toast={toast} />}
@@ -735,7 +746,7 @@ function effortHelpSheet() {
     </div>
     <div className="dim small" style={{ lineHeight: 1.5, display: 'grid', gap: 8 }}>
       <div>{t('RIR counts the reps you left; RPE reads the same effort off a 10-point scale — so RPE ≈ 10 − RIR. Pick the one you already think in.')}</div>
-      <div>{t('The highlighted row is where most working sets land. Sets you have already logged keep their own scale, and nothing else reads the value — progression and estimated 1RM are unaffected.')}</div>
+      <div>{te('The highlighted row is where most working sets land. Sets you have already logged keep their own scale. Progression reads the last set’s rating: 4+ left takes a bigger step, nothing left holds the weight once. Estimated 1RM is unaffected.')}</div>
     </div>
     <div style={{ height: 8 }} />
   </>)
