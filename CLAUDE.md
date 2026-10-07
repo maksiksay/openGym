@@ -39,7 +39,9 @@ docs/      guides indexed in docs/README.md (FAQ, SELF_HOSTING*, MOBILE, AI_COAC
            COACH_ASSISTANT: the chat logs weight, check-in, water and goals through a card, knows the
            app's screens and links to them; consent 4 adds water, sugar and fibre;
            COACH_QUALITY: the app's date and weekday, today's routine, its exercise names and the plan's
-           volume in the payload, a language check with one extra round, Opus 5.5 by default).
+           volume in the payload, a language check with one extra round, Opus 5.5 by default;
+           PROGRESS_PHOTOS: a feed of the photos kept with workouts, and two compared side by side or
+           with a slider, with the weight and waist of their days).
 ```
 
 ## Commands

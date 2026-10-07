@@ -61,6 +61,7 @@ Design notes for specific features, kept next to the code they describe:
 | [RIR step](dev/RIR_STEP.md) | The last set's reps in reserve sets the next step, and a miss after a short night does not count |
 | [Coach assistant](dev/COACH_ASSISTANT.md) | The chat notes a weight, a check-in, water and goals on a card, knows the app's screens and links to them |
 | [Coach quality](dev/COACH_QUALITY.md) | The right day and today's routine, the app's exercise names, a plan read before any session, a language check, Opus 5.5 by default |
+| [Progress photos](dev/PROGRESS_PHOTOS.md) | A feed of the photos kept with workouts, and two of them compared side by side or with a slider |
 
 ## Still stuck?
 
