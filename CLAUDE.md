@@ -45,7 +45,9 @@ docs/      guides indexed in docs/README.md (FAQ, SELF_HOSTING*, MOBILE, AI_COAC
            GAIN_RATE: the weight trend against a corridor, a 100–300 kcal step applied to the goal,
            a 2–3-week food calibration that pauses tracking at its end;
            QUESTS: up to three goals pinned on lifts, suggested or your own, a bar and a forecast as a
-           range of weeks from the 8-week trend, a quest done is a win on the finish sheet).
+           range of weeks from the 8-week trend, a quest done is a win on the finish sheet;
+           WARMUPS: mobility routines (warm-ups, recovery, prehab) run before a workout or on their own,
+           counted for nothing, five ready-made sets, six new built-in exercises).
 ```
 
 ## Commands

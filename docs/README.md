@@ -62,6 +62,7 @@ Design notes for specific features, kept next to the code they describe:
 | [Coach assistant](dev/COACH_ASSISTANT.md) | The chat notes a weight, a check-in, water and goals on a card, knows the app's screens and links to them |
 | [Coach quality](dev/COACH_QUALITY.md) | The right day and today's routine, the app's exercise names, a plan read before any session, a language check, Opus 5.5 by default |
 | [Progress photos](dev/PROGRESS_PHOTOS.md) | A feed of the photos kept with workouts, and two of them compared side by side or with a slider |
+| [Warm-ups](dev/WARMUPS.md) | Warm-up and recovery routines run before a workout or on their own, counted for nothing, and five ready-made sets |
 | [Rate of gain](dev/GAIN_RATE.md) | The weight trend against a corridor, a calorie step applied to the goal, and a food calibration that pauses itself |
 | [Quests](dev/QUESTS.md) | A goal pinned on a lift, a bar from where it started, a forecast as a range of weeks, and a win when it is done |
 
