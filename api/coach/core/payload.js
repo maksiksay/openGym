@@ -714,8 +714,23 @@ function localize(p, names) {
  * an HMAC on its instance secret (api/coach/handle.js), the phone draws a random one once and
  * keeps it. Either way it is 16 characters and never the uid.
  */
-export function build(S, opts = {}) {
+// Training only (docs/dev/WARMUPS.md): a session of warm-up or recovery work alone is no session
+// for the Coach to read, and a warm-up run before a workout leaves it — its sets would count as
+// training days, volume and stalls that are not there.
+function trainingOnly(S) {
+  const workouts = Array.isArray(S?.workouts) ? S.workouts : null;
+  if (!workouts || !workouts.some(w => w && (w.mobility === true || (w.entries || []).some(e => e && e.mobility === true)))) return S;
+  return {
+    ...S,
+    workouts: workouts
+      .filter(w => !(w && w.mobility === true))
+      .map(w => (w && (w.entries || []).some(e => e && e.mobility === true) ? { ...w, entries: w.entries.filter(e => !(e && e.mobility === true)) } : w))
+  };
+}
+
+export function build(S0, opts = {}) {
   if (typeof opts.handle !== 'string' || !opts.handle) throw new Error('payload.build: opts.handle is required');
+  const S = trainingOnly(S0);
   const coach = S.coach || {};
   const profile = opts.intake || coach.profile || null;
   const today = todayFrom(opts.today);

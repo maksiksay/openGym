@@ -47,7 +47,7 @@ docs/      guides indexed in docs/README.md (FAQ, SELF_HOSTING*, MOBILE, AI_COAC
            QUESTS: up to three goals pinned on lifts, suggested or your own, a bar and a forecast as a
            range of weeks from the 8-week trend, a quest done is a win on the finish sheet;
            WARMUPS: mobility routines (warm-ups, recovery, prehab) run before a workout or on their own,
-           counted for nothing, five ready-made sets, six new built-in exercises).
+           counted for nothing, five ready-made sets, seven new built-in exercises).
 ```
 
 ## Commands

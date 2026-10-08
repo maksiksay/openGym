@@ -11,7 +11,9 @@ export const MAX_MONTH_GOAL = 31
 /** Four weeks of the plan: the weekdays that hold a routine (a combined day once), times four.
  *  Eight, two a week, without a plan. */
 export function autoMonthGoal(S) {
-  const days = Object.values(S?.week || {}).filter(ids => ids?.length).length
+  // A weekday that holds only warm-up or recovery routines is no training day (docs/dev/WARMUPS.md).
+  const mobility = new Set((S?.routines || []).filter(r => r && r.kind === 'mobility').map(r => r.id))
+  const days = Object.values(S?.week || {}).filter(ids => [].concat(ids || []).some(id => !mobility.has(id))).length
   return days > 0 ? days * 4 : DEFAULT_MONTH_GOAL
 }
 
@@ -31,12 +33,15 @@ export function prevMonth(month) {
 
 // Training days, not workouts: the gym and a ten-minute session at home on one day are one day.
 // workoutDay reads a record whose day got mangled from its start, as every other count does.
+// A session of nothing but warm-up or recovery work is kept, but it is no training day
+// (docs/dev/WARMUPS.md).
 const daysIn = (workouts, month) =>
-  new Set((workouts || []).map(workoutDay).filter(d => d && d.startsWith(month + '-'))).size
+  new Set((workouts || []).filter(w => !(w && w.mobility === true)).map(workoutDay).filter(d => d && d.startsWith(month + '-'))).size
 
 /**
  * The quota of the calendar month `iso` falls in. Every workout counts towards it: planned or
- * freestyle, a deload, a single set, one logged into the past or imported.
+ * freestyle, a deload, a single set, one logged into the past or imported — all but a session of
+ * warm-up or recovery work alone.
  * Returns `{ month, done, goal, auto, met, extra, prevDone }`.
  */
 export function monthQuota(S, iso = todayISO()) {

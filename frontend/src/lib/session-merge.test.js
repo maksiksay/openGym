@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildCombinedEntries, deriveSessionName } from './session-merge.js'
+import { buildCombinedEntries, deriveSessionName, sessionNamesOf } from './session-merge.js'
 import { buildSessionEntries } from './session-start.js'
 import { buildCompletedWorkout } from './finish-workout.js'
 import { isWarmupRow } from './workout-model.js'
@@ -76,5 +76,42 @@ describe('deriveSessionName', () => {
   it('collapses 4+ to "A + B + N more"', () => {
     expect(deriveSessionName(['A', 'B', 'C', 'D'])).toBe('A + B + 2 more')
     expect(deriveSessionName(['A', 'B', 'C', 'D', 'E'])).toBe('A + B + 3 more')
+  })
+})
+
+// docs/dev/WARMUPS.md: a training routine's warm-up runs first, once, out of progression.
+describe('a warm-up before training', () => {
+  const withWarmup = () => ({
+    ...st,
+    routines: [
+      { id: 'w', name: 'Upper warm-up', kind: 'mobility', ex: [{ id: '3021', sets: 1, reps: 12, weight: 0, prog: 'off' }, { id: '1368', sets: 1, sec: 30, mode: 'time', weight: 0, prog: 'off' }] },
+      { ...st.routines[0], warmup: 'w' },
+      { ...st.routines[1], warmup: 'w' },
+      st.routines[2],
+    ],
+  })
+
+  it('comes first, flagged as mobility and out of progression', () => {
+    const { entries, routineIds, routines } = buildCombinedEntries(withWarmup(), ['r1'])
+    expect(entries.map(e => [e.id, e.rid, !!e.mobility, !!e.noProg])).toEqual([
+      ['3021', 'w', true, true], ['1368', 'w', true, true],
+      ['0025', 'r1', false, false], ['0031', 'r1', false, false],
+    ])
+    expect(routineIds).toEqual(['w', 'r1'])
+    expect(deriveSessionName(sessionNamesOf(routines))).toBe('Strength')
+  })
+
+  it('runs once for two routines that share it, and not again when the list holds it', () => {
+    expect(buildCombinedEntries(withWarmup(), ['r1', 'r2']).routineIds).toEqual(['w', 'r1', 'r2'])
+    expect(buildCombinedEntries(withWarmup(), ['w', 'r1']).routineIds).toEqual(['w', 'r1'])
+    const { routines } = buildCombinedEntries(withWarmup(), ['r1', 'r2'])
+    expect(deriveSessionName(sessionNamesOf(routines))).toBe('Strength + Core')
+  })
+
+  it('a mobility routine on its own keeps its name, and a routine without a warm-up starts as before', () => {
+    const { routines, entries } = buildCombinedEntries(withWarmup(), ['w'])
+    expect(deriveSessionName(sessionNamesOf(routines))).toBe('Upper warm-up')
+    expect(entries.every(e => e.mobility)).toBe(true)
+    expect(buildCombinedEntries(withWarmup(), ['rehab']).routineIds).toEqual(['rehab'])
   })
 })

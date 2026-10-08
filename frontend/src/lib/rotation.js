@@ -10,8 +10,9 @@ const routineIdsOf = w => [].concat(w?.routineIds ?? (w?.routineId ? [w.routineI
 export const usesWeek = S => Object.values(S?.week || {}).some(ids => [].concat(ids || []).length > 0)
 
 /** The routines that take turns, in Plan order: none that is empty or kept out of progression (a
- *  deload or rehab routine is done when it is needed, not when its turn comes). */
-export const rotationOf = S => (S?.routines || []).filter(r => r && (r.ex || []).length > 0 && r.excludeFromProgression !== true)
+ *  deload or rehab routine is done when it is needed, not when its turn comes), and no warm-up or
+ *  recovery routine, which is not training (docs/dev/WARMUPS.md). */
+export const rotationOf = S => (S?.routines || []).filter(r => r && (r.ex || []).length > 0 && r.excludeFromProgression !== true && r.kind !== 'mobility')
 
 /**
  * The routine to offer on `iso`, or null. Null whenever a weekly plan is in use, which then says

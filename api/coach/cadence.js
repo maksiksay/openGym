@@ -24,7 +24,8 @@ export function isDue(coach, S, now, reviewedAt = 0, tz = null) {
   const lastAt = Math.max(coach.lastReview?.at || 0, reviewedAt);
 
   // Nothing new to read is the most common reason not to run, and it applies to both modes.
-  const workouts = S.workouts || [];
+  // A recovery session is nothing new to review (docs/dev/WARMUPS.md).
+  const workouts = (S.workouts || []).filter(w => !(w && w.mobility === true));
   // A workout's `end` is on the same clock as the review's timestamp; its `d` is the phone's
   // local day, which can run ahead of the server's UTC day, so the date only stands in for a
   // workout that has no end.

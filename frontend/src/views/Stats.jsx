@@ -30,7 +30,7 @@ import { CustomThumb } from '../components/CustomMedia.jsx'
 import { progressPhotos } from '../lib/progress-photos.js'
 import { tpr, nPhotos } from '../lib/progress-i18n.js'
 import { tappable } from '../lib/use-sheet-keyboard.js'
-import { isWarmupRow } from '../lib/workout-model.js'
+import { isWarmupRow, isMobilityEntry, isMobilityWorkout } from '../lib/workout-model.js'
 
 // Which muscles the training in a window actually hit — and, the point of the card,
 // which ones it keeps missing. Shading is relative within the window (lib/muscles.js).
@@ -40,6 +40,7 @@ function latestMuscleTraining(workouts) {
     const timestamp = Number(workout?.start || new Date(workout?.d).getTime())
     if (!Number.isFinite(timestamp)) continue
     for (const entry of workout.entries || []) {
+      if (isMobilityEntry(entry)) continue   // warm-up and recovery work (docs/dev/WARMUPS.md)
       if (!(entry.sets || []).some(set => set?.done === true && !isWarmupRow(set))) continue
       const exercise = EXIDX[entry.id] || entry.exercise || entry
       for (const slug of Object.keys(musclesOf(exercise))) {
@@ -463,7 +464,7 @@ export default function Stats() {
       <button className="iconbtn" onClick={() => nav('/history')} aria-label={t('History')}><Icon name="history" /></button></div>
 
     <div className="tiles">
-      <div className="tile"><div className="l"><Icon name="dumbbell" />{t('Workouts')}</div><div className="v">{workouts.length}</div></div>
+      <div className="tile"><div className="l"><Icon name="dumbbell" />{t('Workouts')}</div><div className="v">{workouts.filter(w => !isMobilityWorkout(w)).length}</div></div>
       <div className="tile" title={ts('Training days this month against your goal')}><div className="l"><Icon name="calendar" />{t('This month')}</div><div className="v">{quota.done} / {quota.goal}</div></div>
       <div className="tile"><div className="l"><Icon name="trophy" />{ts('Wins this month')}</div><div className="v">{monthWins(workouts, quota.month) + questWinsIn(S, quota.month)}</div></div>
       <div className="tile"><div className="l"><Icon name="scale" />{t('Weight 30d')}</div><div className="v" style={{ fontSize: 22, color: bwDelta30 === null ? 'inherit' : bwDeltaColor(bwDelta30, (lastBW(S) || {}).w || 0) }}>{bwDelta30 === null ? '—' : (bwDelta30 > 0 ? '+' : '') + fmtNum(bwDelta30) + ' ' + S.unit}</div></div>

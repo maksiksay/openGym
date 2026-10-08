@@ -43,6 +43,9 @@ export const AWAITING_REVIEW = new Set([
   '2204', '2209', '2397', '2401', '2402', '2405', '2407', '2414', '2459', '2464',
   '2705', '2706', '2796', '2805', '2808', '2812', '2987', '3017', '3142', '3194',
   '3235', '3237', '3305', '3313', '3541', '3542', '3635', '3643', '3888',
+  // The warm-ups' band exercises (docs/dev/WARMUPS.md), added without a German name: they keep
+  // their English title until a German speaker writes one and signs it off.
+  '9003', '9004',
 ])
 
 export const stagedExercises = EXDB =>

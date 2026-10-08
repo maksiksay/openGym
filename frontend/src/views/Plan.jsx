@@ -12,6 +12,9 @@ import { glyphOf, DEFAULT_GLYPH } from '../lib/glyphs.js'
 import { DEMO } from '../lib/demo.js'
 import { MOBILE } from '../lib/mobile.js'
 import { coachAvailable } from '../lib/coach.js'
+import { isMobilityRoutine, warmupOf, MOBILITY } from '../lib/warmups.js'
+import { tw } from '../lib/warmups-i18n.js'
+import { readyWarmupsSheet } from '../sheets-warmups.jsx'
 
 export default function Plan() {
   const nav = useNavigate()
@@ -27,20 +30,45 @@ export default function Plan() {
      an instance without the feature sees exactly the Plan screen it saw before. */
   const showCoach = coachAvailable(config, user, { demo: DEMO, mobile: MOBILE, coachMode })
 
-  // Swap with the neighbour, the way the routine editor moves an exercise. `S.routines` is the
-  // one order the whole app reads, so this is all there is to it (#142).
-  const moveRoutine = (i, delta) => update(s => {
-    const to = i + delta
+  // Swap with the neighbour of the same kind, the way the routine editor moves an exercise.
+  // `S.routines` is the one order the whole app reads, so this is all there is to it (#142);
+  // training routines and warm-ups are listed apart (docs/dev/WARMUPS.md), so a step skips the
+  // other kind.
+  const moveRoutine = (id, delta) => update(s => {
+    const i = s.routines.findIndex(r => r.id === id)
+    if (i < 0) return
+    const mob = isMobilityRoutine(s.routines[i])
+    let to = i + delta
+    while (to >= 0 && to < s.routines.length && isMobilityRoutine(s.routines[to]) !== mob) to += delta
     if (to < 0 || to >= s.routines.length) return
     const [moved] = s.routines.splice(i, 1)
     s.routines.splice(to, 0, moved)
   })
 
-  const addRoutine = () => {
-    const r = { id: uid(), name: t('New routine'), emoji: DEFAULT_GLYPH, ex: [] }
+  const addRoutine = (mobility = false) => {
+    const r = { id: uid(), name: mobility ? tw('New warm-up') : t('New routine'), emoji: mobility ? 'stretch' : DEFAULT_GLYPH, ex: [], ...(mobility ? { kind: MOBILITY } : {}) }
     update(s => { s.routines.push(r) })
     nav('/plan/r/' + r.id)
   }
+  const training = S.routines.filter(r => !isMobilityRoutine(r))
+  const mobility = S.routines.filter(isMobilityRoutine)
+  const row = (r, i, list) => <SwipeToDelete key={r.id} className="item"
+    deleteLabel={t('Delete routine')} onDelete={() => confirmDelete(r)} {...tappable(() => nav('/plan/r/' + r.id))}>
+    <span className="lrow-i"><Icon name={glyphOf(r.emoji)} /></span>
+    <div className="grow"><div className="tt">{r.name}</div>
+      <div className="ss">{exCount(r.ex.length)}{warmupOf(S, r) ? ' · ' + tw('warm-up: {0}', warmupOf(S, r).name) : ''}</div></div>
+    {/* The order of this list is the order of `S.routines`, and every other screen reads the
+        same array — the Start screen, the day-assignment sheets, the routine pickers. So
+        moving a routine here moves it everywhere, which is what the request asked for (#142). */}
+    {list.length > 1 && <div style={{ display: 'flex', gap: 2, flex: 'none' }}>
+      <button className="iconbtn" aria-label={t('Move up')} title={t('Move up')} disabled={i === 0}
+        style={{ width: 28, height: 24, borderRadius: 7, fontSize: 12 }}
+        onClick={ev => { ev.stopPropagation(); moveRoutine(r.id, -1) }}><Icon name="chevronUp" /></button>
+      <button className="iconbtn" aria-label={t('Move down')} title={t('Move down')} disabled={i === list.length - 1}
+        style={{ width: 28, height: 24, borderRadius: 7, fontSize: 12 }}
+        onClick={ev => { ev.stopPropagation(); moveRoutine(r.id, 1) }}><Icon name="chevronDown" /></button>
+    </div>}
+    <Icon name="chevronRight" className="chev" /></SwipeToDelete>
 
   // Pull one routine off a weekday; drop the key when the day empties (never store []).
   const removeFromDay = (d, rid) => update(s => {
@@ -104,27 +132,24 @@ export default function Plan() {
     </div><div>
       <div className="row between" style={{ marginTop: 22, marginBottom: 10 }}>
         <h4 className="sec" style={{ margin: 0 }}>{t('Routines')}</h4>
-        <Button size="sm" variant="tinted" icon="plus" onClick={addRoutine}>{t('New')}</Button>
+        <Button size="sm" variant="tinted" icon="plus" onClick={() => addRoutine(false)}>{t('New')}</Button>
       </div>
-      {S.routines.length ? <div className="list">{S.routines.map((r, i) => <SwipeToDelete key={r.id} className="item"
-        deleteLabel={t('Delete routine')} onDelete={() => confirmDelete(r)} {...tappable(() => nav('/plan/r/' + r.id))}>
-        <span className="lrow-i"><Icon name={glyphOf(r.emoji)} /></span>
-        <div className="grow"><div className="tt">{r.name}</div><div className="ss">{exCount(r.ex.length)}</div></div>
-        {/* The order of this list is the order of `S.routines`, and every other screen reads the
-            same array — the Start screen, the day-assignment sheets, the routine pickers. So
-            moving a routine here moves it everywhere, which is what the request asked for (#142). */}
-        {S.routines.length > 1 && <div style={{ display: 'flex', gap: 2, flex: 'none' }}>
-          <button className="iconbtn" aria-label={t('Move up')} title={t('Move up')} disabled={i === 0}
-            style={{ width: 28, height: 24, borderRadius: 7, fontSize: 12 }}
-            onClick={ev => { ev.stopPropagation(); moveRoutine(i, -1) }}><Icon name="chevronUp" /></button>
-          <button className="iconbtn" aria-label={t('Move down')} title={t('Move down')} disabled={i === S.routines.length - 1}
-            style={{ width: 28, height: 24, borderRadius: 7, fontSize: 12 }}
-            onClick={ev => { ev.stopPropagation(); moveRoutine(i, 1) }}><Icon name="chevronDown" /></button>
-        </div>}
-        <Icon name="chevronRight" className="chev" /></SwipeToDelete>)}</div> : <>
+      {training.length ? <div className="list">{training.map((r, i) => row(r, i, training))}</div> : <>
         <div className="empty"><div className="ico"><Icon name="clipboard" /></div>{t('No routines yet.')}<br />{t('Create one or load the starter plan.')}</div>
         <Button icon="sparkles" onClick={starterPlanSheet}>{t('Load starter plan')}</Button>
       </>}
+
+      {/* docs/dev/WARMUPS.md: warm-ups and recovery, apart from training. */}
+      <div className="row between" style={{ marginTop: 22, marginBottom: 10 }}>
+        <h4 className="sec" style={{ margin: 0 }}>{tw('Warm-ups and recovery')}</h4>
+        <div className="row" style={{ gap: 6 }}>
+          <Button size="sm" variant="tinted" icon="sparkles" onClick={readyWarmupsSheet}>{tw('Ready-made')}</Button>
+          <Button size="sm" variant="tinted" icon="plus" onClick={() => addRoutine(true)}>{t('New')}</Button>
+        </div>
+      </div>
+      {mobility.length
+        ? <div className="list">{mobility.map((r, i) => row(r, i, mobility))}</div>
+        : <div className="small dim" style={{ margin: '0 2px' }}>{tw('A warm-up runs before the workouts that name it; recovery and joint work on their own. Neither counts as training.')}</div>}
     </div></div>
   </>
 }

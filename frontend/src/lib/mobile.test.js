@@ -74,4 +74,16 @@ describe('buildReminderNotifications', () => {
     const n = buildReminderNotifications(state({ week: { 1: ['push', 'pull', 'legs'] } }), now)[0]
     expect(n.body).toContain('3 routines')
   })
+
+  // docs/dev/WARMUPS.md: a recovery session alone is not the day's training, unless the day
+  // planned nothing else.
+  it('still reminds of a training day after a recovery session alone, but not of a recovery day', () => {
+    const now = new Date(2026, 5, 1, 7, 0) // Monday
+    const recovery = { id: 'rec', name: 'Recovery', kind: 'mobility' }
+    const morning = { id: 'm', d: iso(now), mobility: true, entries: [] }
+    const training = buildReminderNotifications(state({ week: { 1: 'push' }, workouts: [morning] }), now)
+    expect(iso(training[0].schedule.at)).toBe(iso(now))
+    const recoveryDay = buildReminderNotifications(state({ routines: [push, recovery], week: { 1: 'rec' }, workouts: [morning] }), now)
+    expect(recoveryDay.some(n => iso(n.schedule.at) === iso(now))).toBe(false)
+  })
 })

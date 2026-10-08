@@ -6,7 +6,7 @@ import { todayISO, uid } from './format.js'
 import { workoutDay } from './history.js'
 import { EXIDX, isAssisted } from './exercises.js'
 import { readExercise, winsTimeline, workoutKey } from './scoreboard.js'
-import { isWarmupRow } from './workout-model.js'
+import { isWarmupRow, isMobilityWorkout } from './workout-model.js'
 import { bodyweightOn } from './strength-levels.js'
 import { FORMULAS } from './onerm.js'
 
@@ -41,7 +41,8 @@ export const anchorIds = season => ANCHOR_SLOTS.map(k => season?.anchors?.[k]).f
 export function seasonWorkouts(S, season, upTo = lastDay(season)) {
   const end = upTo < lastDay(season) ? upTo : lastDay(season)
   return list(S?.workouts)
-    .filter(w => { const d = workoutDay(w); return d && d >= season.start && d <= end })
+    // A session of warm-up or recovery work alone is no training session (docs/dev/WARMUPS.md).
+    .filter(w => { const d = workoutDay(w); return d && d >= season.start && d <= end && !isMobilityWorkout(w) })
     .sort((a, b) => (workoutDay(a) < workoutDay(b) ? -1 : workoutDay(a) > workoutDay(b) ? 1 : (a.start || 0) - (b.start || 0)))
 }
 

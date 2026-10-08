@@ -84,7 +84,8 @@ export function plannedConfigOf(entry) {
  * today's 102.5 to the routine's own 60, and its Undo then let those 60 count as progress. So only
  * an entry whose routine is itself kept out is built that way.
  */
-export const builtOutOfProgression = (entry, routine) => entry?.noProg === true && routine?.excludeFromProgression === true
+export const builtOutOfProgression = (entry, routine) => entry?.noProg === true
+  && (routine?.excludeFromProgression === true || routine?.kind === 'mobility' || entry?.mobility === true)
 
 // Returns a bare array of session entries. "Excluded from progression" is per-entry now
 // (`entry.noProg`, written only when true) rather than a wrapper flag — a rehab routine merged
@@ -94,9 +95,12 @@ export const builtOutOfProgression = (entry, routine) => entry?.noProg === true 
 export function buildSessionEntries(st, r) {
   // The prescription is applied as the session is built, so you walk up to the bar with the
   // right weight already on the screen instead of being told about it afterwards.
-  const noProg = r?.excludeFromProgression === true
+  // A warm-up or recovery routine's exercises (docs/dev/WARMUPS.md) are out of progression the
+  // same way, and carry `mobility` frozen onto them, so a routine deleted later still reads right.
+  const mobility = r?.kind === 'mobility'
+  const noProg = r?.excludeFromProgression === true || mobility
   return (r ? r.ex : []).map(cfg => {
     const built = buildPlannedEntry(st, cfg, r, { noProg })
-    return { id: cfg.id, sg: cfg.sg, ...built, ...(noProg ? { noProg: true } : {}) }
+    return { id: cfg.id, sg: cfg.sg, ...built, ...(noProg ? { noProg: true } : {}), ...(mobility ? { mobility: true } : {}) }
   })
 }

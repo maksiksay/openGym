@@ -175,6 +175,11 @@ export function buildPlanBundle(S, name) {
     id: r.id, name: r.name, emoji: r.emoji,
     ...(r.prog ? { prog: r.prog } : {}),
     ...(r.excludeFromProgression === true ? { excludeFromProgression: true } : {}),
+    // Warm-ups and recovery (docs/dev/WARMUPS.md): the kind, the ready-made set it came from, and
+    // a training routine's warm-up, which the import points at the warm-up's new id.
+    ...(r.kind === 'mobility' ? { kind: 'mobility' } : {}),
+    ...(r.preset ? { preset: r.preset } : {}),
+    ...(r.warmup ? { warmup: r.warmup } : {}),
     ex: (r.ex || []).map(cleanEx)
   }))
   const usedIds = new Set(routines.flatMap(r => r.ex.map(e => e.id)))
@@ -275,8 +280,15 @@ export function mergePlan(s, bundle, { schedule } = {}) {
       emoji: r.emoji,
       ...(r.prog ? { prog: r.prog } : {}),
       ...(r.excludeFromProgression === true ? { excludeFromProgression: true } : {}),
+      ...(r.kind === 'mobility' ? { kind: 'mobility' } : {}),
+      ...(typeof r.preset === 'string' ? { preset: r.preset } : {}),
       ex: (r.ex || []).map(e => ({ ...e, id: exIdMap[e.id] || e.id }))
     })
+  })
+  // A warm-up named by an imported routine is the imported warm-up (docs/dev/WARMUPS.md).
+  source.routines.forEach(r => {
+    const mine = r.warmup && ridMap[r.warmup] && s.routines.find(x => x.id === ridMap[r.id])
+    if (mine && mine.kind !== 'mobility') mine.warmup = ridMap[r.warmup]
   })
   if (schedule) {
     WEEK_DAYS.forEach(d => { delete s.week[d] })

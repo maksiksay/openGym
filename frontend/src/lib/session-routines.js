@@ -122,7 +122,7 @@ function copiedEntry(entry, source) {
   return cfg
 }
 
-const SESSION_ONLY = ['planned', 'plan', 'carried', 'rid', 'noProg', 'muscleSnapshot']
+const SESSION_ONLY = ['planned', 'plan', 'carried', 'rid', 'noProg', 'mobility', 'muscleSnapshot']
 
 // `routines` are the ones the session was built from, when they still exist: the rule each copied
 // exercise is read under comes from there (see copiedEntry).

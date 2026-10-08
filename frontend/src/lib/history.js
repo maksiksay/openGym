@@ -2,7 +2,7 @@
 import { todayISO, isoOf, weekKey, weekStartOf, fmtNum } from './format.js'
 import { fmtSpeed } from './speed.js'
 import { isCardio, isBodyweightEq, isAssisted, betterWeight } from './exercises.js'
-import { phaseForSet, modeForSet, modeForEntry, isWarmupRow, normalizeMode, completedVolumeOf, hasCompletedWork, nextDropWeight, splitBurstReps, makeSideSet, isSideSet, syncSideAggregate, WEIGHT_ORIGIN_MANUAL, dropsOf, clustersOf } from './workout-model.js'
+import { phaseForSet, modeForSet, modeForEntry, isWarmupRow, normalizeMode, completedVolumeOf, hasCompletedWork, nextDropWeight, splitBurstReps, makeSideSet, isSideSet, syncSideAggregate, WEIGHT_ORIGIN_MANUAL, dropsOf, clustersOf, isMobilityEntry } from './workout-model.js'
 const objectOf = value => value && typeof value === 'object' && !Array.isArray(value) ? value : {}
 // Completed-state-independent work rows whose authoritative mode matches the requested mode.
 const workRowsForMode = (entry = {}, mode = 'reps') => {
@@ -381,7 +381,7 @@ export function bestWeightFor(S, exId) {
   // 0 means "nothing logged with a load yet" and must not win a min() for an assisted machine.
   let best = 0
   S.workouts.forEach(w => w.entries.forEach(e => {
-    if (e.id !== exId) return
+    if (e.id !== exId || isMobilityEntry(e)) return   // a warm-up's load is no best (docs/dev/WARMUPS.md)
     const entryBest = bestWeightForEntry(e)
     if (entryBest > 0) best = best > 0 ? betterWeight(exId, best, entryBest) : entryBest
   }))
@@ -916,7 +916,9 @@ export function metricModeForEntry(entry, fallback = null) {
 /** Every saved occurrence of an exercise in one workout, in its stored order. */
 export function entriesForExercise(workout, exId) {
   if (exId == null || exId === '') return []
-  return (workout?.entries || []).filter(entry => entry?.id === exId)
+  // A warm-up's sets are no performance (docs/dev/WARMUPS.md): out of wins, records, 1RM,
+  // strength levels and season measures, which all read through here.
+  return (workout?.entries || []).filter(entry => entry?.id === exId && !isMobilityEntry(entry))
 }
 
 /** Metric data for every occurrence in one workout, including legacy reps topW-only records. */

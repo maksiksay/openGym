@@ -9,6 +9,7 @@
 // Imported only by sheets.jsx and views/Workout.jsx; imports session-start.js (which pulls in
 // history.js + progression.js). Nothing in that chain imports this file, so there is no cycle.
 import { buildSessionEntries } from './session-start.js'
+import { isMobilityRoutine, warmupOf } from './warmups.js'
 
 /**
  * Build a session's entries from an ordered list of routine ids.
@@ -21,10 +22,18 @@ import { buildSessionEntries } from './session-start.js'
  */
 export function buildCombinedEntries(st, routineIds) {
   const seen = new Set()
-  const routines = [].concat(routineIds ?? [])
+  const picked = [].concat(routineIds ?? [])
     .filter(id => id && !seen.has(id) && seen.add(id))
     .map(id => (st.routines || []).find(r => r.id === id))
     .filter(Boolean)
+  // A training routine's warm-up runs first (docs/dev/WARMUPS.md): once for the whole session,
+  // even when two routines name the same one, and not again when the list already holds it.
+  const warmups = []
+  for (const r of picked) {
+    const w = warmupOf(st, r)
+    if (w && !picked.includes(w) && !warmups.includes(w)) warmups.push(w)
+  }
+  const routines = [...warmups, ...picked]
   const entries = routines.flatMap(r =>
     buildSessionEntries(st, r).map(e => ({ ...e, rid: r.id }))
   )
@@ -37,6 +46,15 @@ export function buildCombinedEntries(st, routineIds) {
  *   4+ routines  → first two, then "+ N more" → "Rehab + Core + 2 more"
  * An empty list returns null — not a reachable state for a saved or active session.
  */
+/**
+ * The names a session is called by: its training routines', leaving out a warm-up that runs
+ * before them (docs/dev/WARMUPS.md). A session of nothing but mobility routines keeps theirs.
+ */
+export function sessionNamesOf(routines) {
+  const training = routines.filter(r => !isMobilityRoutine(r))
+  return (training.length ? training : routines).map(r => r.name)
+}
+
 export function deriveSessionName(names) {
   if (!names.length) return null
   if (names.length <= 3) return names.join(' + ')

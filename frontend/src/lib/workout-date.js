@@ -7,6 +7,7 @@
 //
 // Kept pure and separate from backfill.js (which is about logging a session that never
 // existed) so the date arithmetic and the badge surgery are testable without the UI.
+import { isMobilityEntry } from './workout-model.js'
 import { insertChronological, backfillStart } from './backfill.js'
 import { bestWeightForEntry } from './history.js'
 import { beatsWeight } from './exercises.js'
@@ -66,7 +67,7 @@ export function rebuildPrHistory(workouts, exerciseIds, moved = null) {
     const kept = []
     let trains = false
     for (const e of w.entries || []) {
-      if (!ids.has(e.id)) continue
+      if (!ids.has(e.id) || isMobilityEntry(e)) continue   // no record from a warm-up (docs/dev/WARMUPS.md)
       trains = true
       const top = bestWeightForEntry(e)
       // Leads everything dated before it. The running best grows whether or not a badge is

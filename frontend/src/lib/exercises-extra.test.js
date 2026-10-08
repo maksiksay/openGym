@@ -12,7 +12,7 @@ describe('the exercises this fork adds', () => {
   afterEach(() => _setLangState('en', {}, null, null))
 
   it('are appended to the catalogue after the dataset, with ids nothing else uses', () => {
-    expect(EXDB.slice(-EXTRA_EXERCISES.length).map(e => e.id)).toEqual(['9001', '9002'])
+    expect(EXDB.slice(-EXTRA_EXERCISES.length).map(e => e.id)).toEqual(['9001', '9002', '9003', '9004', '9005', '9006', '9007', '9008', '9009'])
     expect(new Set(EXDB.map(e => e.id)).size).toBe(EXDB.length)
     for (const e of EXTRA_EXERCISES) expect(EXIDX[e.id]).toBeTruthy()
   })

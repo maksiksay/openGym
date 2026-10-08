@@ -31,6 +31,8 @@ export function copyRoutine(routine, suffix = 'Copy') {
  */
 export function deleteRoutine(s, id) {
   s.routines = s.routines.filter(r => r.id !== id)
+  // A warm-up that is gone is no routine's warm-up any more (docs/dev/WARMUPS.md).
+  for (const r of s.routines) if (r && r.warmup === id) delete r.warmup
   Object.keys(s.week || {}).forEach(d => {
     const ids = [].concat(s.week[d])
     if (!ids.includes(id)) return

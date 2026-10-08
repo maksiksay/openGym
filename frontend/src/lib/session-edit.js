@@ -60,7 +60,7 @@ const comparable = w => {
 function bestIn(workout, id) {
   let best = 0
   for (const e of list(workout?.entries)) {
-    if (e?.id !== id) continue
+    if (e?.id !== id || e?.mobility === true) continue   // a warm-up's load (docs/dev/WARMUPS.md)
     const w = bestWeightForEntry(e)
     if (beatsWeight(id, w, best)) best = w
   }
@@ -197,11 +197,12 @@ function draftRecord(active, current, key) {
     const merged = { ...clone(logged[i]), ...entry }
     delete merged.plan
     delete merged.carried
-    for (const k of ['note', 'notePin', 'noProg', 'muscleSnapshot', 'rid', 'planned']) if (!(k in entry)) delete merged[k]
+    for (const k of ['note', 'notePin', 'noProg', 'mobility', 'muscleSnapshot', 'rid', 'planned']) if (!(k in entry)) delete merged[k]
     return merged
   })
   const record = { ...current, ...updated, id: key, d: current.d, start: current.start, end: current.end }
   if (!('excludeFromProgression' in updated)) delete record.excludeFromProgression
+  if (!('mobility' in updated)) delete record.mobility
   const base = active.editBase
   for (const k of SESSION_FIELDS) {
     // A draft from before `editBase` existed has nothing to compare with, and keeps the editor's.

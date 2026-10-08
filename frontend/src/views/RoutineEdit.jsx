@@ -20,6 +20,8 @@ import { speedUnitOf } from '../lib/speed.js'
 import { POLICIES_FOR, POLICY_NAME, POLICY_DESC } from '../lib/progression.js'
 import BodyMap from '../components/BodyMap.jsx'
 import { loadOfRoutine, rankOf, MUSCLE_NAME } from '../lib/muscles.js'
+import { isMobilityRoutine, setWarmup, warmupOf } from '../lib/warmups.js'
+import { tw } from '../lib/warmups-i18n.js'
 
 export const ROUTINE_LONG_PRESS_MS = 380
 export const ROUTINE_DRAG_SLOP = 8
@@ -404,7 +406,16 @@ export default function RoutineEdit() {
       <button className="iconbtn" aria-label={t('Pick an icon')} onClick={() => glyphPicker(r.emoji, g => update(s => { s.routines.find(x => x.id === id).emoji = g }))}><Icon name={glyphOf(r.emoji)} /></button>
     </div>
 
+    {/* docs/dev/WARMUPS.md: a warm-up or recovery routine has no progression and no deload —
+        it is counted for nothing; a training routine may name one to run first. */}
+    {isMobilityRoutine(r) ? <div className="card" style={{ marginBottom: 16 }}>
+      <div className="row" style={{ gap: 9, marginBottom: 6 }}><span className="lrow-i"><Icon name="stretch" /></span><b>{tw('A warm-up or recovery routine')}</b></div>
+      <div className="small muted">{tw('No progression and no records. Before a workout it runs when that workout names it here; on its own it is kept in history but counts for no quota, wins or season.')}</div>
+    </div> : <>
     <div className="sect-b" style={{ marginBottom: 16 }}>
+      <SelectRow icon="stretch" title={tw('Warm-up')} sheetTitle={tw('Warm-up')}
+        value={warmupOf(S, r)?.id || ''} onChange={v => update(s => { setWarmup(s, id, v || null) })}
+        options={[{ value: '', label: tw('None') }, ...(S.routines || []).filter(isMobilityRoutine).map(w => ({ value: w.id, label: w.name }))]} />
       <SelectRow icon="chartLine" title={t('Progression')} sheetTitle={t('Progression')}
         value={r.prog || 'linear'} onChange={v => update(s => { s.routines.find(x => x.id === id).prog = v })}
         options={POLICIES_FOR.reps.map(p => ({ value: p, label: t(POLICY_NAME[p]), subtitle: t(POLICY_DESC[p]) }))} />
@@ -427,6 +438,8 @@ export default function RoutineEdit() {
         ? t('A deload routine opens at the numbers set here, so the progression above does not apply to it.') + ' ' + t('The next regular target continues from the last included workout.')
         : t(POLICY_DESC[r.prog || 'linear'] || POLICY_DESC.linear) + ' ' + t('Applies to every exercise in this routine that does not set its own rule.')}
     </div>
+    {warmupOf(S, r) && <div className="small dim" style={{ margin: '-10px 2px 16px' }}>{tw('Runs first when this routine starts. Skip warm-up drops it for that day.')}</div>}
+    </>}
 
     {missingCount > 0 && <div className="card" style={{ marginBottom: 16, borderColor: 'var(--orange)' }}>
       <div className="row" style={{ gap: 8, alignItems: 'center' }}>

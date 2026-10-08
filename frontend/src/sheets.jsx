@@ -44,7 +44,7 @@ import { normalizeRepRange } from './lib/rep-range.js'
 import { MOBILE, shareExport, printHtml } from './lib/mobile.js'
 import { speedUnitOf, toSpeed, fromSpeed } from './lib/speed.js'
 import { buildCompletedWorkout } from './lib/finish-workout.js'
-import { isWarmupRow, hasCompletedWork } from './lib/workout-model.js'
+import { isWarmupRow, hasCompletedWork, isMobilityEntry } from './lib/workout-model.js'
 import { saveSessionAsRoutine } from './lib/session-routines.js'
 import { nextUnfinishedUnit } from './lib/supersetFlow.js'
 import { swapActiveExercise } from './lib/active-exercise-swap.js'
@@ -52,7 +52,8 @@ import { useSheetKeyboard, useRevealActiveChip, tappable } from './lib/use-sheet
 import { isFav, toggleFav, sortFavouritesFirst } from './lib/favourites.js'
 import { buildSessionEntries, buildPlannedEntry, builtOutOfProgression } from './lib/session-start.js'
 import { joinSessionNoProg } from './lib/session-noprog.js'
-import { buildCombinedEntries, deriveSessionName } from './lib/session-merge.js'
+import { buildCombinedEntries, deriveSessionName, sessionNamesOf } from './lib/session-merge.js'
+import { tw } from './lib/warmups-i18n.js'
 import { workoutsOn, backfillStart, backfillEnd, completeBackfill, historyAsOf, sessionHistory } from './lib/backfill.js'
 import { moveWorkout, sameWorkout, startTimeOf, durationMinOf, setWorkoutDuration, rebuildPrHistory } from './lib/workout-date.js'
 import { editCompletedSession, editLeftEmpty, editedRecord, editChangesNothing } from './lib/session-edit.js'
@@ -1242,6 +1243,8 @@ export function swapActiveWorkoutExercise(index) {
       // prescription (above): one kept out by hand keeps the marker and its Undo on the card,
       // and an Undo must leave numbers that are right to count.
       ...(current.noProg === true ? { noProg: true } : {}),
+      // A warm-up's slot stays a warm-up's, counted for nothing (docs/dev/WARMUPS.md).
+      ...(current.mobility === true ? { mobility: true } : {}),
     }
 
     const apply = options => {
@@ -2216,6 +2219,7 @@ export function WorkoutRow({ w, onClick }) {
     <span className="lrow-i" style={{ width: 34, height: 34, borderRadius: 8, fontSize: 19 }}><Icon name={glyph} /></span>
     <div className="grow"><div className="tt">{w.name}</div>
       <div className="ss">{[fmtDate(w.d, true), ...durPart(w.end - w.start), t('{0} sets', setsDone(w)), fmtVol(w.vol, st.unit)].join(' · ')}</div></div>
+    {w.mobility === true && <span className="tag">{tw('Recovery')}</span>}
     {mediaN > 0 && <span className="wrow-media" title={t(mediaN === 1 ? '{0} photo or video' : '{0} photos or videos', mediaN)} aria-label={t(mediaN === 1 ? '{0} photo or video' : '{0} photos or videos', mediaN)}><Icon name="image" />{mediaN}</span>}
     {wins > 0 && <span className="pr" title={nWins(wins)} aria-label={nWins(wins)}><Icon name="trophy" />{wins}</span>}
     <Icon name="chevronRight" className="chev" />
@@ -2243,7 +2247,7 @@ export function beginWorkout(routineIds, bw) {
       // A session tracks its routines as a list; per-entry `rid` carries which one each
       // exercise came from. No top-level `excludeFromProgression` — per-entry `noProg` does it.
       routineIds: rids,
-      name: routines.length ? deriveSessionName(routines.map(r => r.name)) : t('Freestyle'),
+      name: routines.length ? deriveSessionName(sessionNamesOf(routines)) : t('Freestyle'),
       bw: bw || null, cur: 0, entries,
       // Snapshot the layout at start so the header ⋮ can change it for this session only —
       // changing the saved default (Settings → Workout view) mid-session leaves it alone.
@@ -2348,7 +2352,7 @@ function beginBackfill({ iso, time, durationMin, routineIds, replaceId }) {
     s.active = {
       id: uid(), d: iso, start,
       routineIds: rids,
-      name: routines.length ? deriveSessionName(routines.map(r => r.name)) : t('Freestyle'),
+      name: routines.length ? deriveSessionName(sessionNamesOf(routines)) : t('Freestyle'),
       bw: null, cur: 0, entries,
       backfill: { durationMin, replaceId: replaceId || null },
       // Same layout snapshot as a live session (see beginWorkout).
@@ -2378,7 +2382,7 @@ function AddRoutineToSession({ close }) {
       s.active.entries.push(...entries.map(e => joinSessionNoProg(s.active, e)))
       s.active.routineIds = [...[].concat(s.active.routineIds || []), r.id]
       if (!s.active.customName) {
-        s.active.name = deriveSessionName(s.active.routineIds.map(id => s.routines.find(x => x.id === id)?.name).filter(Boolean))
+        s.active.name = deriveSessionName(sessionNamesOf(s.active.routineIds.map(id => s.routines.find(x => x.id === id)).filter(Boolean)))
       }
     })
     close()
@@ -2693,10 +2697,15 @@ function FinishSummary({ w, close }) {
         <span><span className={exerciseNameClass(EXIDX[win.id])}>{nameOf(win.id)}</span> — {winChips(win, st.unit).join(' · ')}</span>
       </div>)}
       <QuestFinishRows w={w} />
-      <div className="small dim">{wins.length + questN ? tally : ts('Session banked · {0}', tally)}</div>
+      <div className="small dim">{w.mobility === true ? tw('Recovery: not counted toward the quota · {0}', tally)
+        : wins.length + questN ? tally : ts('Session banked · {0}', tally)}</div>
     </div>
-    <h4 className="sec" style={{ textAlign: 'start' }}>{t('What you just trained')}</h4>
-    <BodyMap load={loadOfWorkouts([w])} body={st.body} />
+    {/* A session of warm-up or recovery work alone loads no muscle (docs/dev/WARMUPS.md), so its
+        map would be blank. */}
+    {w.mobility !== true && <>
+      <h4 className="sec" style={{ textAlign: 'start' }}>{t('What you just trained')}</h4>
+      <BodyMap load={loadOfWorkouts([w])} body={st.body} />
+    </>}
     <div style={{ height: 14 }} />
     {/* The moment for a progress photo or the clip of a set: the workout is already saved, so
         what is added here goes straight onto its record. */}
@@ -2725,6 +2734,7 @@ function doFinishWorkout() {
   // it outdoes loses its own. It used to report none at all while the editor's Save awarded them
   // (QA 1.3.9). The confirmed weights are left alone either way.
   if (!past) A.entries.forEach(e => {
+    if (isMobilityEntry(e)) return   // a warm-up sets no record (docs/dev/WARMUPS.md)
     const loads = e.sets.filter(s => s.done && !isWarmupRow(s)).map(s => s.w).filter(w => w > 0)
     const mx = loads.length ? loads.reduce((a, b) => betterWeight(e.id, a, b)) : 0
     if (beatsWeight(e.id, mx, bestWeightFor(st, e.id))) prs.push(e.id)
@@ -2747,6 +2757,7 @@ function doFinishWorkout() {
       shown = s.workouts.find(x => x === w || (w.id != null && x.id === w.id)) || w
     } else {
       w.entries.forEach(e => {
+        if (isMobilityEntry(e)) return
         const mx = bestWeightForEntry(e)
         if (mx > 0 && beatsWeight(e.id, mx, (s.exWeights[e.id] || {}).w || 0)) s.exWeights[e.id] = { w: mx, d: w.d }
       })

@@ -12,6 +12,7 @@
 import { t } from './i18n-core.js'
 import { isoOf, todayISO } from './format.js'
 import { effectiveRoutineIds } from './history.js'
+import { settlesDay } from './workout-model.js'
 
 export const MOBILE = import.meta.env.VITE_MOBILE === '1'
 
@@ -97,7 +98,7 @@ export function buildReminderNotifications(S, now = new Date()) {
   const r = S?.reminder
   if (!r?.on) return []
   const routines = Array.isArray(S.routines) ? S.routines : []
-  const completed = new Set((S.workouts || []).map(w => w.d))
+  const workouts = Array.isArray(S.workouts) ? S.workouts : []
   const state = { ...S, routines, week: S.week || {}, dayPlan: S.dayPlan || {} }
   const [hour, minute] = (r.time || '08:00').split(':').map(Number)
   if (!Number.isInteger(hour) || !Number.isInteger(minute)) return []
@@ -107,10 +108,11 @@ export function buildReminderNotifications(S, now = new Date()) {
     const day = new Date(date)
     day.setDate(date.getDate() + offset)
     const iso = isoOf(day)
-    if (completed.has(iso)) continue
     // A weekday can hold several routines; name them all, or fall back to a count.
     const dayRoutines = effectiveRoutineIds(state, iso).map(id => routines.find(x => x.id === id)).filter(Boolean)
     if (!dayRoutines.length) continue
+    // Done already. A recovery session alone does not stand for a training day (docs/dev/WARMUPS.md).
+    if (workouts.some(w => w?.d === iso && settlesDay(w, dayRoutines))) continue
     const label = dayRoutines.length <= 2 ? dayRoutines.map(r => r.name).join(' + ') : t('{0} routines', dayRoutines.length)
     const at = new Date(day)
     at.setHours(hour, minute, 0, 0)

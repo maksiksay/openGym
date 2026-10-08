@@ -1,6 +1,6 @@
 import { EXIDX } from './exercises.js'
 import { MUSCLES, musclesOf } from './muscles.js'
-import { isWarmupRow, dropsOf } from './workout-model.js'
+import { isWarmupRow, dropsOf, isMobilityEntry } from './workout-model.js'
 
 // A "normal" hard session for one muscle, in primary-set equivalents. The saturation curve
 // 1 - exp(-stimulus / REF) maps any session size onto [0,1) so volume raises the starting
@@ -227,6 +227,7 @@ function sessionTonnages(workout, opts = {}) {
   const sums = emptyMuscleMap(0)
   const oneRms = session1RMs(workout, opts)
   for (const entry of workout?.entries || []) {
+    if (isMobilityEntry(entry)) continue   // warm-up and recovery work (docs/dev/WARMUPS.md)
     const ex = exerciseFor(entry)
     const weights = musclesOf(ex)
     for (const set of entry.sets || []) {
@@ -332,6 +333,7 @@ export function strengthOf(workouts, now, opts = {}) {
     const timestamp = workoutTimestamp(workout)
     if (!Number.isFinite(timestamp)) continue
     for (const entry of workout.entries || []) {
+      if (isMobilityEntry(entry)) continue
       if (!(entry.sets || []).some(set => set?.done === true && !isWarmupRow(set))) continue
       for (const slug of Object.keys(musclesOf(exerciseFor(entry)))) {
         if (Object.prototype.hasOwnProperty.call(MUSCLES_BY_SLUG, slug) && timestamp > latest[slug]) {

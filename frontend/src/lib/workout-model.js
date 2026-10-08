@@ -22,6 +22,18 @@ export function isWarmupRow(set) {
   return phaseForSet(set) === 'warmup'
 }
 
+// Warm-up and recovery work (docs/dev/WARMUPS.md): an exercise logged from a mobility routine, and
+// a workout made of nothing else. Both are kept and shown, and counted for nothing — no record,
+// win, quota day, season, muscle load or Coach reading.
+export const isMobilityEntry = entry => entry?.mobility === true
+export const isMobilityWorkout = workout => workout?.mobility === true
+
+/** Whether a logged workout settles a day whose plan is `dayRoutines`: a training session always
+ *  does; a recovery session alone only on a day that planned nothing but warm-up or recovery
+ *  work. What Home's today row and the day reminder read. */
+export const settlesDay = (workout, dayRoutines = []) => !!workout && (!isMobilityWorkout(workout) ||
+  (dayRoutines.length > 0 && dayRoutines.every(r => r?.kind === 'mobility')))
+
 // A row's shape beyond warm-up/work: 'straight' (default), 'dropset' (a main set followed by
 // weight drops logged with no rest) or 'restpause' (an activation set followed by short-rest
 // bursts). Both extras ride on the row itself — same card, not a new set in the array — the

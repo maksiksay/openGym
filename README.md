@@ -59,6 +59,10 @@ if you want to try it before installing anything.
   Sunday, your choice.
 - Supersets, warm-up sets, drop sets and rest-pause, timed exercises (planks, hangs, carries),
   cardio by time and speed, rest time per exercise, planned deloads.
+- Warm-up and recovery routines, kept apart from training: one runs first when a routine names
+  it, skippable for the day, or on its own. Five ready-made sets: upper- and lower-body warm-ups,
+  shoulder blades and posture, recovery after football, ligaments and feet. They count for no
+  progression, record or monthly goal.
 - Your own exercises, with your own photo, GIF or short video. Location data is stripped on the
   device before upload.
 

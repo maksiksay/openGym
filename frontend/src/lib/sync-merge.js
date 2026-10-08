@@ -163,7 +163,7 @@ function correctedExWeight(id, workouts, sources) {
   let best = null
   const consider = c => { if (c && c.w > 0 && (!best || beatsWeight(id, c.w, best.w))) best = c }
   for (const w of workouts) {
-    for (const e of list(w?.entries)) if (e?.id === id) consider({ w: bestWeightForEntry(e), d: w.d })
+    for (const e of list(w?.entries)) if (e?.id === id && e?.mobility !== true) consider({ w: bestWeightForEntry(e), d: w.d })
   }
   for (const src of sources) consider(src?.[id])
   return best
@@ -291,7 +291,7 @@ export function sinceReset(S, at, ids) {
   const ex = {}
   for (const w of out.workouts) {
     for (const e of list(w.entries)) {
-      if (e?.id == null) continue
+      if (e?.id == null || e?.mobility === true) continue   // a warm-up's load (docs/dev/WARMUPS.md)
       const wt = bestWeightForEntry(e)
       if (wt > 0 && (!ex[e.id] || beatsWeight(e.id, wt, ex[e.id].w))) ex[e.id] = { w: wt, d: w.d }
     }

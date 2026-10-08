@@ -118,7 +118,7 @@ export function bestSetFor(S, exId, mode = modeOf({ id: exId })) {
   for (const w of S?.workouts || []) {
     let t = null
     for (const en of w.entries || []) {
-      if (en.id !== exId) continue
+      if (en.id !== exId || en.mobility === true) continue   // a warm-up's sets (docs/dev/WARMUPS.md)
       for (const set of metricRowsForEntry(en, mode)) {
         t ??= startOf(w)
         if (!best || better(set, best.set) || (!better(best.set, set) && t < best.t)) best = { d: w.d, set, target: en.target || null, t }

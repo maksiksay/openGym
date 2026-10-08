@@ -2,6 +2,8 @@ import { Fragment, useEffect, useRef, useState } from 'react'
 import SwipeCards from '../components/SwipeCards.jsx'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../store/useStore.js'
+import { isMobilityRoutine, skipWarmup as dropWarmup } from '../lib/warmups.js'
+import { tw } from '../lib/warmups-i18n.js'
 import { workoutControls } from '../lib/workout-controls.js'
 import { useUI } from '../store/useUI.js'
 import { exOr, betterWeight } from '../lib/exercises.js'
@@ -53,7 +55,13 @@ function StartChooser() {
   // With no weekly plan at all, the routine whose turn it is (lib/rotation.js) leads the screen.
   const up = !todayRoutines.length ? nextUp(S, todayISO()) : null
   const idSet = new Set([...todayIds, ...(up ? [up.id] : [])])
-  const others = S.routines.filter(r => !idSet.has(r.id))
+  // Warm-ups and recovery are listed apart from training, as on Plan (docs/dev/WARMUPS.md).
+  const others = S.routines.filter(r => !idSet.has(r.id) && !isMobilityRoutine(r))
+  const mobility = S.routines.filter(r => !idSet.has(r.id) && isMobilityRoutine(r))
+  const item = r => <div key={r.id} className="item" onClick={() => startFlow([r.id])}>
+    <span className="lrow-i"><Icon name={glyphOf(r.emoji)} /></span>
+    <div className="grow"><div className="tt">{r.name}</div><div className="ss">{exCount(r.ex.length)}</div></div>
+    <span className="tag acc">{t('Start')}</span></div>
   return <div className="narrow">
     <div className="hdr"><div><h1>{t('Start workout')}</h1><div className="sub">{t(DAYN[new Date().getDay()])} — {todayRoutines.length ? t('today is {0}', todayName) : up ? tp('next up is {0}', up.name) : t('rest day, but no one’s stopping you')}</div></div></div>
     {todayRoutines.length > 0 && <div className="card" style={{ borderColor: 'var(--acc)' }}>
@@ -73,10 +81,9 @@ function StartChooser() {
       <Button variant="primary" icon="play" onClick={() => startFlow([up.id])}>{t('Start {0}', up.name)}</Button>
     </div>}
     {others.length > 0 && <><h4 className="sec">{t('Other routines')}</h4>
-      <div className="list">{others.map(r => <div key={r.id} className="item" onClick={() => startFlow([r.id])}>
-        <span className="lrow-i"><Icon name={glyphOf(r.emoji)} /></span>
-        <div className="grow"><div className="tt">{r.name}</div><div className="ss">{exCount(r.ex.length)}</div></div>
-        <span className="tag acc">{t('Start')}</span></div>)}</div></>}
+      <div className="list">{others.map(item)}</div></>}
+    {mobility.length > 0 && <><h4 className="sec">{tw('Warm-ups and recovery')}</h4>
+      <div className="list">{mobility.map(item)}</div></>}
     <div style={{ height: 14 }} />
     <Button icon="shuffle" onClick={() => startFlow([])}>{t('Freestyle workout (pick as you go)')}</Button>
     {!S.routines.length && <><div style={{ height: 10 }} /><Button variant="primary" onClick={() => nav('/plan')}>{t('Build a plan first')}</Button></>}
@@ -201,7 +208,8 @@ function ExerciseBlock({ entryIdx, compact, dense, editing, onToggle, onToggleSi
   // logged" rather than a record (issue #232).
   const bestHist = bestWeightFor(H, entry.id)
   const bestKept = (H.exWeights[entry.id] || {}).w || 0
-  const best = cardio ? 0
+  // A warm-up exercise has no best to show: its sets are no performance (docs/dev/WARMUPS.md).
+  const best = cardio || entry.mobility ? 0
     : bestHist > 0 && bestKept > 0 ? betterWeight(entry.id, bestHist, bestKept) : Math.max(bestHist, bestKept)
   // What the progression policy decided for this session, and why (issue #17). Computed when
   // the session was built so the reason matches the numbers already in the rows.
@@ -758,6 +766,18 @@ function ActiveWorkout() {
   // timed sets stays, since counting a hold is how its duration gets entered.
   const startRest = (A.backfill || editing) ? () => {} : liveRest
   const units = supersetUnits(A.entries)
+  // The warm-up's exercises (docs/dev/WARMUPS.md), and dropping them all for today: timers stop,
+  // the current exercise stays the one it was, or the first of the workout proper.
+  const warmCount = A.entries.filter(e => e && e.mobility).length
+  const skipWarmup = () => {
+    stopWork()
+    stopRest()
+    update(s => {
+      if (!s.active) return
+      dropWarmup(s.active, s.routines)
+      cleanupSg(s.active.entries)
+    })
+  }
   const cur = Number.isInteger(A.cur)
     ? Math.min(Math.max(A.cur, 0), Math.max(0, A.entries.length - 1))
     : 0
@@ -940,7 +960,8 @@ function ActiveWorkout() {
   const setNoProg = (idx, on) => update(s => setEntryNoProg(s.active, idx, on))
   // A deload or rehab routine keeps its own exercises out (RoutineEdit). That is the routine's
   // setting, so its entries get the marker but no switch.
-  const routineKeepsOut = e => !!e?.rid && S.routines.some(r => r.id === e.rid && r.excludeFromProgression === true)
+  // A warm-up's exercises are kept out the same way, by what they are (docs/dev/WARMUPS.md).
+  const routineKeepsOut = e => e?.mobility === true || (!!e?.rid && S.routines.some(r => r.id === e.rid && r.excludeFromProgression === true))
   // The same for the whole session from the header ⋮ (Discord, asierlama: "exclude the current
   // workout" on an injury day): every exercise gets the marker, and one added later joins them.
   // Absent when a deload or rehab routine already keeps every exercise out, since nothing is left
@@ -1360,6 +1381,12 @@ function ActiveWorkout() {
     <div className="wprog"><i style={{ width: (total ? done / total * 100 : 0) + '%' }} /></div>
     </div>
     {editing && <p className="muted small">{t('Editing a saved workout. Date and duration stay unchanged.')}</p>}
+    {/* docs/dev/WARMUPS.md: a warm-up that runs before training, and a way to drop it for today. */}
+    {!editing && warmCount > 0 && warmCount < A.entries.length && <div className="wu-banner">
+      <Icon name="stretch" />
+      <div className="wu-m"><div className="wu-t">{tw('Warm-up')}</div><div className="small dim">{exCount(warmCount)}</div></div>
+      <Button size="sm" variant="ghost" onClick={skipWarmup}>{tw('Skip warm-up')}</Button>
+    </div>}
     {A.backfill && <div className="muted small" style={{ marginBottom: 8 }}>{t('Logging a past workout — no rest timers.')}</div>}
 
     {A.entries.length ? (listMode ? (

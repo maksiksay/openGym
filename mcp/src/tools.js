@@ -63,6 +63,7 @@ function prTable(S, formula) {
   const byId = new Map()
   for (const w of (S.workouts || [])) {
     for (const e of (w.entries || [])) {
+      if (e?.mobility === true) continue   // a warm-up's sets are no record (docs/dev/WARMUPS.md)
       const ex = exerciseOf(e.id, S)
       for (const s of (e.sets || [])) {
         if (!s.done || isWarmupRow(s)) continue

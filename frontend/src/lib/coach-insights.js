@@ -7,7 +7,7 @@
 // later, against the data as it was then.
 import { EXIDX } from './exercises.js'
 import { workoutVolume } from './history.js'
-import { isWarmupRow } from './workout-model.js'
+import { isWarmupRow, isMobilityEntry, isMobilityWorkout } from './workout-model.js'
 import { bestSetOf } from './onerm.js'
 
 const median = arr => {
@@ -20,7 +20,10 @@ const tsOf = w => w.start || new Date(w.d + 'T12:00:00').getTime()
 
 /** Workouts inside an inclusive ISO-date window; either bound may be missing. */
 export function windowWorkouts(S, { from, to } = {}) {
-  return (S.workouts || []).filter(w => w && w.d && (!from || w.d >= from) && (!to || w.d <= to))
+  // Training only: warm-up and recovery sessions are no session to read (docs/dev/WARMUPS.md),
+  // and a warm-up run before a workout leaves it.
+  return (S.workouts || []).filter(w => w && w.d && !isMobilityWorkout(w) && (!from || w.d >= from) && (!to || w.d <= to))
+    .map(w => (w.entries || []).some(isMobilityEntry) ? { ...w, entries: w.entries.filter(e => !isMobilityEntry(e)) } : w)
 }
 
 /**

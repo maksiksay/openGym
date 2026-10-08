@@ -95,6 +95,22 @@ describe('the finish sheet', () => {
     act(() => finishWorkout())
     expect(mountTopSheet().textContent).toContain('September: 2 of 2 — quota met ✓')
   })
+
+  // docs/dev/WARMUPS.md: recovery on its own is kept, and is no training day.
+  it('says a recovery session alone is not counted toward the quota, and maps no muscles', () => {
+    act(() => useStore.getState().update(s => {
+      s.routines.push({ id: 'R', name: 'Recovery', kind: 'mobility', ex: [{ id: '1373', sets: 1, reps: 12, weight: 0, prog: 'off' }] })
+      s.active = {
+        id: 'live', d: '2026-09-16', start: Date.now() - 600000, name: 'Recovery', routineIds: ['R'],
+        entries: [{ id: '1373', rid: 'R', mobility: true, noProg: true, target: { mode: 'reps', sets: 1, reps: 12, weight: 0 }, sets: [done(0, 12)] }],
+      }
+    }))
+    act(() => finishWorkout())
+    const sheet = mountTopSheet()
+    expect(S().workouts.at(-1).mobility).toBe(true)
+    expect(sheet.textContent).toContain('Recovery: not counted toward the quota · September: 1 of 8')
+    expect(sheet.textContent).not.toContain('What you just trained')
+  })
 })
 
 describe('History', () => {

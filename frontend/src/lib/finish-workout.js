@@ -41,6 +41,8 @@ export function buildCompletedWorkout(active, { end = Date.now(), prs = [], snap
       // shape it always was. Without this the whitelist drops both at finish.
       ...(entry.rid ? { rid: entry.rid } : {}),
       ...(entry.noProg === true ? { noProg: true } : {}),
+      // A warm-up or recovery exercise (docs/dev/WARMUPS.md): counted for nothing.
+      ...(entry.mobility === true ? { mobility: true } : {}),
       // What the routine asked for when the session was built (session-start.js), next to the
       // target the prescription moved — how the next session tells an edited plan (#275).
       ...(entry.planned ? { planned: entry.planned } : {}),
@@ -74,6 +76,11 @@ export function buildCompletedWorkout(active, { end = Date.now(), prs = [], snap
   // entries, not read from `active` (which no longer carries the flag). A mixed session omits
   // it — that case is new territory only the per-entry `noProg` readers handle.
   const allNoProg = entries.length > 0 && entries.every(e => e.noProg === true)
+  // A session of nothing but warm-up or recovery work: kept and shown, but no training day.
+  const allMobility = entries.length > 0 && entries.every(e => e.mobility === true)
+  // The routine a session is known by is its training routine, not the warm-up that ran first.
+  const mobRids = new Set(entries.filter(e => e.mobility === true).map(e => e.rid).filter(Boolean))
+  const mainId = routineIds.find(id => !mobRids.has(id)) ?? routineIds[0] ?? null
 
   return {
     id: active.id,
@@ -81,12 +88,13 @@ export function buildCompletedWorkout(active, { end = Date.now(), prs = [], snap
     start: active.start,
     end,
     routineIds,
-    routineId: routineIds[0] ?? null,
+    routineId: mainId,
     name: active.name,
     bw: active.bw,
     entries,
     prs,
     ...(allNoProg ? { excludeFromProgression: true } : {}),
+    ...(allMobility ? { mobility: true } : {}),
     ...(sessionNote ? { note: sessionNote } : {}),
   }
 }

@@ -51,7 +51,8 @@ function participant(S) {
   const since = isoDaysAgo(WEEKS_STRENGTH * 7);
   const sinceFreq = isoDaysAgo(WEEKS_FREQUENCY * 7);
   const toKg = S.unit === 'lb' ? LB_TO_KG : 1;
-  const workouts = (S.workouts || []).filter(w => w && w.d && w.d >= since);
+  // Warm-up and recovery sessions are no training sessions (docs/dev/WARMUPS.md).
+  const workouts = (S.workouts || []).filter(w => w && w.d && w.d >= since && w.mobility !== true);
   if (!workouts.length) return null;
   const best = {};
   workouts.forEach(w => (w.entries || []).forEach(en => {

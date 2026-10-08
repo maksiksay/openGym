@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { settlesDay } from '../lib/workout-model.js'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../store/useStore.js'
 import { effectiveRoutines, effectiveRoutineIds, nextTrainingDay, lastBW, setsDoneActive } from '../lib/history.js'
@@ -180,7 +181,9 @@ export default function Home() {
   const doneDays = new Set(S.workouts.map(w => w.d))
   // The last session logged for today, if any — what the row below reports instead of asking
   // you to start the one you already did. Last wins, so a second session names itself.
-  const doneToday = S.workouts.filter(w => w.d === todayISO()).at(-1) || null
+  // A session of warm-up or recovery work alone is not the day's training, unless the day planned
+  // nothing else (docs/dev/WARMUPS.md).
+  const doneToday = S.workouts.filter(w => w.d === todayISO() && settlesDay(w, todayRoutines)).at(-1) || null
   const strip = []
   for (let i = 0; i < 7; i++) {
     const d = new Date(wkStart); d.setDate(wkStart.getDate() + i)
