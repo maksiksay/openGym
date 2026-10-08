@@ -16,7 +16,9 @@
  *              what was eaten last month, the same way a renamed routine does not rename the
  *              workouts logged under it. `drink` is copied the same way, so a drink's grams —
  *              its millilitres, 1 ml taken as 1 g — go into that day's water (lib/health.js).
- *   S.nutri  — settings: { on, paused, goals: { kcal, p, f, c } | null, fibGoal, home }
+ *   S.nutri  — settings: { on, paused, goals: { kcal, p, f, c } | null, fibGoal, home, kcalAt,
+ *              calib } — `kcalAt` the day the calorie goal last changed and `calib` the food
+ *              calibration (lib/gain-rate.js, docs/dev/GAIN_RATE.md)
  *
  * Built-in foods (lib/foods-base.js) are never copied into S.foods; a meal row made from one
  * carries `fid: 'b:<id>'` and `src: 'base'`.
@@ -139,7 +141,12 @@ export function suggestGoals({ sex, weightKg, heightCm, age, activity = 1.375, g
   if (!(w > 0 && h > 0 && a > 0)) return null
   const bmr = 10 * w + 6.25 * h - 5 * a + (sex === 'female' ? -161 : 5)
   const tdee = bmr * (num(activity) || 1.375)
-  const kcal = Math.round(tdee * (1 + (GOAL_ADJ[goal] ?? 0)) / 10) * 10
+  return splitGoals(Math.round(tdee * (1 + (GOAL_ADJ[goal] ?? 0)) / 10) * 10, w)
+}
+
+/** A day's goals for a calorie number: protein 1.8 g/kg, fat 0.8 g/kg, the rest carbohydrate. */
+export function splitGoals(kcal, weightKg) {
+  const w = num(weightKg)
   const p = Math.round(w * 1.8)
   const f = Math.round(w * 0.8)
   const c = Math.max(0, Math.round((kcal - p * 4 - f * 9) / 4))

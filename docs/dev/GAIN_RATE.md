@@ -93,9 +93,11 @@ From the Health screen's food section, **Calibrate: 2 weeks** (or 3):
   - the summary is kept (`S.nutri.calib.result`): days logged, calories, protein, breakfast
     protein.
 - **The paused card** shows that summary above "Resume tracking".
-- **The maintenance estimate.** With a trend over the same days (`gain-rate.js`, its usual minimum)
-  and at least 10 logged days, the paused card also says what the person's own data says: "On
-  2,500 kcal you gained 0.1 % a week. For the corridor, about 2,700 kcal".
+- **The maintenance estimate.** With a trend over the same days and at least 10 logged days, the
+  paused card also says what the person's own data says: "On 2,500 kcal your weight moved +0.1 %
+  a week. For the corridor, about 2,700 kcal".
+  - The trend there is read from the calibration's own days: 4 weigh-ins spanning at least 10 of
+    them, since 14 cannot fit inside a two-week calibration.
   - It is the logged average, moved by the same step rule.
   - **Make it my goal** sets the calories that way and stamps `kcalAt`, with protein at 1.8 g/kg and
     fat at 0.8 g/kg (`suggestGoals`' split) when there are no goals yet.
@@ -112,7 +114,8 @@ From the Health screen's food section, **Calibrate: 2 weeks** (or 3):
   - the weigh-ins it read and since when;
   - the calorie step with Apply, or the link to the Goals sheet;
   - the waist over the same window when it was measured twice or more, shown without a verdict.
-- **The Health screen:** the calibration card, and the summary on the paused card.
+- **The Health screen:** the calibration card above the food day while one runs, the offer to
+  start one below it otherwise, and the summary on the paused card.
 
 ## Not changed
 
@@ -124,11 +127,13 @@ From the Health screen's food section, **Calibrate: 2 weeks** (or 3):
 
 ## Where it lives
 
-- **`frontend/src/lib/gain-rate.js`** (pure) with its test: `weightTrend`, `corridorFor`,
-  `gainVerdict`, `kcalStep`, `applyKcalStep`, and the calibration's `startCalibration`,
-  `calibrationView`, `endCalibration`, `maintenanceEstimate`.
+- **`frontend/src/lib/gain-rate.js`** (pure) with its test: `weightTrend`, `directionOf`,
+  `gainVerdict`, `kcalStep`, `applyKcalStep`, `setKcalGoal`, `waistOver`, and the calibration's
+  `startCalibration`, `dropCalibration`, `calibrationView`, `calibrationDue`, `endCalibration`,
+  `maintenanceEstimate`.
+- **`frontend/src/lib/nutrition.js`:** `splitGoals`, the Goals sheet's macro split on its own.
 - **`frontend/src/lib/gain-i18n.js`, `gain-i18n.ru.js`:** the strings.
-- **`frontend/src/sheets-gain.jsx`:** the Rate sheet.
+- **`frontend/src/sheets-gain.jsx`:** the Home line, the Rate sheet and the calibration's cards.
 - **`frontend/src/views/Home.jsx`:** the line on the body-weight card.
 - **`frontend/src/views/Health.jsx`:** the calibration card, the summary on the paused card.
 - **`frontend/src/sheets-health.jsx`:** the Goals sheet stamps `kcalAt`.

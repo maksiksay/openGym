@@ -52,6 +52,24 @@ red or green verdict on today. A day with no entries is unknown, never zero. Cou
 **paused** at any time without losing the log or the goals. Goals can be worked out from age,
 height, weight, activity and goal (Mifflin–St Jeor, protein 1.8 g/kg) or typed in.
 
+### The rate of gain and the calibration
+
+Whether you eat the right amount for what you are after is read from the scale, not from the
+food log ([`dev/GAIN_RATE.md`](dev/GAIN_RATE.md)):
+
+- **The rate.** A line through the last four weeks of weigh-ins, in per cent of body weight a
+  week. It needs 4 weigh-ins over 2 weeks; two or three a week are enough, and the one asked
+  before a workout counts.
+- **The corridor.** With a goal weight, a gain is +0.25 to +0.5 % a week, a cut −0.5 to −1 %, and
+  within 0.5 kg of the goal the weight is held (±0.2 %). Without one, the Goals sheet's goal.
+- **The step.** Outside the corridor by more than the scale's noise, Home's body-weight card says
+  so with a calorie step of 100 to 300 kcal a day, which **Apply** in its sheet puts into the
+  calorie goal (carbohydrate moves with it). The next reading waits two weeks.
+- **The calibration.** *Food calibration* on the Health screen: log everything for 2 or 3 weeks,
+  with the days logged, the averages and breakfast protein on a card. At its end food tracking
+  pauses by itself, and with weigh-ins over those days it says what your own data says the
+  calories should be.
+
 ## Steps and sleep from Apple Health
 
 A Shortcuts automation on the iPhone can send yesterday's step count and last night's sleep every

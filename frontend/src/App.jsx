@@ -3,7 +3,8 @@ import { HashRouter, Routes, Route, Navigate, useNavigate, useLocation, useNavig
 import { useStore } from './store/useStore.js'
 import { useUI } from './store/useUI.js'
 import { bindUI } from './components/ui.jsx'
-import { ACCENTS, setWeightDecimals } from './lib/format.js'
+import { ACCENTS, setWeightDecimals, todayISO } from './lib/format.js'
+import { calibrationDue, endCalibration } from './lib/gain-rate.js'
 import { setLang, useLang, baseLang } from './lib/i18n.js'
 import { effectiveLang } from './lib/default-lang.js'
 import { setPlayOnSilent, setVibrate } from './lib/sound.js'
@@ -122,6 +123,19 @@ function Shell() {
     if (MOBILE || !user || !ready) return
     syncPushSubscription().catch(() => {})
   }, [user?.id, ready])
+  // A food calibration whose last day has gone by closes the first time the app runs after it:
+  // food tracking pauses and its summary stays (docs/dev/GAIN_RATE.md). Checked again each time the
+  // app comes back to the front, since a phone keeps it open across midnight.
+  useEffect(() => {
+    if (!ready) return
+    const check = () => {
+      const today = todayISO()
+      if (calibrationDue(useStore.getState().S, today)) useStore.getState().update(s => { endCalibration(s, today) })
+    }
+    check()
+    document.addEventListener('visibilitychange', check)
+    return () => document.removeEventListener('visibilitychange', check)
+  }, [ready])
   // Opened from a device-link QR code (#95): once boot knows who is here, the sheet that redeems
   // it opens by itself — over the sign-in screen, or over the app for a guest or a signed-in
   // browser. Once per visit; closed, the code stays for the sign-in screen's own button.

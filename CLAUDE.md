@@ -41,7 +41,9 @@ docs/      guides indexed in docs/README.md (FAQ, SELF_HOSTING*, MOBILE, AI_COAC
            COACH_QUALITY: the app's date and weekday, today's routine, its exercise names and the plan's
            volume in the payload, a language check with one extra round, Opus 5.5 by default;
            PROGRESS_PHOTOS: a feed of the photos kept with workouts, and two compared side by side or
-           with a slider, with the weight and waist of their days).
+           with a slider, with the weight and waist of their days;
+           GAIN_RATE: the weight trend against a corridor, a 100–300 kcal step applied to the goal,
+           a 2–3-week food calibration that pauses tracking at its end).
 ```
 
 ## Commands

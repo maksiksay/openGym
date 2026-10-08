@@ -579,7 +579,10 @@ function GoalsSheet({ close }) {
     const goals = Object.fromEntries(['kcal', 'p', 'f', 'c'].map(k => [k, g[k] > 0 ? Math.round(g[k]) : null]))
     // Fibre has a goal of its own, 30 g unless set (docs/dev/SUGAR_FIBRE.md); empty goes back to that.
     const fibGoal = g.fib >= 5 && g.fib <= 100 ? Math.round(g.fib) : null
-    update(s => { s.nutri = { ...(s.nutri || {}), goals: Object.values(goals).some(Boolean) ? goals : null, fibGoal, body: b } })
+    // A new calorie number restarts the rate's clock (docs/dev/GAIN_RATE.md): the scale is read again
+    // from today, and judged two weeks on.
+    const kcalAt = goals.kcal > 0 && goals.kcal !== g0.kcal ? { kcalAt: todayISO() } : {}
+    update(s => { s.nutri = { ...(s.nutri || {}), goals: Object.values(goals).some(Boolean) ? goals : null, fibGoal, body: b, ...kcalAt } })
     close(); toast(th('Goals saved'))
   }
   return <>

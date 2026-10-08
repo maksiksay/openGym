@@ -23,6 +23,7 @@ import { tp } from '../lib/plan-i18n.js'
 import { ANCHOR_SLOTS, anchorProgress, change, seasonState } from '../lib/season.js'
 import { tsn, measureShort, changeShort } from '../lib/season-i18n.js'
 import { seasonSheet, seasonStartSheet } from '../sheets-season.jsx'
+import { GainLine } from '../sheets-gain.jsx'
 import { EXIDX } from '../lib/exercises.js'
 import { exerciseNameFor } from '../lib/i18n.js'
 
@@ -317,6 +318,8 @@ export default function Home() {
             <span>{t('Goal')} {fmtNum(S.targetW)} {S.unit} · {Math.abs(S.targetW - bw.w) < 0.05 ? t('reached!') : t(S.targetW > bw.w ? '{0} to gain' : '{0} to lose', fmtNum(Math.abs(S.targetW - bw.w)) + ' ' + S.unit)}</span>
           </div>
         )}
+        {/* the rate of the last weeks against its corridor (docs/dev/GAIN_RATE.md) */}
+        <GainLine S={S} />
         <div className="chart" style={{ marginTop: 8 }}><LineChart points={bwPoints} h={130} unit={S.unit} goal={S.targetW} /></div>
         {/* every weigh-in, week by week with its average (Discord 'Weight') */}
         <div className="row" style={{ justifyContent: 'flex-end', marginTop: 4 }}>

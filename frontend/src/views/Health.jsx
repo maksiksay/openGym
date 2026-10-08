@@ -11,6 +11,7 @@ import LineChart from '../components/LineChart.jsx'
 import Icon from '../components/Icon.jsx'
 import { Button } from '../components/ui.jsx'
 import { tappable } from '../lib/use-sheet-keyboard.js'
+import { CalibrationCard, CalibrationOffer, CalibrationSummary } from '../sheets-gain.jsx'
 
 const shift = (iso, n) => { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + n); return isoOf(d) }
 const SQ = ['Very poor', 'Poor', 'OK', 'Good', 'Great']
@@ -218,10 +219,12 @@ export default function Health() {
     {nutri.on !== false && (nutri.paused
       ? <div className="card">
           <h2 style={{ marginTop: 0 }}>{th('Food tracking is paused')}</h2>
+          {/* a calibration that ended here says what it found (docs/dev/GAIN_RATE.md) */}
+          <CalibrationSummary S={S} />
           <div className="muted small" style={{ marginBottom: 10 }}>{th('Taking a break from counting is part of doing it well. Your log and goals are kept.')}</div>
           <Button onClick={() => useStore.getState().update(s => { s.nutri = { ...(s.nutri || {}), paused: false } })}>{th('Resume tracking')}</Button>
         </div>
-      : <NutritionDay S={S} d={d} />)}
+      : <><CalibrationCard S={S} /><NutritionDay S={S} d={d} /><CalibrationOffer S={S} /></>)}
 
     <WeekCard S={S} d={d} />
     <TrendsCard S={S} />
