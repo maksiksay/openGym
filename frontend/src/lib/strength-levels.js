@@ -63,8 +63,8 @@ export function bodyweightOn(S, iso = todayISO()) {
 }
 
 /** What one workout says of a lift: the best estimated max of a loaded one, or the most reps in a
- *  set of a repetition one. In the profile's unit. */
-function workoutMeasure(workout, exId, lift) {
+ *  set of a repetition one. In the profile's unit. The quests read it too (lib/quests.js). */
+export function workoutMeasure(workout, exId, lift = standardOf(exId)) {
   let best = null
   for (const entry of entriesForExercise(workout, exId)) {
     if (isRepsLift(lift)) {

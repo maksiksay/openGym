@@ -50,6 +50,8 @@ is read from the log, like a win, every time it is needed.
 - **Flat:** with the slope at or under 0 there is no forecast, only "no climb yet".
 - **The range:** the weeks the gap to the target takes at the slope plus its standard error, and at
   the slope minus it. With the second at or under 0, the range has no upper end ("5+ weeks").
+  - The gap is read from the line at the last session, not today: weeks off the bar are not weeks
+    of progress.
   - Rounded to whole weeks; equal ends read "about 4 weeks".
   - Past 26 weeks: "more than half a year". A straight line runs fast over months, and the sheet
     says "if the pace holds" every time.

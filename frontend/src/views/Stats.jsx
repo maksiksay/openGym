@@ -18,6 +18,7 @@ import { fatigueStateOf } from '../lib/recovery-view.js'
 import { e1rmSeries, best1RM } from '../lib/onerm.js'
 import { monthQuota } from '../lib/quota.js'
 import { monthWins } from '../lib/scoreboard.js'
+import { questWinsIn } from '../lib/quests.js'
 import { ts } from '../lib/score-i18n.js'
 import {
   hasEffort, displayScale, scaleName, toScale, avgRir, effortSummary, effortWeeks,
@@ -464,7 +465,7 @@ export default function Stats() {
     <div className="tiles">
       <div className="tile"><div className="l"><Icon name="dumbbell" />{t('Workouts')}</div><div className="v">{workouts.length}</div></div>
       <div className="tile" title={ts('Training days this month against your goal')}><div className="l"><Icon name="calendar" />{t('This month')}</div><div className="v">{quota.done} / {quota.goal}</div></div>
-      <div className="tile"><div className="l"><Icon name="trophy" />{ts('Wins this month')}</div><div className="v">{monthWins(workouts, quota.month)}</div></div>
+      <div className="tile"><div className="l"><Icon name="trophy" />{ts('Wins this month')}</div><div className="v">{monthWins(workouts, quota.month) + questWinsIn(S, quota.month)}</div></div>
       <div className="tile"><div className="l"><Icon name="scale" />{t('Weight 30d')}</div><div className="v" style={{ fontSize: 22, color: bwDelta30 === null ? 'inherit' : bwDeltaColor(bwDelta30, (lastBW(S) || {}).w || 0) }}>{bwDelta30 === null ? '—' : (bwDelta30 > 0 ? '+' : '') + fmtNum(bwDelta30) + ' ' + S.unit}</div></div>
 
     </div>

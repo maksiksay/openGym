@@ -63,6 +63,7 @@ Design notes for specific features, kept next to the code they describe:
 | [Coach quality](dev/COACH_QUALITY.md) | The right day and today's routine, the app's exercise names, a plan read before any session, a language check, Opus 5.5 by default |
 | [Progress photos](dev/PROGRESS_PHOTOS.md) | A feed of the photos kept with workouts, and two of them compared side by side or with a slider |
 | [Rate of gain](dev/GAIN_RATE.md) | The weight trend against a corridor, a calorie step applied to the goal, and a food calibration that pauses itself |
+| [Quests](dev/QUESTS.md) | A goal pinned on a lift, a bar from where it started, a forecast as a range of weeks, and a win when it is done |
 
 ## Still stuck?
 

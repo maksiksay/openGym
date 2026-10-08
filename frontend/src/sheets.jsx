@@ -31,6 +31,8 @@ import { importHevyData, HevyApiError, HEVY_DEV_SETTINGS, mergeHevyRoutines } fr
 import { buildPlanBundle, parsePlan, mergePlan, printPlan, planPrintHTML } from './lib/plan-share.js'
 import { estimate1RM, best1RM, REP_CAP } from './lib/onerm.js'
 import { winsOf } from './lib/scoreboard.js'
+import { questsDoneBy } from './lib/quests.js'
+import { QuestFinishRows } from './sheets-quests.jsx'
 import { monthQuota, monthGoalOf, autoMonthGoal, MAX_MONTH_GOAL } from './lib/quota.js'
 import { ts, nWins, winChips, monthLabel } from './lib/score-i18n.js'
 import { tp } from './lib/plan-i18n.js'
@@ -2669,6 +2671,8 @@ function FinishSummary({ w, close }) {
   // The wins come from the saved history (docs/dev/SCOREBOARD.md), so a workout logged into the
   // past is judged against what came before its own day, and the sheet says what History will.
   const wins = winsOf(st.workouts, w)
+  // A quest this workout completed is a win too (docs/dev/QUESTS.md), listed after the lifts'.
+  const questN = questsDoneBy(st, w).length
   const q = monthQuota(st, w.d)
   const month = monthLabel(q.month)
   const tally = q.met ? ts('{0}: {1} of {2} — quota met ✓', month, q.done, q.goal) : ts('{0}: {1} of {2}', month, q.done, q.goal)
@@ -2680,7 +2684,7 @@ function FinishSummary({ w, close }) {
       <div className="tile"><div className="l">{t('Duration')}</div><div className="v" style={{ fontSize: '1.1rem' }}>{fmtDur(w.end - w.start)}</div></div>
       <div className="tile"><div className="l">{t('Volume')}</div><div className="v" style={{ fontSize: '1.1rem' }}>{fmtVol(w.vol, st.unit)}</div></div>
       <div className="tile"><div className="l">{t('Sets')}</div><div className="v" style={{ fontSize: '1.1rem' }}>{setsWorkCount(setsDone(w), workSetsDone(w))}</div></div>
-      <div className="tile"><div className="l">{ts('Wins')}</div><div className="v" style={{ fontSize: 20 }}>{wins.length || '—'}</div></div>
+      <div className="tile"><div className="l">{ts('Wins')}</div><div className="v" style={{ fontSize: 20 }}>{wins.length + questN || '—'}</div></div>
     </div>
     {/* A session with nothing better than before still counts, and the sheet says only that:
         a bad day is not a loss, and saying so is how a habit survives one. */}
@@ -2688,7 +2692,8 @@ function FinishSummary({ w, close }) {
       {wins.map(win => <div key={win.id} className="small winrow"><Icon name="trophy" />
         <span><span className={exerciseNameClass(EXIDX[win.id])}>{nameOf(win.id)}</span> — {winChips(win, st.unit).join(' · ')}</span>
       </div>)}
-      <div className="small dim">{wins.length ? tally : ts('Session banked · {0}', tally)}</div>
+      <QuestFinishRows w={w} />
+      <div className="small dim">{wins.length + questN ? tally : ts('Session banked · {0}', tally)}</div>
     </div>
     <h4 className="sec" style={{ textAlign: 'start' }}>{t('What you just trained')}</h4>
     <BodyMap load={loadOfWorkouts([w])} body={st.body} />

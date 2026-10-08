@@ -43,7 +43,9 @@ docs/      guides indexed in docs/README.md (FAQ, SELF_HOSTING*, MOBILE, AI_COAC
            PROGRESS_PHOTOS: a feed of the photos kept with workouts, and two compared side by side or
            with a slider, with the weight and waist of their days;
            GAIN_RATE: the weight trend against a corridor, a 100–300 kcal step applied to the goal,
-           a 2–3-week food calibration that pauses tracking at its end).
+           a 2–3-week food calibration that pauses tracking at its end;
+           QUESTS: up to three goals pinned on lifts, suggested or your own, a bar and a forecast as a
+           range of weeks from the 8-week trend, a quest done is a win on the finish sheet).
 ```
 
 ## Commands

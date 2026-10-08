@@ -8,6 +8,7 @@
  */
 import { todayISO } from './format.js'
 import { splitGoals } from './nutrition.js'
+import { fitLine } from './trend.js'
 
 export const WINDOW_DAYS = 28        // the weigh-ins a rate is read from
 export const MIN_WEIGH_INS = 4       // on different days
@@ -67,16 +68,9 @@ export function weightTrend(S, today = todayISO(), range = null) {
   if (n < MIN_WEIGH_INS || span < minSpan) {
     return { ...base, enough: false, missing: Math.max(0, MIN_WEIGH_INS - n), readyOn: n && span < minSpan ? isoPlus(base.first, minSpan) : null }
   }
-  const mx = pts.reduce((s, p) => s + p.x, 0) / n
-  const my = pts.reduce((s, p) => s + p.y, 0) / n
-  let sxx = 0, sxy = 0
-  for (const p of pts) { sxx += (p.x - mx) ** 2; sxy += (p.x - mx) * (p.y - my) }
-  const slope = sxy / sxx
-  let sse = 0
-  for (const p of pts) sse += (p.y - my - slope * (p.x - mx)) ** 2
-  const se = Math.sqrt(sse / (n - 2) / sxx)
+  const { slope, se, my, at } = fitLine(pts)
   return {
-    ...base, enough: true, mean: my, now: my + slope * (pts.at(-1).x - mx),
+    ...base, enough: true, mean: my, now: at(pts.at(-1).x),
     perWeek: slope * 7, sePerWeek: se * 7, rate: (slope * 7) / my * 100, rateSE: (se * 7) / my * 100,
   }
 }

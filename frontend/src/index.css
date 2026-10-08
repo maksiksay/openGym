@@ -1541,6 +1541,19 @@ body.chips-dragging *{cursor:inherit}
 .season-row-n{color:var(--label-2);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-transform:capitalize}
 .season-row-v{flex:none;font-variant-numeric:tabular-nums;display:inline-flex;align-items:center;gap:4px}
 .season-row-v .icn,.season-tested .icn{color:var(--green)}
+/* Quests (docs/dev/QUESTS.md) */
+.quest{margin-bottom:14px}
+.quest:last-child{margin-bottom:0}
+.quest[role=button]{cursor:pointer}
+.quest-ex{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.quest-now{flex:none;white-space:nowrap;margin-inline-start:8px}
+.quest-goal{font-weight:600;margin:2px 0 4px}
+.quest-f{margin-top:5px}
+.quest-idea{padding:8px 0;border-bottom:var(--hair) solid var(--sep)}
+.quest-idea:last-of-type{border-bottom:0}
+.quest-doneline{padding:4px 0;gap:10px}
+.quest-doneline svg{color:var(--green);vertical-align:-2px}
+.finwins .quest-donerow svg{color:var(--acc)}
 .season-row .up,.season-anchor-v .up{color:var(--green)}
 .season-anchors{display:flex;flex-direction:column;gap:12px;margin:4px 0 14px}
 .season-anchor{padding:10px 12px;border-radius:var(--r-md,12px);background:var(--surface)}

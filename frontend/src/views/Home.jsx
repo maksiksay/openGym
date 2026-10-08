@@ -24,6 +24,8 @@ import { ANCHOR_SLOTS, anchorProgress, change, seasonState } from '../lib/season
 import { tsn, measureShort, changeShort } from '../lib/season-i18n.js'
 import { seasonSheet, seasonStartSheet } from '../sheets-season.jsx'
 import { GainLine } from '../sheets-gain.jsx'
+import { QuestsCard } from '../sheets-quests.jsx'
+import { questWinsIn } from '../lib/quests.js'
 import { EXIDX } from '../lib/exercises.js'
 import { exerciseNameFor } from '../lib/i18n.js'
 
@@ -194,7 +196,8 @@ export default function Home() {
   // The quota stands where the week streak was: a streak is kept alive by the fear of losing it,
   // and one missed week ends it; a month's count only goes up, and a miss costs nothing.
   const quota = monthQuota(S)
-  const wins = monthWins(S.workouts, quota.month)
+  // A quest done that month is a win of its own (docs/dev/QUESTS.md).
+  const wins = monthWins(S.workouts, quota.month) + questWinsIn(S, quota.month)
   const quotaSub = [
     quota.met && ts('Quota met ✓'),
     ts('Wins: {0}', wins),
@@ -331,6 +334,7 @@ export default function Home() {
     </div>}
 
     <SeasonCard S={S} />
+    <QuestsCard S={S} />
 
     <div className="card tappable" style={{ cursor: 'pointer' }} {...tappable(() => calendarSheet())}>
       <div className="row between">
