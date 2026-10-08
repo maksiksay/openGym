@@ -5,6 +5,7 @@ import {
   suggestAnchors, swapGuard, testFrom,
 } from './season.js'
 import { estimate1RM } from './onerm.js'
+import { changeShort, changeText, measureText } from './season-i18n.js'
 
 // A season from Monday 5 October 2026: week 6, the test week, runs 9–15 November.
 const START = '2026-10-05'
@@ -208,5 +209,54 @@ describe('starting and closing', () => {
   it('adds days across a month and a year', () => {
     expect(isoPlus('2026-12-29', 7)).toBe('2027-01-05')
     expect(isoPlus('2026-10-25', 1)).toBe('2026-10-26')
+  })
+})
+
+// An assistance machine's number is help. In reps alone, less help at the same reps read as +0 %,
+// though it is the very progress the machine is for; against a weigh-in it reads as what it is.
+describe('an assistance machine, read against the body weight', () => {
+  const bodyweight = [{ d: '2026-10-01', w: 72 }]
+
+  it('measures its best set as the body weight the help left you, at its reps', () => {
+    const w = workout('2026-10-06', [entry('0017', [set(30, 8), set(25, 6)])])
+    // 42 kg of you × 8 → 53.2; 47 kg × 6 → 56.4.
+    expect(anchorMeasure(w, '0017', 72)).toEqual({ kind: 'assist', value: 56.4, w: 25, r: 6 })
+    expect(anchorMeasure(w, '0017')).toMatchObject({ kind: 'reps', value: 8, w: 30 })
+  })
+
+  it('counts less help at the same reps as progress, where reps alone said +0 %', () => {
+    const ws = [
+      workout('2026-10-06', [entry('0017', [set(30, 8), set(30, 8)])]),
+      workout('2026-11-10', [entry('0017', [set(25, 8, { test: true })])]),
+    ]
+    const p = anchorProgress(S(ws, { bodyweight }), season(), '0017', '2026-11-15')
+    expect(p.base).toEqual({ kind: 'assist', value: 53.2, w: 30, r: 8 })
+    expect(p.test).toEqual({ kind: 'assist', value: 59.5, w: 25, r: 8 })
+    expect(change(p.base, p.test)).toEqual({ kind: 'assist', delta: 6.3, pct: 12 })
+    const blind = anchorProgress(S(ws), season(), '0017', '2026-11-15')
+    expect(change(blind.base, blind.test)).toEqual({ kind: 'reps', delta: 0, pct: 0 })
+  })
+
+  it('reads week 1 against a weigh-in made later, so the start and the test stay comparable', () => {
+    const ws = [
+      workout('2026-10-06', [entry('0017', [set(30, 8)])]),
+      workout('2026-10-27', [entry('0017', [set(27.5, 8)])]),
+    ]
+    const p = anchorProgress(S(ws, { bodyweight: [{ d: '2026-10-20', w: 72 }] }), season(), '0017', '2026-10-28')
+    expect(p.base).toMatchObject({ kind: 'assist', w: 30 })
+    expect(p.best).toMatchObject({ kind: 'assist', w: 27.5 })
+    expect(change(p.base, p.best).pct).toBeGreaterThan(0)
+  })
+
+  it('on reps alone, keeps the set with less help when the reps tie', () => {
+    const w = workout('2026-10-06', [entry('0017', [set(30, 8), set(25, 8)])])
+    expect(anchorMeasure(w, '0017')).toMatchObject({ kind: 'reps', value: 8, w: 25 })
+  })
+
+  it('says the set behind its number, and how far it came in per cent only', () => {
+    expect(measureText({ kind: 'assist', value: 59.5, w: 25, r: 8 }, 'kg')).toBe('8 reps · 25 kg of help')
+    expect(measureText({ kind: 'assist', value: 79.2, w: 0, r: 8 }, 'kg')).toBe('8 reps')
+    expect(changeText({ kind: 'assist', delta: 6.3, pct: 12 }, 'kg')).toBe('+12%')
+    expect(changeShort({ kind: 'assist', delta: 6.3, pct: 12 })).toBe('+12%')
   })
 })

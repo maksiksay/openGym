@@ -58,6 +58,16 @@ The measure is read from one workout, the way the scoreboard reads it (`readExer
 
 - **A loaded exercise:** the best estimated one-rep max (`e1rm`).
 - **Body weight, a band, or an assistance machine:** the most reps in one set.
+- **An assistance machine with a weigh-in** (`assist`): the body weight its best set's help
+  left you, at that set's reps, as Epley estimates it.
+  - **Why:** in reps alone, less help at the same reps read as +0 %, though less help is the
+    progress the machine is for.
+  - **The body weight:** of each workout's day (`bodyweightOn`: the last weigh-in by then, else
+    the first after). So one weigh-in anywhere puts the whole season on `assist`, and week 1 and
+    the test stay comparable. With none, the machine is read in reps as before.
+  - **Not capped at 12 reps** like an e1RM, since it is never shown as a max, only compared with
+    itself.
+  - **Shown as** the set itself ("8 reps · 25 kg of help"), and the change in per cent only.
 - **A timed exercise:** the longest hold.
 
 ## The test

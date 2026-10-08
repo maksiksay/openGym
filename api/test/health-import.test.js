@@ -77,6 +77,19 @@ test('refuses what is not a day of the log, rather than clamping it', () => {
   assert.deepEqual(S.health, [], 'nothing written by a refusal');
 });
 
+test('a sleep of 0 is no night: the steps are written, the sleep is not', () => {
+  // What a Shortcut adds up on an iPhone with no watch or sleep app. Filed, it would have made
+  // every night a short one, and a short night's miss never counts toward a deload.
+  const S = {};
+  assert.deepEqual(applyHealthImport(S, { today: iso(0), steps: 8123, sleep: 0 }).wrote, [{ d: iso(-1), steps: 8123 }]);
+  assert.deepEqual(applyHealthImport(S, { today: iso(0), steps: 8123, sleepMinutes: '0' }).wrote, [{ d: iso(-1), steps: 8123 }]);
+  assert.deepEqual(applyHealthImport(S, { today: iso(0), steps: 8123, sleep: 0.1 }).wrote, [{ d: iso(-1), steps: 8123 }], 'rounds to no sleep');
+  assert.match(applyHealthImport(S, { today: iso(0), sleep: 0 }).error, /nothing to write: a sleep of 0/);
+  assert.deepEqual(applyHealthImport(S, { days: [{ d: iso(-2), steps: 900, sleep: 0 }] }).wrote, [{ d: iso(-2), steps: 900 }]);
+  assert.ok(S.health.every(e => !('sleep' in e)), 'no 0 h night in the log');
+  assert.deepEqual(applyHealthImport(S, { today: iso(0), steps: 0 }).wrote, [{ d: iso(-1), steps: 0 }], 'no steps is still a count');
+});
+
 test('a backfill of several days, within its limits', () => {
   const S = {};
   const r = applyHealthImport(S, { days: [{ d: iso(-3), steps: 9000, sleep: '6,5' }, { d: iso(-2), sleepMinutes: 420 }] });

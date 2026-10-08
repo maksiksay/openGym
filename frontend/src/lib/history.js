@@ -440,16 +440,18 @@ export function nextTrainingDay(S, iso) {
  *
  * The warm-ups are stacked with insertWarmupRow, one call each, so the ramp is the same one
  * the in-session "Add warm-up set" button produces: each row halves the gap left to the work
- * weight, giving 50% / 75% / 87.5% for three. `options.step` is the exercise's loading step,
- * passed in by the caller (see insertWarmupRow for why this module cannot read it itself).
+ * weight, giving 50% / 75% / 87.5% for three — on an assistance machine, of the load the help
+ * leaves you (rampHelp). `options.step` is the exercise's loading step, passed in by the caller
+ * (see insertWarmupRow for why this module cannot read it itself).
  */
 export function buildSets(S, cfg, options = {}) {
   const rows = buildWorkSets(S, cfg, options)
   const warm = Math.max(0, Math.min(MAX_PLANNED_WARMUPS, Math.round(cfg.warmupSets) || 0))
   if (!warm) return rows
   const mode = modeOf(cfg)
+  const ramp = warmupRamp(S, cfg)
   let out = rows
-  for (let i = 0; i < warm; i++) out = insertWarmupRow(out, mode, cfg, options.step)
+  for (let i = 0; i < warm; i++) out = insertWarmupRow(out, mode, cfg, options.step, ramp)
   return out
 }
 
@@ -770,7 +772,8 @@ export function cascadeWeight(rows, from, value, side) {
  * row you edited by hand is what the next one ramps from. `step` is the exercise's own loading
  * step (progression.js's defaultIncrement, passed in by the caller so this module keeps no
  * dependency on progression — that one already imports from here): a warm-up you cannot
- * actually load onto the bar is noise.
+ * actually load onto the bar is noise. `ramp` (warmupRamp) turns the ramp round on an assistance
+ * machine, where the number is help.
  *
  * The reference is the first WORK row, never `rows[at - 1]` alone: for the first warm-up
  * `at` is 0, and reading `rows[-1]` used to fall through to the *last* row — the heaviest
@@ -786,32 +789,62 @@ export function cascadeWeight(rows, from, value, side) {
  *
  * A warm-up already logged keeps its weight and becomes what the next one ramps from: it
  * happened, and rewriting performed work is data loss. Entries with nothing to ramp toward
- * — cardio, bodyweight, an unloaded hold — are returned untouched.
+ * — cardio, bodyweight, an unloaded hold — are returned untouched. `ramp` is warmupRamp's: on
+ * an assistance machine the block runs from more help down to the work's.
  */
-export function rerampWarmups(rows, step = 2.5) {
+export function rerampWarmups(rows, step = 2.5, { assisted = false, bw = null } = {}) {
   const firstWork = rows.findIndex(x => !isWarmupRow(x))
   if (firstWork <= 0) return rows
   const target = rows[firstWork].w || 0
-  if (!(target > 0)) return rows
+  if (!(target > 0) && !(assisted && bw > 0)) return rows
   const out = rows.slice()
-  let from = 0
+  let from = assisted ? null : 0
   for (let i = 0; i < firstWork; i++) {
     if (out[i].done) { from = out[i].w || 0; continue }
-    const w = target > from
-      ? Math.max(0, Math.min(target, Math.floor((from + (target - from) / 2) / step) * step))
-      : target
+    const w = assisted
+      ? rampHelp(from, target, step, bw)
+      : target > from
+        ? Math.max(0, Math.min(target, Math.floor((from + (target - from) / 2) / step) * step))
+        : target
     out[i] = { ...out[i], w }
     from = w
   }
   return out
 }
 
-export function insertWarmupRow(rows, mode, target, step = 2.5) {
+/** The latest weigh-in, in the profile's unit; null without one. */
+export function latestBodyWeight(S) {
+  const last = (S?.bodyweight || []).filter(e => e && e.w > 0).sort((a, b) => String(a.d).localeCompare(String(b.d))).at(-1)
+  return last ? Number(last.w) : null
+}
+
+/**
+ * What the warm-up ramp needs to know of an exercise beyond its rows: whether its number is the
+ * help an assistance machine gives, and then the body weight that help comes off (the latest
+ * weigh-in, null without one). An ordinary lift needs nothing.
+ */
+export const warmupRamp = (S, ex) => (isAssisted(ex) ? { assisted: true, bw: latestBodyWeight(S) } : {})
+
+// On an assistance machine a warm-up carries MORE help than the work sets, never less: climbing
+// from 0 toward the work's number handed you warm-ups harder than the sets they warm up for. The
+// ramp runs down instead, from help as large as your body weight (no load at all) to the work's,
+// each warm-up halving the gap left, so they land at 50 % / 75 % of the load the work sets put on
+// you, the ordinary ramp's numbers. Without a weigh-in it starts from twice the work's help.
+// Rounded UP to the step: a notch more help is a notch easier, the side a warm-up should err on.
+function rampHelp(from, to, step, bw) {
+  const top = from != null ? from : bw > to ? bw : 2 * to
+  if (!(top > to)) return to
+  return Math.min(top, Math.ceil((to + (top - to) / 2) / step - 1e-9) * step)
+}
+
+export function insertWarmupRow(rows, mode, target, step = 2.5, { assisted = false, bw = null } = {}) {
   const firstWork = rows.findIndex(x => !isWarmupRow(x))
   const at = firstWork === -1 ? rows.length : firstWork
   const prev = at > 0 ? rows[at - 1] : null            // the warm-up this one ramps from
   const work = firstWork === -1 ? null : rows[firstWork]
   const rampTo = to => {
+    // An assistance machine (warmupRamp) ramps the other way, from more help down to the work's.
+    if (assisted) return rampHelp(prev ? (prev.w || 0) : null, to || 0, step, bw)
     const from = prev ? (prev.w || 0) : 0
     // Nothing to ramp toward: bodyweight, cardio, a timed hold with no load.
     if (!(to > 0)) return 0

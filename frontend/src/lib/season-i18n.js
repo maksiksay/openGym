@@ -28,11 +28,13 @@ const SLOT = { squat: 'Squat', hinge: 'Hinge', press: 'Horizontal press', pull: 
 /** The name of an anchor slot. */
 export const slotLabel = slot => tsn(SLOT[slot] || slot)
 
-/** An anchor's number in its own unit: "≈1RM 76 kg", "9 reps", "1:05". */
+/** An anchor's number in its own unit: "≈1RM 76 kg", "9 reps", "1:05", and on an assistance
+ *  machine the set behind its number, "8 reps · 25 kg of help". */
 export function measureText(m, unit = 'kg') {
   if (!m) return '—'
   if (m.kind === 'e1rm') return tsn('≈1RM {0} {1}', num(m.value), unit)
   if (m.kind === 'sec') return fmtSec(m.value)
+  if (m.kind === 'assist') return m.w > 0 ? tsn('{0} · {1} {2} of help', nReps(m.r), num(m.w), unit) : nReps(m.r)
   return nReps(m.value)
 }
 
@@ -52,9 +54,11 @@ export function setText(m, unit = 'kg') {
   return `${num(m.w)} ${unit} × ${m.r}`
 }
 
-/** How far an anchor came: "+8 kg · +11%", "+3 reps · +50%", "+0:10". */
+/** How far an anchor came: "+8 kg · +11%", "+3 reps · +50%", "+0:10". On an assistance machine
+ *  only the per cent: its number is an estimate made to be compared, not a load anyone lifted. */
 export function changeText(ch, unit = 'kg') {
   if (!ch) return ''
+  if (ch.kind === 'assist') return ch.pct != null && ch.delta !== 0 ? `${ch.pct > 0 ? '+' : '−'}${Math.abs(ch.pct)}%` : ''
   const sign = ch.delta > 0 ? '+' : ch.delta < 0 ? '−' : '±'
   const abs = Math.abs(ch.delta)
   const amount = ch.kind === 'e1rm' ? `${sign}${num(abs)} ${unit}` : ch.kind === 'sec' ? `${sign}${fmtSec(abs)}` : `${sign}${nReps(abs)}`

@@ -5,6 +5,7 @@ export default {
   'Horizontal press': 'Горизонтальный жим',
   'Vertical pull': 'Вертикальная тяга',
   '≈1RM {0} {1}': '≈1ПМ {0} {1}',
+  '{0} · {1} {2} of help': '{0} · {1} {2} помощи',
 
   // Home
   'Start a season': 'Начать сезон',

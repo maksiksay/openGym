@@ -16,7 +16,7 @@
 //   · fewer sets than prescribed                       → miss
 // So a session that fell apart can never advance the load as though it had succeeded.
 
-import { modeOf, repStep, rerampWarmups, isBw, isPerSide, entryExcluded, entryRoutineId, effortOf, workoutDay } from './history.js'
+import { modeOf, repStep, rerampWarmups, isBw, isPerSide, entryExcluded, entryRoutineId, effortOf, workoutDay, latestBodyWeight } from './history.js'
 import { EXIDX, isAssisted, isLoadedEq } from './exercises.js'
 import { isWarmupRow, isSideSet, syncSideAggregate, makeSideSet, setType } from './workout-model.js'
 import { normalizeRepRange } from './rep-range.js'
@@ -258,12 +258,6 @@ function firstOf(S, cfg, mode, policy) {
     if (reps > 0) return { calibrate: true, why: ['First time: add weight through your warm-ups until {0} reps leave about 2 in reserve — that is your working weight.', reps] }
   }
   return { why: ['Nothing logged yet — this session sets the baseline.'] }
-}
-
-// The latest weigh-in by date, in the profile's unit, or null.
-function latestBodyWeight(S) {
-  const last = (S.bodyweight || []).filter(e => e && e.w > 0).sort((a, b) => String(a.d).localeCompare(String(b.d))).at(-1)
-  return last ? Number(last.w) : null
 }
 
 // Whether a doubled step stays within MAX_JUMP of the work being done: the weight lifted, or on an
@@ -714,9 +708,10 @@ export function nextPrescription(S, cfg, routine) {
 
 /**
  * Apply a prescription to freshly built sets. Only the fields the policy actually decided
- * are touched, and only on sets that have not been logged yet.
+ * are touched, and only on sets that have not been logged yet. `ramp` is the exercise's
+ * warmupRamp (history.js), for the warm-ups re-ramped at the end.
  */
-export function applyPrescription(sets, p, step = 2.5) {
+export function applyPrescription(sets, p, step = 2.5, ramp = {}) {
   if (!p || p.kind === 'off' || p.kind === 'first') return sets
   const out = sets.map(s => {
     // Never rewrite a logged set (a ticked warm-up falling through here would be the data-loss
@@ -752,7 +747,7 @@ export function applyPrescription(sets, p, step = 2.5) {
   if (p.sets > workRows.length) {
     // An all-warm-up entry has no work row to seed growth from - growing warm-up copies
     // would both invent work and never terminate the loop. Leave the entry untouched.
-    if (!workRows.length) return rerampWarmups(out, step)
+    if (!workRows.length) return rerampWarmups(out, step, ramp)
     const seed = workRows[workRows.length - 1]
     // A freshly appended row hasn't been performed, so it never inherits a seed's already-
     // logged drops/clusters — that would invent extra work the row never actually did. Its
@@ -767,5 +762,5 @@ export function applyPrescription(sets, p, step = 2.5) {
   }
   // Last, because the work rows now carry their final weight: the warm-up block ramps toward
   // what you are actually about to lift, not toward what you lifted last time.
-  return rerampWarmups(out, step)
+  return rerampWarmups(out, step, ramp)
 }

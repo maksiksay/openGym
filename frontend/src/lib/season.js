@@ -4,9 +4,11 @@
 // the way the scoreboard reads its wins.
 import { todayISO, uid } from './format.js'
 import { workoutDay } from './history.js'
-import { EXIDX } from './exercises.js'
+import { EXIDX, isAssisted } from './exercises.js'
 import { readExercise, winsTimeline, workoutKey } from './scoreboard.js'
 import { isWarmupRow } from './workout-model.js'
+import { bodyweightOn } from './strength-levels.js'
+import { FORMULAS } from './onerm.js'
 
 export const SEASON_WEEKS = 6
 export const ANCHOR_SLOTS = ['squat', 'hinge', 'press', 'pull']
@@ -116,8 +118,14 @@ export function anchorsOutOfPlan(routines, anchors) {
  * loaded exercise (`e1rm`), the most reps in a set of one done with body weight, a band or an
  * assistance machine (`reps`), or the longest hold of a timed one (`sec`). Null when it was not
  * trained, or is cardio.
+ *
+ * An assistance machine with a body weight to read it against (`bw`, that day's) is `assist`
+ * instead: the body weight its best set's help left you, at that set's reps, as Epley estimates
+ * it. In reps alone, less help at the same reps read as +0 %, though less help is the very
+ * progress the machine is there for. Not capped at REP_CAP like an e1RM: it is never shown as a
+ * max, only held against itself.
  */
-export function anchorMeasure(workout, exId) {
+export function anchorMeasure(workout, exId, bw = null) {
   const read = readExercise(workout, exId)
   if (!read) return null
   if (read.mode === 'time') return read.longest > 0 ? { kind: 'sec', value: read.longest } : null
@@ -125,19 +133,31 @@ export function anchorMeasure(workout, exId) {
   if (!read.bw && read.volUnit !== 'reps' && read.e1rm && read.e1rm.est > 0) {
     return { kind: 'e1rm', value: Math.round(read.e1rm.est * 10) / 10, w: read.e1rm.w, r: read.e1rm.r }
   }
-  const top = list(read.items).reduce((b, i) => (!b || i.r > b.r || (i.r === b.r && i.w > b.w) ? i : b), null)
+  const assisted = isAssisted(exId)
+  if (assisted && bw > 0) {
+    let best = null
+    for (const i of list(read.items)) {
+      const load = bw - i.w
+      if (!(load > 0) || !(i.r > 0)) continue
+      const value = Math.round(FORMULAS.epley(load, i.r) * 10) / 10
+      if (!best || value > best.value) best = { kind: 'assist', value, w: i.w, r: i.r }
+    }
+    if (best) return best
+  }
+  // Level on reps, the harder set: more weight, or on an assistance machine less help.
+  const top = list(read.items).reduce((b, i) => (!b || i.r > b.r || (i.r === b.r && (assisted ? i.w < b.w : i.w > b.w)) ? i : b), null)
   return top && top.r > 0 ? { kind: 'reps', value: top.r, w: top.w, r: top.r } : null
 }
 
 /** The same, from the test set alone. */
-function testMeasure(workout, exId) {
+function testMeasure(workout, exId, bw = null) {
   const marked = list(workout?.entries).some(en => String(en?.id) === String(exId) && list(en.sets).some(s => s?.test === true && s.done === true))
   if (!marked) return null
   const only = {
     ...workout,
     entries: list(workout.entries).map(en => (String(en?.id) === String(exId) ? { ...en, sets: list(en.sets).filter(s => s?.test === true) } : en))
   }
-  return anchorMeasure(only, exId)
+  return anchorMeasure(only, exId, bw)
 }
 
 const better = (a, b) => (!b || (a && a.kind === b.kind && a.value > b.value) ? a : b)
@@ -160,22 +180,28 @@ export function testedIds(S, season) {
  * One anchor across a season up to `iso`: where it started (`base`: the best of week 1, or the
  * first time it was trained when week 1 missed it, `late`), its best so far, and its test — the
  * test set, or the best of the test week standing in for one (`fallback`).
+ *
+ * An assistance machine is read against the body weight of each workout's day (bodyweightOn: the
+ * last weigh-in by then, else the first after), so one weigh-in anywhere puts the whole season on
+ * `assist` and week 1 and the test stay comparable. With none, it is read in reps.
  */
 export function anchorProgress(S, season, exId, iso = todayISO()) {
   const ws = seasonWorkouts(S, season, iso)
   const week2 = isoPlus(season.start, 7)
   const from = testFrom(season)
+  const bwOn = isAssisted(exId) ? d => bodyweightOn(S, d)?.w ?? null : () => null
   let base = null, late = false, best = null, test = null, testWeekBest = null
   for (const w of ws) {
-    const m = anchorMeasure(w, exId)
-    if (!m) continue
     const d = workoutDay(w)
+    const bw = bwOn(d)
+    const m = anchorMeasure(w, exId, bw)
+    if (!m) continue
     if (d < week2) base = better(m, base)
     else if (!base) { base = m; late = true }
     best = better(m, best)
     if (d >= from) {
       testWeekBest = better(m, testWeekBest)
-      const t = testMeasure(w, exId)
+      const t = testMeasure(w, exId, bw)
       if (t && !test) test = t
     }
   }

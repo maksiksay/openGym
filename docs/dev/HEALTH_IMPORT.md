@@ -60,6 +60,10 @@ check as the paired app's does: a browser never adds one by itself).
     sends.
   - Bounds and rounding are the log's own (`cleanField`): steps 0–200 000, sleep 0–16 h in
     quarter hours. Anything outside is refused with a 400, not clamped.
+  - A sleep of 0 counts as none sent. It is what a Shortcut adds up when Health holds no sleep
+    (an iPhone with no watch or sleep app, its only samples "In Bed"). Filed, it made every
+    night a short one, and the RIR step leaves a short night's miss out of the deload count
+    (`docs/dev/RIR_STEP.md`). Sent alone, it is a 400 that says so.
 - **`days`** may come instead of the rest, for backfill: `[{ d, steps?, sleep? }]`, at most 14
   days, each within the last 60.
 

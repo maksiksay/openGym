@@ -81,7 +81,12 @@ function field(k, v) {
   if (!Number.isFinite(n)) return { error: `${k} must be a number` };
   const [lo, hi] = RANGE[k];
   if (n < lo || n > hi) return { error: `${k} must be between ${lo} and ${hi}` };
-  return { value: k === 'sleep' ? Math.round(n * 4) / 4 : Math.round(n) };
+  const value = k === 'sleep' ? Math.round(n * 4) / 4 : Math.round(n);
+  // No sleep at all is what a Shortcut adds up when Health holds none — an iPhone with no watch
+  // or sleep app, its only samples "In Bed" — not a night. Filed as 0 h it was a short night every
+  // night, and the RIR step leaves a short night's miss out of the deload count (RIR_STEP.md).
+  if (k === 'sleep' && value === 0) return null;
+  return { value };
 }
 /** Sleep from `sleep` (hours) or `sleepMinutes`. */
 function sleepOf(o) {
@@ -96,7 +101,8 @@ function sleepOf(o) {
  * the steps are yesterday's, and the sleep is the night that ended this morning, which the log
  * files under `today`. `{ days: [{ d, steps?, sleep? }] }` fills several days at once. Each field is
  * set on its day with `t = now`, the clock the log's field-by-field merge goes by, so a check-in made
- * on the phone keeps its own fields. → { ok: true, wrote } | { ok: false, error }.
+ * on the phone keeps its own fields. A sleep of 0 counts as none sent (field). → { ok: true, wrote }
+ * | { ok: false, error }.
  */
 export function applyHealthImport(S, body, now = Date.now()) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return { ok: false, error: 'send a JSON object' };
@@ -118,7 +124,10 @@ export function applyHealthImport(S, body, now = Date.now()) {
     const steps = field('steps', body.steps);
     const sleep = sleepOf(body);
     for (const f of [steps, sleep]) if (f?.error) return { ok: false, error: f.error };
-    if (!steps && !sleep) return { ok: false, error: 'nothing to write: send steps, sleep or sleepMinutes, with today' };
+    if (!steps && !sleep) {
+      const zero = [body.sleep, body.sleepMinutes].some(v => v != null && v !== '');
+      return { ok: false, error: zero ? 'nothing to write: a sleep of 0 is taken as none logged' : 'nothing to write: send steps, sleep or sleepMinutes, with today' };
+    }
     if (!realDay(body.today)) return { ok: false, error: 'today must be the phone\'s date, YYYY-MM-DD' };
     if (Math.abs(dayNum(body.today) - serverDay) > TODAY_SLACK_DAYS) return { ok: false, error: 'today is too far from the server\'s date' };
     if (steps) writes.push({ d: isoOf(dayNum(body.today) - 1), steps: steps.value });
