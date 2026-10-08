@@ -8,7 +8,9 @@ import { pendingSection, clearPendingSection } from '../lib/app-links.js'
 import { useUI } from '../store/useUI.js'
 import { ACCENTS, ACCENT_NAMES, todayISO, localTZ, weekStartOf, MONDAY, SUNDAY, fmtPlate } from '../lib/format.js'
 import { inventoryFor, ownsPlates } from '../lib/plates.js'
-import { effortOf, effortScopeOf } from '../lib/history.js'
+import { effortOf, effortScopeOf, fmtSec } from '../lib/history.js'
+import { clearOwnRests, ownRestRange, ownRests } from '../lib/rest.js'
+import { trest } from '../lib/rest-i18n.js'
 import { te } from '../lib/effort-i18n.js'
 import { unlock, playOnSilentSupported, vibrateSupported } from '../lib/sound.js'
 import { api, webauthnOK, passkeyRegister, IS_ANDROID } from '../lib/api.js'
@@ -72,6 +74,17 @@ export default function Settings() {
   const fileRef = useRef(null)
   const importRef = useRef(null)
   const wakeOK = wakeLockSupported()
+  // An exercise's own rest wins over the rest timer (lib/rest.js), and a plan file can bring them
+  // in. The row under the timer says so, and Reset makes the timer the rest of every exercise,
+  // the workout under way included.
+  const ownRestCount = ownRests(S).length
+  const restRange = ownRestRange(S)
+  const resetOwnRests = () => confirmSheet({
+    title: trest('Rest by the timer everywhere?'),
+    message: trest('Every exercise in the plan, and the workout under way, will rest {0} between sets. An exercise can get a rest of its own again in its settings.', fmtSec(S.restSec)),
+    confirmText: trest('Reset'),
+    onConfirm: () => { update(s => { clearOwnRests(s) }); toast(trest('Rest: {0} everywhere', fmtSec(S.restSec))) },
+  })
 
   // Two honest choices on a unit switch (issue #22): convert the numbers, or keep them and only
   // change the label — the old behaviour, still right for someone who logged in lb all along
@@ -500,6 +513,11 @@ export default function Settings() {
       <SelectRow icon="timer" iconTint="var(--orange)" title={t('Rest timer')}
         value={S.restSec} onChange={v => update(s => { s.restSec = v })}
         options={[{ value: 0, label: t('Off') }, ...[60, 90, 120, 150, 180].map(v => ({ value: v, label: v + 's' }))]} />
+      {ownRestCount > 0 && <Row icon="timer" iconTint="var(--orange)" title={trest('Own rest in the plan')}
+        subtitle={trest('Exercises with a rest of their own: {0} ({1}). It wins over the timer above.', ownRestCount,
+          restRange[0] === restRange[1] ? fmtSec(restRange[0]) : fmtSec(restRange[0]) + '–' + fmtSec(restRange[1]))}>
+        {S.restSec > 0 && <Button size="sm" onClick={resetOwnRests}>{trest('Reset')}</Button>}
+      </Row>}
       {/* Default for a rest-pause burst added live on a plain set — a planned exercise's own
           "Rest (s)" (in its Intensifier config) overrides this, same as the main rest timer
           is the fallback whenever an exercise has no progression rule of its own. */}

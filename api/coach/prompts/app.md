@@ -48,7 +48,7 @@ What the openGym app looks like, so you can tell someone where something is and 
 - **Log food:** Home → Food, or Health → + next to a meal.
 - **Set food goals:** Health → Goals, or Settings → Health & food → Daily goals.
 - **Steps and water goals:** Settings → Health & food.
-- **Rest timer:** Settings → During a workout → Rest timer.
+- **Rest timer:** Settings → During a workout → Rest timer. It is the default: an exercise with a rest of its own (set in the exercise's settings, or brought in by a plan file) keeps that, and its card shows "Rest 2:30". "Own rest in the plan", right under the timer, counts them, and its Reset puts every exercise on the timer, the workout under way too.
 - **Back up or move data:** Settings → Data → Export backup / Import backup.
 - **Steps and sleep from an iPhone:** Settings → Import from Apple Health.
 - **Start a season:** Home → Start a season.
