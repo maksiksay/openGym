@@ -88,6 +88,8 @@ if you want to try it before installing anything.
 - A muscle map in three modes: where your volume went, what is still recovering, and what has gone
   untrained.
 - Body-weight chart against a goal line.
+- Progress photos: keep photos with a workout, see them all by date with that day's weight, and
+  compare two side by side or under a slider. They stay on your device and your own server.
 - Edit any saved workout after the fact, log one you did on paper, or move it to the right date.
   Records are re-read from the corrected history.
 

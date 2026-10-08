@@ -34,6 +34,7 @@ import RoutineEdit from './views/RoutineEdit.jsx'
 import Workout from './views/Workout.jsx'
 import Stats from './views/Stats.jsx'
 import History from './views/History.jsx'
+import Progress from './views/Progress.jsx'
 import Library from './views/Library.jsx'
 import Muscles from './views/Muscles.jsx'
 import StructuralBalance from './views/StructuralBalance.jsx'
@@ -186,6 +187,7 @@ function Shell() {
               <Route path="/workout" element={<Workout />} />
               <Route path="/stats" element={<Stats />} />
               <Route path="/history" element={<History />} />
+              <Route path="/progress" element={<Progress />} />
               <Route path="/library" element={<Library />} />
               <Route path="/muscles" element={<Muscles />} />
               <Route path="/structural-balance" element={<StructuralBalance />} />

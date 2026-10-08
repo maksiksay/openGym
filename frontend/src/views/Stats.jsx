@@ -25,6 +25,9 @@ import {
 } from '../lib/effort.js'
 import { Button, Segmented, SelectRow } from '../components/ui.jsx'
 import StrengthLevelsCard from '../components/StrengthLevels.jsx'
+import { CustomThumb } from '../components/CustomMedia.jsx'
+import { progressPhotos } from '../lib/progress-photos.js'
+import { tpr, nPhotos } from '../lib/progress-i18n.js'
 import { tappable } from '../lib/use-sheet-keyboard.js'
 import { isWarmupRow } from '../lib/workout-model.js'
 
@@ -484,6 +487,7 @@ export default function Stats() {
     </div>}
     {workouts.length > 0 && <StrengthLevelsCard S={S} />}
     {hasEffort(S) && <EffortCard S={S} />}
+    {workouts.length > 0 && <ProgressPhotosCard S={S} nav={nav} />}
 
     <div className="cols">
       <div className="card">
@@ -546,4 +550,23 @@ export default function Stats() {
       <div className="list">{[...workouts].reverse().slice(0, 6).map(w => <WorkoutRow key={w.id} w={w} onClick={() => workoutDetailSheet(w)} />)}</div>
     </>}
   </>
+}
+
+// docs/dev/PROGRESS_PHOTOS.md: the way into the progress photos — the latest one and how many
+// there are, or what they are for while there are none.
+function ProgressPhotosCard({ S, nav }) {
+  const photos = useMemo(() => progressPhotos(S), [S.workouts])
+  const latest = photos[0]
+  return <div className="card tappable pp-card" style={{ cursor: 'pointer' }} {...tappable(() => nav('/progress'))}>
+    <div className="row between" style={{ marginBottom: latest ? 10 : 6 }}>
+      <h2 style={{ margin: 0 }}>{tpr('Progress photos')}</h2>
+      <Icon name="chevronRight" className="chev" />
+    </div>
+    {latest
+      ? <div className="row" style={{ gap: 12 }}>
+          <div className="pp-cardthumb"><CustomThumb ex={{ custom: true, media: latest.ref }} /></div>
+          <div className="muted small">{tpr('{0} · latest {1}', nPhotos(photos.length), fmtDate(latest.d, false, true))}</div>
+        </div>
+      : <div className="muted small">{tpr('Keep a photo with a workout, and see the change over months side by side.')}</div>}
+  </div>
 }

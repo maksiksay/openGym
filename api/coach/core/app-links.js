@@ -3,7 +3,7 @@
  * a section (frontend/src/lib/app-links.js — whose test checks every id against App.jsx and the
  * Settings sections). The app map in prompts/app.md names them. */
 export const APP_LINKS = Object.freeze([
-  'home', 'plan', 'health', 'stats', 'history', 'library', 'muscles', 'balance', 'coach', 'checkin',
+  'home', 'plan', 'health', 'stats', 'history', 'progress', 'library', 'muscles', 'balance', 'coach', 'checkin',
   'settings', 'settings.general', 'settings.health', 'settings.import', 'settings.workout',
   'settings.appearance', 'settings.data', 'settings.notifications', 'settings.equipment', 'settings.account'
 ]);

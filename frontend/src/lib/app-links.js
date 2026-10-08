@@ -4,6 +4,7 @@
 import { APP_LINKS } from '../../../api/coach/core/app-links.js'
 import { t } from './i18n.js'
 import { th } from './health-i18n.js'
+import { tpr } from './progress-i18n.js'
 
 export { APP_LINKS }
 
@@ -13,6 +14,7 @@ export const LINKS = {
   health: { path: '/health', label: () => th('Health'), needs: S => S?.healthOn !== false },
   stats: { path: '/stats', label: () => t('Stats') },
   history: { path: '/history', label: () => t('History') },
+  progress: { path: '/progress', label: () => tpr('Progress photos') },
   library: { path: '/library', label: () => t('Exercises') },
   muscles: { path: '/muscles', label: () => t('Explore muscles') },
   balance: { path: '/structural-balance', label: () => t('Structural balance') },

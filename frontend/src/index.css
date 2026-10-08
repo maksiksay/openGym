@@ -840,6 +840,29 @@ body.chips-dragging *{cursor:inherit}
 }
 .wmedia-item .thumb{width:100%;height:100%;border-radius:0;display:block}
 .wmedia-item .thumb-x{font-size:22px}
+/* docs/dev/PROGRESS_PHOTOS.md: the feed, the compare card and its slider, the Stats card. */
+.pp-day{margin:0 0 14px}
+.pp-dayh{font-size:14px;margin:0 2px 6px}
+.pp-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.pp-item{position:relative;aspect-ratio:3/4;border:0;padding:0;border-radius:10px;overflow:hidden;background:var(--surface-2);cursor:pointer}
+.pp-item .thumb{width:100%;height:100%;border-radius:0;display:block;object-fit:cover}
+.pp-item.picking{outline:2px dashed var(--label-3);outline-offset:-2px}
+.pp-item.on{outline:3px solid var(--acc);outline-offset:-3px}
+.pp-compare{padding-bottom:12px}
+.pp-pair{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.pp-frame{position:relative;aspect-ratio:3/4;border-radius:12px;overflow:hidden;background:var(--surface-2)}
+.pp-img{display:block;width:100%;height:100%;object-fit:cover;border:0;padding:0;background:var(--surface-2);color:var(--label-3)}
+.pp-wait{display:flex;align-items:center;justify-content:center;font-size:26px;cursor:pointer}
+.pp-slider{position:relative;margin-top:10px;aspect-ratio:3/4;border-radius:12px;overflow:hidden;user-select:none}
+.pp-slider .pp-frame{position:absolute;inset:0;border-radius:0}
+.pp-line{position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;background:#fff;box-shadow:0 0 6px rgba(0,0,0,.5);pointer-events:none}
+.pp-range{width:100%;margin:10px 0 0;accent-color:var(--acc)}
+.pp-sides{margin-top:8px}
+.pp-side{display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-width:0}
+.pp-date{font-weight:600;font-size:14px}
+.pp-sum{margin-top:12px;font-size:15px;font-weight:600}
+.pp-cardthumb{width:56px;aspect-ratio:3/4;border-radius:8px;overflow:hidden;flex:none;background:var(--surface-2)}
+.pp-cardthumb .thumb{width:100%;height:100%;border-radius:0;display:block;object-fit:cover}
 .wmedia-kind{
   position:absolute;inset-inline-end:5px;bottom:5px;width:22px;height:22px;border-radius:99px;
   display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);color:#fff;font-size:12px;

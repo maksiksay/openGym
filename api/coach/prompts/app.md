@@ -15,7 +15,8 @@ What the openGym app looks like, so you can tell someone where something is and 
 - **Plan:** "Week schedule" (tap an empty day to give it a routine or a rest day; + adds another routine to a day; ✕ removes one); "Routines" with "New"; tap a routine to edit it; swipe to delete; the upload icon shares or imports a plan file; "Coach".
 - **A routine (edit):** its name and icon, "Progression", "Deload routine", the exercise list (tap an exercise for its sets, reps and rest; swipe to remove; "Superset with exercise above"), "Add exercise", "Copy routine", "Delete routine".
 - **Workout (during a session):** ✕ discard, the "Workout view" menu ("Mark all sets done", "Rename workout", "Add routine", "Don't count for progression", "Layout"), ✓ Finish. On each exercise, ⋯ More: "Details", "History", "Progression settings", "Plate loading", "Add warm-up set", supersets, "Swap exercise", "Move up/down", "Remove exercise". The set number's menu has "Drop set" and "Rest-pause burst". "Add exercise" at the bottom, then "Finish workout".
-- **Stats:** tiles (workouts, this month, wins this month, weight over 30 days); activity over 12 months; muscle balance, fatigue and strength; "Structural balance"; "Strength levels" (needs a logged body weight); effort; the Body weight card; "Exercise progress" (top set, estimated 1RM, best); recent workouts. The clock icon at the top opens History.
+- **Stats:** tiles (workouts, this month, wins this month, weight over 30 days); activity over 12 months; muscle balance, fatigue and strength; "Structural balance"; "Strength levels" (needs a logged body weight); effort; "Progress photos"; the Body weight card; "Exercise progress" (top set, estimated 1RM, best); recent workouts. The clock icon at the top opens History.
+- **Progress photos** (from the Stats card): every photo kept with a workout, by date with that day's weight; "Add photos" (pick a workout, then add); "Compare" two photos, first and latest by default, "Side by side" or "Slider", with the weight and waist of both days and what changed. Photos are added to a workout (the finish screen, a workout in History, or here), stay on the device and the person's own server, and never go to you.
 - **History:** every logged workout; "Log a past workout". Tap a workout to edit it, change its date and time or duration, save it as a routine, copy it as text, or delete it.
 - **Exercises:** search, body-part and equipment filters, "Create your own exercise" at the top of the list, "By muscle" (the muscle explorer). Tap an exercise for its details, history and best; its "Plan" button adds it to a routine.
 - **Health:** a day switcher; "Wellbeing" (the daily check-in: sleep, sleep quality, energy, stress, steps, waist, a note); "Water" (tap the number for the exact amount; −250, +250, +500 ml); "Food" (calories, protein, fat, carbs and fibre against the goals, sugar, breakfast, lunch, dinner and snack with + to add food; "Goals"); the last 7 days; six weeks of charts; "My foods".
@@ -52,10 +53,11 @@ What the openGym app looks like, so you can tell someone where something is and 
 - **Steps and sleep from an iPhone:** Settings → Import from Apple Health.
 - **Start a season:** Home → Start a season.
 - **Strength levels:** Stats → Strength levels.
+- **Progress photos:** Stats → Progress photos; add them to a workout on its finish screen, in History, or with Add photos there.
 
 ## The link ids for `open`
 
 Each id opens one place; use them only as listed.
 
-- `home`, `plan`, `stats`, `history`, `library` (Exercises), `muscles` (the muscle explorer), `balance` (Structural balance), `health` (the Health screen), `coach`, `checkin` (the gym check-in)
+- `home`, `plan`, `stats`, `history`, `progress` (Progress photos), `library` (Exercises), `muscles` (the muscle explorer), `balance` (Structural balance), `health` (the Health screen), `coach`, `checkin` (the gym check-in)
 - `settings` (the top of Settings), `settings.general`, `settings.health` (Health & food), `settings.import` (Import from Apple Health), `settings.workout` (During a workout), `settings.appearance`, `settings.data`, `settings.notifications`, `settings.equipment`, `settings.account`
